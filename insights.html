@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#061521">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <title>ResourceFlow | AI Insights</title>
+  <link rel="stylesheet" href="./styles.css?v=20260331-authfix3">
+</head>
+<body data-page="insights">
+  <a class="skip-link" href="#mainContent">Skip to content</a>
+  <div class="site-shell">
+    <header class="site-header">
+      <a class="brand" href="./index.html" aria-label="ResourceFlow home">
+        <span class="brand-mark">RF</span>
+        <span>
+          <strong>ResourceFlow</strong>
+          <small>AI Insight Workspace</small>
+        </span>
+      </a>
+
+      <nav class="site-nav" aria-label="Primary">
+        <a class="nav-link" data-nav="home" href="./index.html">Overview</a>
+        <a class="nav-link" data-nav="operations" href="./operations.html">Operations</a>
+        <a class="nav-link" data-nav="volunteer" href="./volunteer.html">Volunteer Portal</a>
+        <a class="nav-link" data-nav="insights" href="./insights.html">AI Insights</a>
+        <a class="nav-link" data-nav="admin" href="./admin.html">Admin</a>
+        <a class="nav-link" data-nav="judge" href="./judge.html">Judge Mode</a>
+      </nav>
+
+      <div class="header-actions">
+        <button class="ghost-button" data-action="download-brief">Download Brief</button>
+        <a class="ghost-link" href="./tests.html">Run Tests</a>
+        <a class="primary-link" href="./submission/solution-challenge-submission.md">Submission Draft</a>
+      </div>
+    </header>
+
+    <main id="mainContent" class="page-stack" tabindex="-1">
+      <section class="page-intro">
+        <div>
+          <p class="eyebrow">AI Copilot</p>
+          <h1>Turn live operations data into decisions, summaries, and submission-ready narratives.</h1>
+        </div>
+        <div class="info-card">
+          <strong data-storage-mode>Checking...</strong>
+          <p data-sync-note>Preparing sync status.</p>
+        </div>
+      </section>
+
+      <section class="three-column">
+        <article class="panel">
+          <p class="eyebrow">Next Action</p>
+          <h2 id="insightNextActionTitle">No action yet</h2>
+          <p id="insightNextActionText">Add data to generate the top coordinator recommendation.</p>
+        </article>
+        <article class="panel">
+          <p class="eyebrow">Recruitment Gap</p>
+          <h2 id="insightRecruitmentTitle">No gap yet</h2>
+          <p id="insightRecruitmentText">The app will identify which skills or zones need more volunteers.</p>
+        </article>
+        <article class="panel">
+          <p class="eyebrow">Fairness Watch</p>
+          <h2 id="insightFairnessTitle">No fairness signal yet</h2>
+          <p id="insightFairnessText">Coverage differences across zones will appear here.</p>
+        </article>
+      </section>
+
+      <section class="three-column">
+        <article class="panel">
+          <p class="eyebrow">Readiness Index</p>
+          <h2 id="readinessScore">0 / 100</h2>
+          <p id="readinessScoreText">Operational readiness summary will appear here.</p>
+        </article>
+        <article class="panel">
+          <p class="eyebrow">Surge Forecast</p>
+          <h2 id="surgeForecast">No forecast yet</h2>
+          <p id="surgeForecastText">Trend-based surge guidance will appear here.</p>
+        </article>
+        <article class="panel">
+          <p class="eyebrow">Collaboration Health</p>
+          <h2 id="collaborationHealth">No activity yet</h2>
+          <p id="collaborationHealthText">Revision and teamwork health signals will appear here.</p>
+        </article>
+      </section>
+
+      <section class="two-column">
+        <article class="panel">
+          <p class="eyebrow">AidFlow Forecast</p>
+          <h2 id="disasterForecastTitle">No predictive signal yet</h2>
+          <p id="disasterForecastText">Shortage forecasting activates when requests and volunteers are available.</p>
+          <pre id="satellitePrompt" class="brief-box">Earth Engine and weather-ready prompt will appear here.</pre>
+        </article>
+
+        <article class="panel">
+          <p class="eyebrow">Verification Trail</p>
+          <div id="verificationTrail" class="stack-list">
+            <div class="empty-box">Delivery token and verification insights will appear here.</div>
+          </div>
+        </article>
+      </section>
+
+      <section class="two-column">
+        <article class="panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">AI Simulation Lab</p>
+              <h2>What-if staffing simulator</h2>
+            </div>
+          </div>
+          <form id="whatIfForm" class="form-grid" aria-label="Scenario simulator">
+            <div class="split-grid">
+              <label>
+                Zone
+                <select id="whatIfZone" required>
+                  <option>North</option>
+                  <option>South</option>
+                  <option>East</option>
+                  <option>West</option>
+                  <option>Central</option>
+                </select>
+              </label>
+              <label>
+                Added Volunteers
+                <input id="whatIfCount" type="number" min="1" max="10" value="2" required>
+              </label>
+            </div>
+            <label>
+              Skill To Add
+              <input id="whatIfSkill" type="text" value="first aid" required>
+            </label>
+            <button class="primary-button" type="submit">Simulate Impact</button>
+          </form>
+          <pre id="whatIfResult" class="brief-box">Run the simulation to see predicted coverage and impact changes.</pre>
+        </article>
+
+        <article class="panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">AI Outreach Generator</p>
+              <h2>Community recruitment message</h2>
+            </div>
+          </div>
+          <div class="form-grid compact-controls">
+            <div class="split-grid">
+              <label>
+                Language Style
+                <select id="outreachLanguage">
+                  <option value="English">English</option>
+                  <option value="Hinglish">Hinglish</option>
+                  <option value="HindiRoman">Hindi (Romanized)</option>
+                </select>
+              </label>
+              <label>
+                Tone
+                <select id="outreachTone">
+                  <option value="Urgent">Urgent</option>
+                  <option value="Warm">Warm</option>
+                  <option value="Formal">Formal</option>
+                </select>
+              </label>
+            </div>
+          </div>
+          <pre id="outreachMessage" class="brief-box">Outreach message will appear here.</pre>
+        </article>
+      </section>
+
+      <section class="two-column">
+        <article class="panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Executive Brief</p>
+              <h2>Coordinator summary</h2>
+            </div>
+            <button class="ghost-button" data-action="download-brief">Download</button>
+          </div>
+          <pre id="executiveBrief" class="brief-box">No data yet.</pre>
+        </article>
+
+        <article class="panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Judge Narrative</p>
+              <h2>Pitch-ready summary</h2>
+            </div>
+          </div>
+          <pre id="judgeBrief" class="brief-box">No data yet.</pre>
+        </article>
+      </section>
+
+      <section class="two-column">
+        <article class="panel">
+          <p class="eyebrow">Gemini-Ready Prompt</p>
+          <pre id="geminiPrompt" class="brief-box">No data yet.</pre>
+        </article>
+
+        <article class="panel">
+          <p class="eyebrow">Scale Strategy</p>
+          <pre id="scaleStrategy" class="brief-box">No data yet.</pre>
+        </article>
+      </section>
+
+      <section class="two-column">
+        <article class="panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Live Gemini Analysis</p>
+              <h2>Call Gemini for real workspace recommendations</h2>
+            </div>
+            <button class="primary-button" data-action="run-gemini-live">Run Gemini</button>
+          </div>
+          <div id="geminiLiveStatus" class="subtle-banner">Add a Gemini API key in `firebase-config.js` to enable live model analysis.</div>
+          <pre id="geminiLiveResponse" class="brief-box">Gemini output will appear here.</pre>
+        </article>
+
+        <article class="panel">
+          <p class="eyebrow">Analytics Charts</p>
+          <div id="zoneChart" class="stack-list">
+            <div class="empty-box">Zone coverage chart will appear here.</div>
+          </div>
+          <div id="skillChart" class="stack-list">
+            <div class="empty-box">Skill gap chart will appear here.</div>
+          </div>
+        </article>
+      </section>
+
+      <section class="two-column">
+        <article class="panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Risk Radar</p>
+              <h2>High-risk requests and gaps</h2>
+            </div>
+            <button class="ghost-button" data-action="download-analysis">Download Analysis Pack</button>
+          </div>
+          <div id="riskRadarList" class="stack-list">
+            <div class="empty-box">Risk-ranked requests will appear here.</div>
+          </div>
+        </article>
+
+        <article class="panel">
+          <p class="eyebrow">Trend History</p>
+          <div id="trendHistoryList" class="stack-list">
+            <div class="empty-box">Revision trend history will appear here.</div>
+          </div>
+        </article>
+      </section>
+
+      <section class="panel">
+        <p class="eyebrow">Innovation Evidence</p>
+        <div id="innovationEvidenceGrid" class="criteria-grid">
+          <article class="evidence-card"><h3>Novel Workflow</h3><p>Innovation evidence will appear here.</p></article>
+          <article class="evidence-card"><h3>Creative Use Of AI</h3><p>AI evidence will appear here.</p></article>
+          <article class="evidence-card"><h3>Scalability</h3><p>Scaling evidence will appear here.</p></article>
+          <article class="evidence-card"><h3>Community Value</h3><p>Impact evidence will appear here.</p></article>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="./firebase-config.js"></script>
+  <script src="./app.js?v=20260331-authfix3"></script>
+  <script src="./criteria.js"></script>
+</body>
+</html>

@@ -1,0 +1,109 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdminEmail() {
+      return signedIn() && request.auth.token.email == "acshrisundaram@gmail.com";
+    }
+
+    function currentProfileRole() {
+      return signedIn() && exists(/databases/$(database)/documents/resourceflowUsers/$(request.auth.uid))
+        ? get(/databases/$(database)/documents/resourceflowUsers/$(request.auth.uid)).data.role
+        : "volunteer";
+    }
+
+    function canManageWorkspace() {
+      return isAdminEmail()
+        || (signedIn() && (
+          currentProfileRole() == "admin" || currentProfileRole() == "coordinator"
+        ));
+    }
+
+    function validWorkspacePayload() {
+      return request.resource.data.keys().hasOnly(["state", "updatedAt"])
+        && request.resource.data.state is map
+        && request.resource.data.state.keys().hasOnly([
+          "requests",
+          "volunteers",
+          "assignments",
+          "artifacts",
+          "activityLog",
+          "history",
+          "meta",
+          "lastUpdated"
+        ])
+        && request.resource.data.state.requests is list
+        && request.resource.data.state.volunteers is list
+        && request.resource.data.state.assignments is list
+        && request.resource.data.state.artifacts is list
+        && request.resource.data.state.activityLog is list
+        && request.resource.data.state.history is list
+        && request.resource.data.state.meta is map
+        && request.resource.data.state.meta.keys().hasOnly(["revision", "updatedBy", "updatedAt"])
+        && request.resource.data.state.meta.revision is int
+        && request.resource.data.state.meta.updatedBy is string
+        && request.resource.data.state.meta.updatedAt is string
+        && request.resource.data.state.lastUpdated is string
+        && request.resource.data.updatedAt is string;
+    }
+
+    function validProfileShape(userId) {
+      return request.resource.data.keys().hasOnly([
+        "uid",
+        "email",
+        "displayName",
+        "photoURL",
+        "role",
+        "requestedRole",
+        "updatedAt",
+        "updatedBy"
+      ])
+        && request.resource.data.uid == userId
+        && request.resource.data.email is string
+        && request.resource.data.displayName is string
+        && request.resource.data.photoURL is string
+        && request.resource.data.role is string
+        && request.resource.data.requestedRole is string
+        && request.resource.data.updatedAt is string;
+    }
+
+    match /resourceflow/{workspaceId} {
+      allow read: if true;
+      allow create, update: if signedIn() && validWorkspacePayload();
+      allow delete: if canManageWorkspace();
+    }
+
+    match /resourceflowUsers/{userId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.auth.uid == userId
+        && validProfileShape(userId)
+        && (
+          request.resource.data.role == "volunteer"
+          || (request.resource.data.role == "admin" && isAdminEmail())
+        );
+      allow update: if validProfileShape(userId) && (
+        (signedIn()
+          && request.auth.uid == userId
+          && request.resource.data.role == resource.data.role)
+        || isAdminEmail()
+      );
+      allow delete: if isAdminEmail();
+    }
+
+    match /resourceflowNotifications/{notificationId} {
+      allow read, write: if false;
+    }
+
+    match /resourceflowErrorLogs/{errorId} {
+      allow read, write: if false;
+    }
+
+    match /resourceflowAudit/{auditId} {
+      allow read, write: if false;
+    }
+  }
+}

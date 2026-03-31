@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="ResourceFlow browser test runner for submission-safe code review.">
+  <title>ResourceFlow Tests</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="stylesheet" href="./styles.css?v=20260331-authfix3">
+</head>
+<body data-page="tests">
+  <a class="skip-link" href="#mainContent">Skip to content</a>
+  <div class="site-shell">
+    <header class="site-header">
+      <a class="brand" href="./index.html">
+        <div class="brand-mark" aria-hidden="true">RF</div>
+        <span>
+          <strong>ResourceFlow</strong>
+          <small>Browser Test Runner</small>
+        </span>
+      </a>
+
+      <nav class="site-nav" aria-label="Primary">
+        <a class="nav-link" href="./index.html">Overview</a>
+        <a class="nav-link" href="./operations.html">Operations</a>
+        <a class="nav-link" href="./insights.html">AI Insights</a>
+        <a class="nav-link" href="./admin.html">Admin</a>
+        <a class="nav-link" href="./judge.html">Judge Mode</a>
+      </nav>
+
+      <div class="header-actions">
+        <button id="runTests" class="ghost-button" type="button">Run Browser Tests</button>
+        <a class="primary-link" href="./insights.html">Back To Product</a>
+      </div>
+    </header>
+
+    <main id="mainContent" class="page-stack" tabindex="-1">
+      <section class="hero-card judge-hero">
+        <div class="hero-copy">
+          <p class="eyebrow">Submission Safety</p>
+          <h1>Verification For Core Logic</h1>
+          <p class="lead">
+            This page runs lightweight browser tests against the ResourceFlow matching engine,
+            sanitization layer, role handling, and analytics calculations.
+          </p>
+        </div>
+        <div class="hero-side">
+          <article class="signal-card">
+            <span class="mini-label">Latest Run</span>
+            <strong id="testSummary">Pending</strong>
+            <p id="testTimestamp">Tests have not run yet.</p>
+          </article>
+          <article class="signal-card">
+            <span class="mini-label">Coverage Focus</span>
+            <p id="testCoverage">
+              Matching, validation, auth-role logic, sanitization, risk scoring, readiness analytics, and free-mode helpers.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="two-column">
+        <article class="panel">
+          <p class="eyebrow">Results</p>
+          <div id="testResults" class="stack-list" aria-live="polite">
+            <div class="empty-box">Click "Run Browser Tests" to execute the review suite.</div>
+          </div>
+        </article>
+
+        <article class="panel">
+          <p class="eyebrow">What This Proves</p>
+          <div class="stack-list">
+            <div class="stack-card">
+              <strong>Code Review Readiness</strong>
+              <p class="card-meta">Critical business logic is separated enough to test without running a full backend stack.</p>
+            </div>
+            <div class="stack-card">
+              <strong>Reproducible Demo Logic</strong>
+              <p class="card-meta">Judges can verify matching and analytics behavior with deterministic sample data.</p>
+            </div>
+            <div class="stack-card">
+              <strong>Safer Firebase Workflow</strong>
+              <p class="card-meta">Role and validation checks are exercised before the app writes to shared cloud state.</p>
+            </div>
+            <div class="stack-card">
+              <strong>Free Deployment Confidence</strong>
+              <p class="card-meta">Local strategy and outreach fallbacks are covered so the Spark-safe app remains demo-ready without paid backend services.</p>
+            </div>
+          </div>
+        </article>
+      </section>
+    </main>
+  </div>
+
+  <script>window.__RESOURCEFLOW_TEST_MODE__ = true;</script>
+  <script src="./firebase-config.js"></script>
+  <script src="./app.js?v=20260331-authfix3"></script>
+  <script src="./criteria.js"></script>
+  <script src="./tests.js"></script>
+</body>
+</html>

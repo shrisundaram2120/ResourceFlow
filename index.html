@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="ResourceFlow is a smart resource allocation app for community and disaster response teams, designed for Google Solution Challenge judging criteria.">
+  <meta name="theme-color" content="#061521">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <title>ResourceFlow | Smart Resource Allocation</title>
+  <link rel="stylesheet" href="./styles.css?v=20260331-authfix3">
+</head>
+<body data-page="home">
+  <a class="skip-link" href="#mainContent">Skip to content</a>
+  <div class="site-shell">
+    <header class="site-header">
+      <a class="brand" href="./index.html" aria-label="ResourceFlow home">
+        <span class="brand-mark">RF</span>
+        <span>
+          <strong>ResourceFlow</strong>
+          <small>Google Solution Challenge App</small>
+        </span>
+      </a>
+
+      <nav class="site-nav" aria-label="Primary">
+        <a class="nav-link" data-nav="home" href="./index.html">Overview</a>
+        <a class="nav-link" data-nav="operations" href="./operations.html">Operations</a>
+        <a class="nav-link" data-nav="volunteer" href="./volunteer.html">Volunteer Portal</a>
+        <a class="nav-link" data-nav="insights" href="./insights.html">AI Insights</a>
+        <a class="nav-link" data-nav="admin" href="./admin.html">Admin</a>
+        <a class="nav-link" data-nav="judge" href="./judge.html">Judge Mode</a>
+      </nav>
+
+      <div class="header-actions">
+        <button class="ghost-button" data-action="seed-demo">Load Demo</button>
+        <a class="primary-link" href="./operations.html">Open App</a>
+      </div>
+    </header>
+
+    <main id="mainContent" class="page-stack" tabindex="-1">
+      <section class="hero-card">
+        <div class="hero-copy">
+          <p class="eyebrow">Smart Resource Allocation</p>
+          <h1>Move from chaotic coordination to predictive, confident disaster response.</h1>
+          <p class="lead">
+            ResourceFlow helps NGOs, relief teams, shelters, and community organizers capture requests, onboard volunteers, forecast shortages, prioritize urgency, and coordinate verified aid delivery through one web platform.
+          </p>
+          <div class="button-row">
+            <a class="primary-link" href="./operations.html">Go To Command Center</a>
+            <a class="ghost-link" href="./judge.html">Open Judge Mode</a>
+          </div>
+          <ul class="hero-points">
+            <li>Request intake and live response board</li>
+            <li>Volunteer registration with skill matching</li>
+            <li>Predictive shortage forecasting and QR-ready delivery tracking</li>
+          </ul>
+        </div>
+
+        <div class="hero-side">
+          <article class="signal-card">
+            <span class="mini-label">Storage Mode</span>
+            <strong data-storage-mode>Checking...</strong>
+            <p data-sync-note>Preparing workspace data.</p>
+          </article>
+          <article class="signal-card warm">
+            <span class="mini-label">AI Copilot</span>
+            <strong id="homeInsightTitle">Waiting for live data</strong>
+            <p id="homeInsightText">Load demo data or add real requests to generate coordinator guidance.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="onboarding-grid">
+        <article class="panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Choose Your Portal</p>
+              <h2>Start from the role that matches your work</h2>
+            </div>
+            <button class="ghost-button" type="button" data-action="open-portal-login">Open Login</button>
+          </div>
+          <div class="portal-grid">
+            <article class="portal-card">
+              <span class="portal-badge">Volunteer</span>
+              <h3>Volunteer Portal</h3>
+              <p>Register availability, review opportunities, and follow training and outreach guidance.</p>
+              <button class="primary-button" type="button" data-demo-role="volunteer">Enter Volunteer Portal</button>
+            </article>
+            <article class="portal-card">
+              <span class="portal-badge">Coordinator</span>
+              <h3>Operations Center</h3>
+              <p>Capture requests, run matching, monitor forecasts, and manage live field coordination.</p>
+              <button class="primary-button" type="button" data-demo-role="coordinator">Enter Operations</button>
+            </article>
+            <article class="portal-card">
+              <span class="portal-badge">Admin</span>
+              <h3>Admin Console</h3>
+              <p>Review access, draft outreach, inspect audit signals, and manage governance workflows.</p>
+              <button class="primary-button" type="button" data-demo-role="admin">Enter Admin Console</button>
+            </article>
+          </div>
+        </article>
+
+        <article class="panel compact">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">First Run Guide</p>
+              <h2>Simple path for a clean demo</h2>
+            </div>
+          </div>
+          <div class="guide-grid">
+            <article class="guide-card">
+              <span class="flow-step">01</span>
+              <strong>Load demo data</strong>
+              <p>Use the header button once so every dashboard has realistic requests, volunteers, and assignments.</p>
+            </article>
+            <article class="guide-card">
+              <span class="flow-step">02</span>
+              <strong>Pick a portal</strong>
+              <p>Use the role cards above to open the right workspace instead of jumping between pages without context.</p>
+            </article>
+            <article class="guide-card">
+              <span class="flow-step">03</span>
+              <strong>Show one clear story</strong>
+              <p>Demo intake, matching, forecast, and admin review in sequence so the app feels organized and easy to follow.</p>
+            </article>
+          </div>
+        </article>
+      </section>
+
+      <section class="stats-grid" aria-label="Impact summary">
+        <article class="stat-card">
+          <span>Total Requests</span>
+          <strong id="metricRequests">0</strong>
+          <small>Community tasks captured</small>
+        </article>
+        <article class="stat-card">
+          <span>Volunteers Ready</span>
+          <strong id="metricVolunteers">0</strong>
+          <small>Available responders</small>
+        </article>
+        <article class="stat-card">
+          <span>Assignments</span>
+          <strong id="metricAssignments">0</strong>
+          <small>Auto-generated matches</small>
+        </article>
+        <article class="stat-card">
+          <span>Beneficiaries</span>
+          <strong id="metricBeneficiaries">0</strong>
+          <small>Projected people supported</small>
+        </article>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">How It Works</p>
+            <h2>A real workflow from intake to verified relief delivery</h2>
+          </div>
+        </div>
+        <div class="flow-grid">
+          <article class="flow-card">
+            <span class="flow-step">01</span>
+            <h3>Capture Needs</h3>
+            <p>Coordinators add requests with urgency, zone, people needed, skills, and field notes so the workspace reflects real ground demand.</p>
+          </article>
+          <article class="flow-card">
+            <span class="flow-step">02</span>
+            <h3>Forecast Gaps</h3>
+            <p>The AidFlow layer estimates which zones may face the next shortage and suggests what kind of relief packs or support should be pre-positioned.</p>
+          </article>
+          <article class="flow-card">
+            <span class="flow-step">03</span>
+            <h3>Match Responders</h3>
+            <p>ResourceFlow recommends volunteers using urgency, skills, transport, experience, and zone proximity so response decisions happen faster.</p>
+          </article>
+          <article class="flow-card">
+            <span class="flow-step">04</span>
+            <h3>Verify Delivery</h3>
+            <p>Each high-priority request gets a QR-ready token and field trail that can support transparent relief handoff and proof-of-delivery workflows.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">Criteria Fit</p>
+            <h2>Built directly against the judging categories</h2>
+          </div>
+          <a class="ghost-link" href="./judge.html">See full evaluation view</a>
+        </div>
+        <div class="criteria-grid">
+          <article class="evidence-card">
+            <p class="eyebrow">Technical Merit 40%</p>
+            <h3>Google tech, maintainability, and scale</h3>
+            <p id="criteriaTechEvidence">Loading evidence...</p>
+          </article>
+          <article class="evidence-card">
+            <p class="eyebrow">User Experience 10%</p>
+            <h3>Usability and accessibility</h3>
+            <p id="criteriaUxEvidence">Loading evidence...</p>
+          </article>
+          <article class="evidence-card">
+            <p class="eyebrow">Alignment With Cause 25%</p>
+            <h3>Problem fit and community impact</h3>
+            <p id="criteriaCauseEvidence">Loading evidence...</p>
+          </article>
+          <article class="evidence-card">
+            <p class="eyebrow">Innovation 25%</p>
+            <h3>Novelty and creative AI use</h3>
+            <p id="criteriaInnovationEvidence">Loading evidence...</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="two-column">
+        <article class="panel">
+          <p class="eyebrow">Problem Statement</p>
+          <h2>Disaster and community response teams still rely on spreadsheets, calls, and scattered field updates.</h2>
+          <p>
+            During floods, cyclones, medical camps, shelter support drives, or urgent field visits, coordinators often do not know which request should be staffed first, which zone may face the next shortage, or which volunteers have the right skills and transport.
+          </p>
+          <p>
+            ResourceFlow solves this by centralizing requests, volunteers, assignments, analytics, predictive shortage signals, and delivery verification into one system that can scale from a campus event to a city-wide relief operation.
+          </p>
+        </article>
+
+        <article class="panel compact">
+          <p class="eyebrow">SDG Alignment</p>
+          <ul class="clean-list">
+            <li><strong>SDG 11:</strong> Sustainable Cities and Communities</li>
+            <li><strong>SDG 3:</strong> Good Health and Well-Being</li>
+            <li><strong>SDG 17:</strong> Partnerships for the Goals</li>
+          </ul>
+          <div class="subtle-banner" id="impactNarrative">Impact narrative will appear here when workspace data is available.</div>
+        </article>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">AidFlow AI Layer</p>
+            <h2>Predictive disaster allocation inside the same prototype</h2>
+          </div>
+        </div>
+        <div class="criteria-grid">
+          <article class="evidence-card">
+            <h3>Shortage Forecasting</h3>
+            <p>The app can estimate which high-risk zones are likely to face the next staffing or supply shortfall so teams can pre-position aid.</p>
+          </article>
+          <article class="evidence-card">
+            <h3>Verified Delivery</h3>
+            <p>Each request can surface a QR-ready delivery token and status trail so field teams have a simple chain of custody for relief packs.</p>
+          </article>
+          <article class="evidence-card">
+            <h3>Earth Engine Ready</h3>
+            <p>The insight layer is structured so satellite, weather, or flood-risk signals can later be added through Google Earth Engine and Gemini.</p>
+          </article>
+          <article class="evidence-card">
+            <h3>Proactive Response</h3>
+            <p>Instead of reacting only after requests pile up, coordinators can use forecast, fairness, and risk signals to intervene earlier.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">Google Technology Utilization</p>
+            <h2>Technical stack evidence</h2>
+          </div>
+        </div>
+        <div class="tech-grid">
+          <article class="tech-card">
+            <span class="mini-label">Firebase</span>
+            <strong id="techFirebase">Ready</strong>
+            <p>Shared data layer with local offline fallback.</p>
+          </article>
+          <article class="tech-card">
+            <span class="mini-label">Google Maps</span>
+            <strong id="techMaps">Integrated</strong>
+            <p>Dispatch links and route handoff for zone-based response.</p>
+          </article>
+          <article class="tech-card">
+            <span class="mini-label">Gemini Workflow</span>
+            <strong id="techGemini">Prompt Studio</strong>
+            <p>AI briefs, outreach drafts, and scenario planning surfaces.</p>
+          </article>
+          <article class="tech-card">
+            <span class="mini-label">PWA</span>
+            <strong id="techPwa">Packaged</strong>
+            <p>Manifest and offline caching setup for hosted deployment.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="two-column">
+        <article class="panel">
+          <p class="eyebrow">Recent Activity</p>
+          <div id="homeActivity" class="stack-list" aria-live="polite">
+            <div class="empty-box">No activity yet. Load demo data to populate the workspace.</div>
+          </div>
+        </article>
+
+        <article class="panel">
+          <p class="eyebrow">Submission Kit</p>
+          <ul class="doc-list">
+            <li><a href="./submission/solution-challenge-submission.md">Solution Challenge submission draft</a></li>
+            <li><a href="./submission/demo-script.md">2-minute demo script</a></li>
+            <li><a href="./submission/pitch-outline.md">Pitch outline</a></li>
+            <li><a href="./submission/firebase-setup.md">Firebase setup guide</a></li>
+            <li><a href="./submission/judging-criteria-map.md">Judging criteria mapping</a></li>
+          </ul>
+        </article>
+      </section>
+    </main>
+  </div>
+
+  <script src="./firebase-config.js"></script>
+  <script src="./app.js?v=20260331-authfix3"></script>
+  <script src="./criteria.js"></script>
+</body>
+</html>

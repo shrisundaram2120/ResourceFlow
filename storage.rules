@@ -1,0 +1,42 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdminEmail() {
+      return signedIn() && request.auth.token.email == "acshrisundaram@gmail.com";
+    }
+
+    function currentProfileRole() {
+      return signedIn() && firestore.exists(/databases/(default)/documents/resourceflowUsers/$(request.auth.uid))
+        ? firestore.get(/databases/(default)/documents/resourceflowUsers/$(request.auth.uid)).data.role
+        : "volunteer";
+    }
+
+    function canManageWorkspace() {
+      return isAdminEmail()
+        || (signedIn() && (
+          currentProfileRole() == "admin" || currentProfileRole() == "coordinator"
+        ));
+    }
+
+    function allowedArtifactType() {
+      return request.resource.contentType is string
+        && (
+          request.resource.contentType.matches("image/.*")
+          || request.resource.contentType == "application/pdf"
+          || request.resource.contentType == "text/plain"
+        );
+    }
+
+    match /resourceflow/{workspaceId}/artifacts/{fileName} {
+      allow read: if signedIn();
+      allow create, update: if canManageWorkspace()
+        && request.resource.size < 10 * 1024 * 1024
+        && allowedArtifactType();
+      allow delete: if canManageWorkspace();
+    }
+  }
+}

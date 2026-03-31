@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#061521">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <title>ResourceFlow | Admin</title>
+  <link rel="stylesheet" href="./styles.css?v=20260331-authfix3">
+</head>
+<body data-page="admin">
+  <a class="skip-link" href="#mainContent">Skip to content</a>
+  <div class="site-shell">
+    <header class="site-header">
+      <a class="brand" href="./index.html" aria-label="ResourceFlow home">
+        <span class="brand-mark">RF</span>
+        <span>
+          <strong>ResourceFlow</strong>
+          <small>Admin Console</small>
+        </span>
+      </a>
+
+      <nav class="site-nav" aria-label="Primary">
+        <a class="nav-link" data-nav="home" href="./index.html">Overview</a>
+        <a class="nav-link" data-nav="operations" href="./operations.html">Operations</a>
+        <a class="nav-link" data-nav="volunteer" href="./volunteer.html">Volunteer Portal</a>
+        <a class="nav-link" data-nav="insights" href="./insights.html">AI Insights</a>
+        <a class="nav-link" data-nav="admin" href="./admin.html">Admin</a>
+        <a class="nav-link" data-nav="judge" href="./judge.html">Judge Mode</a>
+      </nav>
+
+      <div class="header-actions">
+        <button class="ghost-button" type="button" data-entity-action="refresh-admin">Refresh Snapshot</button>
+        <button class="ghost-button" type="button" data-action="export-governance">Export Governance</button>
+        <a class="primary-link" href="./tests.html">Open Tests</a>
+      </div>
+    </header>
+
+    <main id="mainContent" class="page-stack" tabindex="-1">
+      <div id="announce" class="sr-only" aria-live="polite"></div>
+
+      <section class="page-intro">
+        <div>
+          <p class="eyebrow">Workspace Governance</p>
+          <h1>Manage roles, outreach drafts, and operational signals.</h1>
+        </div>
+        <div class="button-row">
+          <span class="storage-pill" id="adminRoleStatus">Guest access</span>
+          <span class="storage-pill" id="adminBackendStatus">Checking backend</span>
+        </div>
+      </section>
+
+      <section class="stats-grid role-stats">
+        <article class="stat-card role-stat-card">
+          <p class="eyebrow">Tracked Users</p>
+          <strong id="adminStatUsers">0</strong>
+          <p id="adminStatUsersText" class="card-meta">Profiles tracked across the workspace.</p>
+        </article>
+        <article class="stat-card role-stat-card">
+          <p class="eyebrow">Review Queue</p>
+          <strong id="adminStatReviews">0</strong>
+          <p id="adminStatReviewsText" class="card-meta">Role requests and risk items waiting for review.</p>
+        </article>
+        <article class="stat-card role-stat-card">
+          <p class="eyebrow">Outreach Drafts</p>
+          <strong id="adminStatDrafts">0</strong>
+          <p id="adminStatDraftsText" class="card-meta">Queued or drafted updates for operators and volunteers.</p>
+        </article>
+        <article class="stat-card role-stat-card">
+          <p class="eyebrow">Audit Signals</p>
+          <strong id="adminStatAudits">0</strong>
+          <p id="adminStatAuditsText" class="card-meta">Recent governance and workspace activity markers.</p>
+        </article>
+      </section>
+
+      <section class="two-column">
+        <article class="panel">
+          <p class="eyebrow">Admin Access</p>
+          <h2>Activate the configured admin profile</h2>
+          <p class="card-meta">
+            In Spark-safe mode, the configured admin email becomes the admin profile after sign-in. The button below simply refreshes that profile state.
+          </p>
+          <form id="bootstrapAdminForm" class="form-grid" aria-label="Bootstrap admin form">
+            <label>
+              Refresh Token
+              <input name="accessCode" type="password" placeholder="Optional in Spark-safe mode">
+            </label>
+            <button class="primary-button" type="submit">Refresh Admin Access</button>
+          </form>
+        </article>
+
+        <article class="panel">
+          <p class="eyebrow">Admin Snapshot</p>
+          <div id="adminSummary" class="highlight-box">Load the backend snapshot to inspect users, errors, notifications, and audit events.</div>
+        </article>
+      </section>
+
+      <section class="panel">
+        <p class="eyebrow">Review Queue</p>
+        <div id="adminReviewList" class="stack-list">
+          <div class="empty-box">High-risk and uncovered requests will appear here for admin review.</div>
+        </div>
+      </section>
+
+      <section class="two-column">
+        <article class="panel">
+          <p class="eyebrow">User Role Management</p>
+          <div id="adminUserList" class="stack-list">
+            <div class="empty-box">User roles will appear here after the backend snapshot loads.</div>
+          </div>
+        </article>
+
+        <article class="panel">
+          <p class="eyebrow">Outreach Center</p>
+          <form id="notificationForm" class="form-grid" aria-label="Notification queue form">
+            <label>
+              Subject
+              <input name="subject" type="text" placeholder="Urgent field update" required>
+            </label>
+            <label>
+              Message
+              <textarea name="message" rows="5" placeholder="Write the operational update to send." required></textarea>
+            </label>
+            <label>
+              Recipients
+              <textarea name="recipients" rows="5" placeholder="Name | email@example.com | +919999999999&#10;Another User | second@example.com | +918888888888" required></textarea>
+            </label>
+            <div class="chip-row">
+              <label><input type="checkbox" name="channels" value="email" checked> Email</label>
+              <label><input type="checkbox" name="channels" value="whatsapp"> WhatsApp</label>
+            </div>
+            <button class="primary-button" type="submit">Create Outreach Draft</button>
+          </form>
+        </article>
+      </section>
+
+      <section class="two-column">
+        <article class="panel">
+          <p class="eyebrow">Outreach Drafts</p>
+          <div id="adminNotificationList" class="stack-list">
+            <div class="empty-box">Drafted email and WhatsApp outreach packs will appear here.</div>
+          </div>
+        </article>
+
+        <article class="panel">
+          <p class="eyebrow">Error Monitor</p>
+          <div id="adminErrorList" class="stack-list">
+            <div class="empty-box">Recent client-side issues will appear here.</div>
+          </div>
+        </article>
+      </section>
+
+      <section class="panel">
+        <p class="eyebrow">Audit Trail</p>
+        <div id="adminAuditList" class="stack-list">
+          <div class="empty-box">Role changes, workspace sync events, and notification processing activity will appear here.</div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="./firebase-config.js"></script>
+  <script src="./app.js?v=20260331-authfix3"></script>
+  <script src="./criteria.js"></script>
+</body>
+</html>

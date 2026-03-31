@@ -1,0 +1,17 @@
+{
+  "name": "ResourceFlow",
+  "short_name": "ResourceFlow",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f5efe6",
+  "theme_color": "#0f8d84",
+  "description": "Smart resource allocation for community response teams.",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
