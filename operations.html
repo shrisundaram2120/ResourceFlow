@@ -356,6 +356,41 @@
         </article>
       </section>
 
+      <section class="two-column">
+        <article class="panel">
+          <p class="eyebrow">Response Calendar</p>
+          <h2>Weekly shift and workload view</h2>
+          <div id="responseCalendar" class="stack-list">
+            <div class="empty-box">Calendar view will appear here after requests and assignments are loaded.</div>
+          </div>
+        </article>
+        <article class="panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Operator Notes</p>
+              <h2>Pinned notes and handoff memory</h2>
+            </div>
+          </div>
+          <form id="opsNotesForm" class="form-grid" aria-label="Operator notes form">
+            <label>
+              Daily Briefing Note
+              <textarea name="briefing" rows="3" placeholder="Key update for the next operator shift"></textarea>
+            </label>
+            <label>
+              Handoff Note
+              <textarea name="handoff" rows="3" placeholder="What the next coordinator must know"></textarea>
+            </label>
+            <label>
+              Incident Note
+              <textarea name="incident" rows="3" placeholder="Route issue, shortage alert, or beneficiary concern"></textarea>
+            </label>
+            <div class="button-row">
+              <button class="primary-button" type="submit">Save Notes</button>
+            </div>
+          </form>
+        </article>
+      </section>
+
       <section class="three-column">
         <article class="panel">
           <p class="eyebrow">Workflow Board</p>
@@ -378,6 +413,18 @@
             <div class="empty-box">Volunteer utilization analytics will appear here.</div>
           </div>
         </article>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">Kanban Workflow</p>
+            <h2>See every request by stage at a glance</h2>
+          </div>
+        </div>
+        <div id="workflowKanban" class="kanban-board">
+          <div class="empty-box">Workflow board will appear here.</div>
+        </div>
       </section>
 
       <section class="two-column">
@@ -592,7 +639,7 @@
   </div>
 
   <script src="./firebase-config.js"></script>
-  <script src="./app.js?v=20260401-upgrade1"></script>
+  <script src="./app.js?v=20260401-upgrade4"></script>
   <script src="./criteria.js"></script>
 </body>
 </html>

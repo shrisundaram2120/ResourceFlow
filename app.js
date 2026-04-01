@@ -7,6 +7,7 @@
   const DEMO_SCENARIO_KEY = "resourceflow-demo-scenario-v1";
   const UI_LANGUAGE_KEY = "resourceflow-ui-language-v1";
   const UI_PREFERENCES_KEY = "resourceflow-ui-preferences-v1";
+  const OPS_NOTES_KEY = "resourceflow-ops-notes-v1";
   const MAX_ACTIVITY_LOG = 48;
   const MAX_HISTORY_SNAPSHOTS = 30;
   const MAX_TEXT_FIELD = 180;
@@ -272,6 +273,11 @@
       reducedMotion: false,
       fontScale: "default",
       notificationsEnabled: false
+    },
+    opsNotes: {
+      briefing: "",
+      handoff: "",
+      incident: ""
     }
   };
 
@@ -289,7 +295,9 @@
     ensureTourDialog();
     loadDemoSession();
     loadOnboardingState();
+    loadUiLanguage();
     loadUiPreferences();
+    loadOpsNotes();
     applyUiPreferences();
     bindGlobalActions();
     bindEntityActions();
@@ -1086,6 +1094,15 @@
       '<strong id="authUserLabel">Secure access available</strong>',
       '<small id="authRoleLabel">Sign in, create an account, or use demo mode to enter the workspace.</small>',
       "</div>",
+      '<label class="inline-select auth-language-select" aria-label="Workspace language">',
+      '<span>Workspace Language</span>',
+      '<select id="uiLanguageSelect">',
+      UI_LANGUAGE_OPTIONS.map(function (option) {
+        var label = option === "HindiRoman" ? "Hindi (Romanized)" : option;
+        return '<option value="' + escapeHtml(option) + '">' + escapeHtml(label) + "</option>";
+      }).join(""),
+      "</select>",
+      "</label>",
       '<div class="auth-actions">',
       '<button class="ghost-button" id="signInButton" type="button">Sign In</button>',
       '<button class="ghost-button" id="tourButton" type="button">Quick Tour</button>',
@@ -1479,7 +1496,8 @@
     const tourButton = document.getElementById("tourButton");
     const switchRoleButton = document.getElementById("switchRoleButton");
     const signOutButton = document.getElementById("signOutButton");
-    if (!userLabel || !roleLabel || !signInButton || !tourButton || !switchRoleButton || !signOutButton) {
+    const uiLanguageSelect = document.getElementById("uiLanguageSelect");
+    if (!userLabel || !roleLabel || !signInButton || !tourButton || !switchRoleButton || !signOutButton || !uiLanguageSelect) {
       return;
     }
 
@@ -1535,6 +1553,19 @@
       signOutButton.dataset.bound = "true";
       signOutButton.addEventListener("click", function () { signOutSession(); });
     }
+    if (uiLanguageSelect.dataset.bound !== "true") {
+      uiLanguageSelect.dataset.bound = "true";
+      uiLanguageSelect.addEventListener("change", function () {
+        state.uiLanguage = UI_LANGUAGE_OPTIONS.indexOf(uiLanguageSelect.value) >= 0 ? uiLanguageSelect.value : "English";
+        try {
+          localStorage.setItem(UI_LANGUAGE_KEY, state.uiLanguage);
+        } catch (error) {
+          console.warn("Could not persist UI language.", error);
+        }
+        renderAll(true);
+      });
+    }
+    uiLanguageSelect.value = UI_LANGUAGE_OPTIONS.indexOf(state.uiLanguage) >= 0 ? state.uiLanguage : "English";
 
     syncPermissionUi();
   }
@@ -1868,6 +1899,35 @@
     }
   }
 
+  function loadUiLanguage() {
+    try {
+      const raw = localStorage.getItem(UI_LANGUAGE_KEY);
+      state.uiLanguage = UI_LANGUAGE_OPTIONS.indexOf(raw) >= 0 ? raw : "English";
+    } catch (error) {
+      console.warn("Could not restore UI language.", error);
+      state.uiLanguage = "English";
+    }
+  }
+
+  function loadOpsNotes() {
+    try {
+      const raw = localStorage.getItem(OPS_NOTES_KEY);
+      const parsed = raw ? JSON.parse(raw) : {};
+      state.opsNotes = Object.assign({ briefing: "", handoff: "", incident: "" }, parsed || {});
+    } catch (error) {
+      console.warn("Could not restore operator notes.", error);
+      state.opsNotes = { briefing: "", handoff: "", incident: "" };
+    }
+  }
+
+  function persistOpsNotes() {
+    try {
+      localStorage.setItem(OPS_NOTES_KEY, JSON.stringify(state.opsNotes || {}));
+    } catch (error) {
+      console.warn("Could not persist operator notes.", error);
+    }
+  }
+
   function persistOnboardingState() {
     try {
       localStorage.setItem(ONBOARDING_KEY, JSON.stringify({
@@ -2138,6 +2198,17 @@
       '<button class="ghost-button" type="button" data-action="enable-browser-notifications">Browser Alerts</button>',
       '</div>'
     ].join("");
+  }
+
+  function uiText(english, hinglish, hindiRoman) {
+    const value = state.uiLanguage || "English";
+    if (value === "Hinglish") {
+      return hinglish || english;
+    }
+    if (value === "HindiRoman") {
+      return hindiRoman || hinglish || english;
+    }
+    return english;
   }
 
   function bindAccessibilityControls() {
@@ -2720,6 +2791,11 @@
     document.querySelectorAll('[data-action="undo-archive"]').forEach(function (button) {
       button.addEventListener("click", function () { undoLastArchive(); });
     });
+    document.querySelectorAll('[data-action="judge-demo-mode"]').forEach(function (button) {
+      button.addEventListener("click", function () {
+        launchJudgeDemoMode();
+      });
+    });
   }
 
   function openPortalChooser(role) {
@@ -2867,6 +2943,31 @@
       });
     }
 
+    const opsNotesForm = document.getElementById("opsNotesForm");
+    if (opsNotesForm && opsNotesForm.dataset.bound !== "true") {
+      opsNotesForm.dataset.bound = "true";
+      if (opsNotesForm.elements.briefing) {
+        opsNotesForm.elements.briefing.value = state.opsNotes.briefing || "";
+      }
+      if (opsNotesForm.elements.handoff) {
+        opsNotesForm.elements.handoff.value = state.opsNotes.handoff || "";
+      }
+      if (opsNotesForm.elements.incident) {
+        opsNotesForm.elements.incident.value = state.opsNotes.incident || "";
+      }
+      opsNotesForm.addEventListener("submit", function (event) {
+        event.preventDefault();
+        state.opsNotes = {
+          briefing: textValue(new FormData(opsNotesForm), "briefing"),
+          handoff: textValue(new FormData(opsNotesForm), "handoff"),
+          incident: textValue(new FormData(opsNotesForm), "incident")
+        };
+        persistOpsNotes();
+        announceNotice("Operator notes were saved for the current browser.");
+        renderAll(true);
+      });
+    }
+
     if (document.getElementById("adminSummary")) {
       loadAdminSnapshot(false);
     }
@@ -2882,6 +2983,7 @@
       "#volunteerSearch",
       "#volunteerZoneFilter",
       "#volunteerSkillFilter",
+      "#homeGlobalSearch",
       "#volunteerLanguage",
       "#volunteerTone"
     ]);
@@ -2972,6 +3074,19 @@
     state.data = registerActivity(state.data, "system", "Loaded demo workspace data for walkthrough in " + scenarioTitle(scenario) + " mode.", currentActor());
     await persist();
     renderAll();
+  }
+
+  async function launchJudgeDemoMode() {
+    if (canManageWorkspace()) {
+      if (!state.data.requests.length) {
+        await seedDemo();
+      }
+    } else if (!state.data.requests.length) {
+      state.data = createScenarioDemoState(loadDemoScenario());
+      renderAll();
+    }
+    announceNotice("Judge demo mode: show Overview, Operations matching, AI Insights, then Judge Mode proof cards.");
+    sendBrowserNotification("Judge demo mode", "Walk through Overview, Operations, AI Insights, and Judge Mode in that order.");
   }
 
   async function resetAll() {
@@ -3922,6 +4037,8 @@
     const activityNode = document.getElementById("homeActivity");
     const homeAccessibilityPanel = document.getElementById("homeAccessibilityPanel");
     const homePwaPanel = document.getElementById("homePwaPanel");
+    const globalSearchResults = document.getElementById("globalSearchResults");
+    const guidedDemoPanel = document.getElementById("guidedDemoPanel");
     if (!activityNode) {
       return;
     }
@@ -3929,6 +4046,17 @@
     const insights = buildInsights(state.data);
     setText("#homeInsightTitle", insights.nextActionTitle);
     setText("#homeInsightText", insights.nextActionText);
+    setText(".hero-card .eyebrow", uiText("Smart Resource Allocation", "Smart Resource Allocation", "Smart Resource Allocation"));
+    setText(".hero-card h1", uiText(
+      "Move from chaotic coordination to predictive, confident disaster response.",
+      "Chaotic coordination se predictive aur confident disaster response ki taraf badho.",
+      "Bikhri hui samanvay prakriya se bhavishyadrashti aur vishwaspoorn disaster response tak badhiye."
+    ));
+    setText(".hero-card .lead", uiText(
+      "ResourceFlow helps NGOs, relief teams, shelters, and community organizers capture requests, onboard volunteers, forecast shortages, prioritize urgency, and coordinate verified aid delivery through one web platform.",
+      "ResourceFlow NGOs, relief teams, shelters aur community organizers ko requests capture karne, volunteers onboard karne, shortages forecast karne, urgency prioritize karne aur verified aid delivery ko ek hi platform par coordinate karne me madad karta hai.",
+      "ResourceFlow NGOs, relief teams, shelters aur samudayik sangathanon ko requests capture karne, volunteers onboard karne, shortage ka anuman lagane, urgency ko prioritize karne aur verified aid delivery ko ek hi platform par coordinate karne me madad karta hai."
+    ));
 
     const activity = buildActivityFeed(state.data);
     activityNode.innerHTML = activity.length
@@ -3946,6 +4074,24 @@
         '<div class="stack-card"><strong>' + escapeHtml(pwaStatus.label) + '</strong><p class="card-meta">' + escapeHtml(pwaStatus.description) + '</p></div>',
         '<div class="stack-card"><strong>Offline draft recovery</strong><p class="card-meta">Request and volunteer forms save browser drafts automatically so operators can recover after refresh or poor connectivity.</p></div>',
         '<div class="stack-card"><strong>Install-ready shell</strong><p class="card-meta">Manifest, app icon, standalone display, and theme metadata are configured for a more app-like experience.</p></div>'
+      ].join("");
+    }
+
+    if (globalSearchResults) {
+      const matches = buildGlobalSearchResults(state.data, inputControlValue("#homeGlobalSearch", ""));
+      globalSearchResults.innerHTML = matches.length
+        ? matches.map(function (item) {
+            return '<div class="stack-card"><strong>' + escapeHtml(item.type + ": " + item.title) + '</strong><p class="card-meta">' + escapeHtml(item.text) + '</p></div>';
+          }).join("")
+        : '<div class="empty-box">Search requests, volunteers, assignments, or alerts from here.</div>';
+    }
+
+    if (guidedDemoPanel) {
+      guidedDemoPanel.innerHTML = [
+        '<div class="stack-card"><strong>1. Overview</strong><p class="card-meta">Explain the problem, load demo data, and show the role-based product framing.</p></div>',
+        '<div class="stack-card"><strong>2. Operations</strong><p class="card-meta">Show request intake, approval, kanban workflow, response calendar, and matching.</p></div>',
+        '<div class="stack-card"><strong>3. AI Insights</strong><p class="card-meta">Show readiness, risk radar, outreach, and what-if simulation.</p></div>',
+        '<div class="stack-card"><strong>4. Judge + Impact</strong><p class="card-meta">Finish with the proof cards, SDG mapping, and public impact story.</p></div>'
       ].join("");
     }
   }
@@ -4297,6 +4443,142 @@
     });
   }
 
+  function buildWorkflowKanbanColumns(data) {
+    return WORKFLOW_SEQUENCE.map(function (status) {
+      const items = getVisibleRequests(data).filter(function (request) {
+        return normalizeWorkflowStatus(request.workflowStatus || "pending") === status;
+      }).slice(0, 6);
+      return {
+        id: status,
+        title: workflowLabel(status),
+        items: items
+      };
+    });
+  }
+
+  function buildResponseCalendarItems(data) {
+    const buckets = {};
+    ["Today", "Tomorrow"].forEach(function (day) {
+      ["Morning", "Afternoon", "Evening"].forEach(function (slot) {
+        const key = day + " - " + slot;
+        buckets[key] = { label: key, requests: 0, assigned: 0, beneficiaries: 0 };
+      });
+    });
+    getVisibleRequests(data).forEach(function (request) {
+      const key = normalizeShiftLabel(request.shiftLabel || inferShiftLabel(request.createdAt || new Date().toISOString(), request.urgency));
+      if (!buckets[key]) {
+        buckets[key] = { label: key, requests: 0, assigned: 0, beneficiaries: 0 };
+      }
+      buckets[key].requests += 1;
+      buckets[key].beneficiaries += Number(request.beneficiaries || 0);
+      buckets[key].assigned += getVisibleAssignments(data).filter(function (item) {
+        return item.requestId === request.id;
+      }).length;
+    });
+    return Object.keys(buckets).map(function (key) {
+      return buckets[key];
+    });
+  }
+
+  function buildGlobalSearchResults(data, query) {
+    const term = safeText(query, 120).trim().toLowerCase();
+    if (!term) {
+      return [];
+    }
+    const results = [];
+
+    getVisibleRequests(data).forEach(function (request) {
+      const haystack = [
+        request.title,
+        request.organization,
+        request.zone,
+        request.category,
+        (request.skills || []).join(" "),
+        request.location
+      ].join(" ").toLowerCase();
+      if (haystack.indexOf(term) >= 0) {
+        results.push({
+          type: "Request",
+          title: request.title,
+          text: request.organization + " | " + request.zone + " zone | " + request.category
+        });
+      }
+    });
+
+    getVisibleVolunteers(data).forEach(function (volunteer) {
+      const haystack = [
+        volunteer.name,
+        volunteer.zone,
+        volunteer.location,
+        (volunteer.skills || []).join(" "),
+        (volunteer.languages || []).join(" ")
+      ].join(" ").toLowerCase();
+      if (haystack.indexOf(term) >= 0) {
+        results.push({
+          type: "Volunteer",
+          title: volunteer.name,
+          text: volunteer.zone + " zone | " + volunteer.experience + " | " + (volunteer.skills || []).join(", ")
+        });
+      }
+    });
+
+    getVisibleAssignments(data).forEach(function (assignment) {
+      const haystack = [
+        assignment.requestTitle,
+        assignment.volunteerName,
+        assignment.zone,
+        assignment.reason
+      ].join(" ").toLowerCase();
+      if (haystack.indexOf(term) >= 0) {
+        results.push({
+          type: "Assignment",
+          title: assignment.requestTitle,
+          text: assignment.volunteerName + " | " + assignment.zone + " zone | " + workflowLabel(assignment.status || "assigned")
+        });
+      }
+    });
+
+    buildNotificationCenter(data).forEach(function (item) {
+      const haystack = [item.title, item.text].join(" ").toLowerCase();
+      if (haystack.indexOf(term) >= 0) {
+        results.push({
+          type: "Alert",
+          title: item.title,
+          text: item.text
+        });
+      }
+    });
+
+    return results.slice(0, 10);
+  }
+
+  function buildVolunteerRankingItems(data) {
+    const highestPriorityRequests = getVisibleRequests(data).slice().sort(function (left, right) {
+      return Number(right.urgency || 0) - Number(left.urgency || 0);
+    }).slice(0, 2);
+    const items = [];
+    highestPriorityRequests.forEach(function (request) {
+      getVisibleVolunteers(data).map(function (volunteer) {
+        return {
+          volunteer: volunteer,
+          request: request,
+          score: scoreVolunteer(volunteer, request, data)
+        };
+      }).sort(function (left, right) {
+        return right.score - left.score;
+      }).slice(0, 3).forEach(function (entry) {
+        items.push({
+          volunteerName: entry.volunteer.name,
+          requestTitle: entry.request.title,
+          zone: entry.volunteer.zone,
+          score: entry.score,
+          text: entry.volunteer.experience + " | " + (entry.volunteer.skills || []).slice(0, 3).join(", ")
+        });
+      });
+    });
+    return items.slice(0, 6);
+  }
+
   function buildScenarioChartItems(data) {
     const counts = {};
     getVisibleRequests(data).forEach(function (request) {
@@ -4463,7 +4745,9 @@
     const opsUrgencyChart = document.getElementById("opsUrgencyChart");
     const approvalQueue = document.getElementById("approvalQueue");
     const shiftPlanner = document.getElementById("shiftPlanner");
+    const responseCalendar = document.getElementById("responseCalendar");
     const workflowChart = document.getElementById("workflowChart");
+    const workflowKanban = document.getElementById("workflowKanban");
     const scenarioChart = document.getElementById("scenarioChart");
     const volunteerUtilizationChart = document.getElementById("volunteerUtilizationChart");
     const notificationCenter = document.getElementById("notificationCenter");
@@ -4480,6 +4764,12 @@
     if (!requestsBoard || !assignmentsBoard || !operationsAlert || !operationsSummary) {
       return;
     }
+    setText("body[data-page='operations'] .page-intro .eyebrow", uiText("Coordinator Command Center", "Coordinator Command Center", "Coordinator Command Center"));
+    setText("body[data-page='operations'] .page-intro h1", uiText(
+      "Capture needs, run matching, forecast shortages, and manage field response.",
+      "Needs capture karo, matching chalao, shortages forecast karo, aur field response manage karo.",
+      "Aavashyaktaein capture kijiye, matching chalaiye, shortage ka anuman lagaiye aur field response manage kijiye."
+    ));
 
     const insights = buildInsights(state.data);
     const metrics = computeMetrics(state.data);
@@ -4551,11 +4841,52 @@
         : '<div class="empty-box">Shift slots will appear here after requests and assignments are loaded.</div>';
     }
 
+    if (responseCalendar) {
+      const calendarItems = buildResponseCalendarItems(state.data);
+      responseCalendar.innerHTML = [
+        '<div class="calendar-grid">',
+        calendarItems.map(function (item) {
+          return [
+            '<div class="calendar-card">',
+            '<strong>' + escapeHtml(item.label) + '</strong>',
+            '<p class="card-meta">' + escapeHtml(String(item.requests)) + ' request(s)</p>',
+            '<div class="chip-row">',
+            renderChip(item.assigned + " assigned"),
+            renderChip(item.beneficiaries + " people"),
+            '</div>',
+            '</div>'
+          ].join("");
+        }).join(""),
+        '</div>'
+      ].join("");
+    }
+
     if (workflowChart) {
       const items = buildWorkflowChartItems(state.data);
       workflowChart.innerHTML = items.length
         ? renderBarChart("Workflow status", items)
         : '<div class="empty-box">Workflow distribution will appear here.</div>';
+    }
+
+    if (workflowKanban) {
+      const columns = buildWorkflowKanbanColumns(state.data);
+      workflowKanban.innerHTML = columns.map(function (column) {
+        return [
+          '<article class="kanban-column">',
+          '<div class="kanban-column-head">',
+          '<strong>' + escapeHtml(column.title) + '</strong>',
+          '<span>' + escapeHtml(String(column.items.length)) + '</span>',
+          '</div>',
+          '<div class="kanban-column-body">',
+          column.items.length
+            ? column.items.map(function (request) {
+                return '<div class="kanban-ticket"><strong>' + escapeHtml(request.title) + '</strong><p class="card-meta">' + escapeHtml(request.zone + " zone | " + request.category) + '</p></div>';
+              }).join("")
+            : '<div class="empty-box">No items</div>',
+          '</div>',
+          '</article>'
+        ].join("");
+      }).join("");
     }
 
     if (scenarioChart) {
@@ -4582,24 +4913,32 @@
     if (dailyBriefingPanel) {
       const topRisk = metrics.riskRadar[0];
       dailyBriefingPanel.innerHTML = [
-        '<div class="stack-card"><strong>Morning briefing</strong><p class="card-meta">' + escapeHtml(insights.nextActionText) + '</p></div>',
+        '<div class="stack-card"><strong>Morning briefing</strong><p class="card-meta">' + escapeHtml((state.opsNotes && state.opsNotes.briefing) || insights.nextActionText) + '</p></div>',
         '<div class="stack-card"><strong>Scenario focus</strong><p class="card-meta">Current demo mode: ' + escapeHtml(scenarioTitle(loadDemoScenario())) + '. Coverage sits at ' + escapeHtml(String(metrics.coverage)) + '% with readiness ' + escapeHtml(String(metrics.readinessScore)) + '/100.</p></div>',
         '<div class="stack-card"><strong>Highest risk gap</strong><p class="card-meta">' + escapeHtml(topRisk ? topRisk.title + " in " + topRisk.zone + " zone needs " + topRisk.deficit + " more responder(s)." : "No uncovered critical requests are visible right now.") + '</p></div>'
       ].join("");
     }
 
     if (handoffNotesPanel) {
-      handoffNotesPanel.innerHTML = (state.data.activityLog || []).slice(0, 3).map(function (event) {
+      const handoffItems = [];
+      if (state.opsNotes && state.opsNotes.handoff) {
+        handoffItems.push('<div class="stack-card"><strong>Saved handoff</strong><p class="card-meta">' + escapeHtml(state.opsNotes.handoff) + '</p></div>');
+      }
+      handoffNotesPanel.innerHTML = handoffItems.join("") + (state.data.activityLog || []).slice(0, 3).map(function (event) {
         return '<div class="stack-card"><strong>' + escapeHtml(titleCase(event.type || "Update")) + '</strong><p class="card-meta">' + escapeHtml(event.message || "Workspace handoff update.") + '</p></div>';
       }).join("") || '<div class="empty-box">Operator handoff notes will appear here.</div>';
     }
 
     if (incidentLogPanel) {
-      incidentLogPanel.innerHTML = metrics.riskRadar.length
+      const incidentItems = [];
+      if (state.opsNotes && state.opsNotes.incident) {
+        incidentItems.push('<div class="stack-card soft-warning"><strong>Saved incident note</strong><p class="card-meta">' + escapeHtml(state.opsNotes.incident) + '</p></div>');
+      }
+      incidentLogPanel.innerHTML = incidentItems.join("") + (metrics.riskRadar.length
         ? metrics.riskRadar.slice(0, 3).map(function (risk) {
             return '<div class="stack-card soft-warning"><strong>' + escapeHtml(risk.title) + '</strong><p class="card-meta">' + escapeHtml("Deficit " + risk.deficit + " | severity " + risk.severity + " | zone " + risk.zone) + '</p></div>';
           }).join("")
-        : '<div class="empty-box">Incident log entries will appear here.</div>';
+        : '<div class="empty-box">Incident log entries will appear here.</div>');
     }
 
     if (forecastBoard) {
@@ -4776,6 +5115,12 @@
     if (!roster || !list) {
       return;
     }
+    setText("body[data-page='volunteer'] .page-intro .eyebrow", uiText("Volunteer Experience", "Volunteer Experience", "Volunteer Experience"));
+    setText("body[data-page='volunteer'] .page-intro h1", uiText(
+      "Register responders with the right skills, availability, and location fit.",
+      "Sahi skills, availability aur location fit ke saath responders register karo.",
+      "Sahi kaushal, availability aur sthaan-anukoolta ke saath responders register kijiye."
+    ));
 
     const filters = getVolunteerFilterState();
     const filteredVolunteers = filterVolunteers(state.data.volunteers, filters);
@@ -4784,6 +5129,7 @@
     const communityMessage = document.getElementById("volunteerCommunityMessage");
     const shiftPlanNode = document.getElementById("volunteerShiftPlan");
     const utilizationNode = document.getElementById("volunteerUtilizationSummary");
+    const rankingNode = document.getElementById("volunteerRankingPanel");
     const profileSignalsNode = document.getElementById("volunteerProfileSignals");
     const draftCenterNode = document.getElementById("volunteerDraftCenter");
     const accessibilityControlPanel = document.getElementById("accessibilityControlPanel");
@@ -4831,6 +5177,15 @@
       utilizationNode.innerHTML = utilization.length
         ? renderBarChart("Volunteer demand by shift", utilization)
         : '<div class="empty-box">Volunteer utilization metrics will appear here.</div>';
+    }
+
+    if (rankingNode) {
+      const ranking = buildVolunteerRankingItems(state.data);
+      rankingNode.innerHTML = ranking.length
+        ? ranking.map(function (item) {
+            return '<div class="stack-card"><strong>' + escapeHtml(item.volunteerName + " -> " + item.requestTitle) + '</strong><p class="card-meta">' + escapeHtml(item.text) + '</p><div class="chip-row">' + renderChip(item.zone + " zone") + renderChip("score " + item.score) + '</div></div>';
+          }).join("")
+        : '<div class="empty-box">Volunteer ranking insights will appear here.</div>';
     }
 
     if (profileSignalsNode) {
@@ -4885,6 +5240,12 @@
     if (!executive) {
       return;
     }
+    setText("body[data-page='insights'] .page-intro .eyebrow", uiText("AI Copilot", "AI Copilot", "AI Copilot"));
+    setText("body[data-page='insights'] .page-intro h1", uiText(
+      "Turn live operations data into decisions, summaries, and submission-ready narratives.",
+      "Live operations data ko decisions, summaries aur submission-ready narratives me badlo.",
+      "Live operations data ko decisions, summaries aur submission-ready narratives mein badaliye."
+    ));
 
     const insights = buildInsights(state.data);
     const aidSignals = buildAidFlowSignals(state.data);
@@ -5053,6 +5414,12 @@
     const storyNode = document.getElementById("impactStoryPanel");
     const snapshotNode = document.getElementById("impactSnapshotPanel");
     const trustNode = document.getElementById("impactTrustPanel");
+    setText("body[data-page='impact'] .page-intro .eyebrow", uiText("Read-only NGO View", "Read-only NGO View", "Read-only NGO View"));
+    setText("body[data-page='impact'] .page-intro h1", uiText(
+      "Share impact, coverage, and response readiness with judges and partners.",
+      "Impact, coverage aur response readiness ko judges aur partners ke saath share karo.",
+      "Impact, coverage aur response readiness ko judges aur partners ke saath share kijiye."
+    ));
 
     setText("#impactMetricRequests", String(metrics.totalRequests));
     setText("#impactMetricAssignments", String(metrics.totalAssignments));
@@ -5096,7 +5463,7 @@
     if (snapshotNode) {
       snapshotNode.innerHTML = report.bullets.map(function (item) {
         return '<div class="stack-card"><p class="card-meta">' + escapeHtml(item) + '</p></div>';
-      }).join("");
+      }).join("") + '<div class="stack-card"><strong>Share-ready note</strong><p class="card-meta">Use Export CSV or Judge Report from the header to generate a partner-safe snapshot.</p></div>';
     }
     if (trustNode) {
       trustNode.innerHTML = [
