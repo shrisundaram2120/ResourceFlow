@@ -6,6 +6,7 @@
   const ONBOARDING_KEY = "resourceflow-onboarding-v1";
   const DEMO_SCENARIO_KEY = "resourceflow-demo-scenario-v1";
   const UI_LANGUAGE_KEY = "resourceflow-ui-language-v1";
+  const UI_PREFERENCES_KEY = "resourceflow-ui-preferences-v1";
   const MAX_ACTIVITY_LOG = 48;
   const MAX_HISTORY_SNAPSHOTS = 30;
   const MAX_TEXT_FIELD = 180;
@@ -265,7 +266,13 @@
     lastVerifiedToken: "",
     onboardingSeen: false,
     onboardingStep: 0,
-    uiLanguage: "English"
+    uiLanguage: "English",
+    uiPreferences: {
+      highContrast: false,
+      reducedMotion: false,
+      fontScale: "default",
+      notificationsEnabled: false
+    }
   };
 
   document.addEventListener("DOMContentLoaded", function () {
@@ -282,6 +289,8 @@
     ensureTourDialog();
     loadDemoSession();
     loadOnboardingState();
+    loadUiPreferences();
+    applyUiPreferences();
     bindGlobalActions();
     bindEntityActions();
     bindCrossTabSync();
@@ -1942,6 +1951,237 @@
     openTourDialog(0);
   }
 
+  function defaultUiPreferences() {
+    return {
+      highContrast: false,
+      reducedMotion: false,
+      fontScale: "default",
+      notificationsEnabled: false
+    };
+  }
+
+  function loadUiPreferences() {
+    try {
+      const raw = localStorage.getItem(UI_PREFERENCES_KEY);
+      const parsed = raw ? JSON.parse(raw) : {};
+      state.uiPreferences = Object.assign(defaultUiPreferences(), parsed || {});
+      state.uiPreferences.notificationsEnabled = Boolean(state.uiPreferences.notificationsEnabled);
+    } catch (error) {
+      console.warn("Could not restore UI preferences.", error);
+      state.uiPreferences = defaultUiPreferences();
+    }
+  }
+
+  function persistUiPreferences() {
+    try {
+      localStorage.setItem(UI_PREFERENCES_KEY, JSON.stringify(state.uiPreferences));
+    } catch (error) {
+      console.warn("Could not persist UI preferences.", error);
+    }
+  }
+
+  function applyUiPreferences() {
+    const root = document.documentElement;
+    const prefs = state.uiPreferences || defaultUiPreferences();
+    root.classList.toggle("rf-high-contrast", Boolean(prefs.highContrast));
+    root.classList.toggle("rf-reduced-motion", Boolean(prefs.reducedMotion));
+    root.classList.toggle("rf-font-lg", prefs.fontScale === "large");
+    root.classList.toggle("rf-font-xl", prefs.fontScale === "xlarge");
+  }
+
+  function setUiPreference(key, value) {
+    state.uiPreferences = Object.assign(defaultUiPreferences(), state.uiPreferences || {});
+    state.uiPreferences[key] = value;
+    persistUiPreferences();
+    applyUiPreferences();
+    renderAll(true);
+  }
+
+  async function enableBrowserNotifications() {
+    if (!("Notification" in window)) {
+      announceNotice("Browser notifications are not supported in this browser.");
+      return;
+    }
+    if (Notification.permission === "granted") {
+      setUiPreference("notificationsEnabled", true);
+      announceNotice("Browser notifications are already enabled.");
+      return;
+    }
+    const permission = await Notification.requestPermission();
+    const enabled = permission === "granted";
+    setUiPreference("notificationsEnabled", enabled);
+    announceNotice(enabled ? "Browser notifications enabled." : "Notification permission was not granted.");
+  }
+
+  function sendBrowserNotification(title, body) {
+    if (!state.uiPreferences || !state.uiPreferences.notificationsEnabled) {
+      return;
+    }
+    if (!("Notification" in window) || Notification.permission !== "granted") {
+      return;
+    }
+    try {
+      new Notification(title, {
+        body: body,
+        icon: "./icon.svg"
+      });
+    } catch (error) {
+      console.warn("Could not show browser notification.", error);
+    }
+  }
+
+  function buildDraftRecoveryItems() {
+    const items = [];
+    [REQUEST_DRAFT_KEY, VOLUNTEER_DRAFT_KEY].forEach(function (key) {
+      try {
+        const raw = localStorage.getItem(key);
+        if (!raw) {
+          return;
+        }
+        const parsed = JSON.parse(raw);
+        const fieldCount = parsed && parsed.fields ? Object.keys(parsed.fields).filter(function (field) {
+          return safeText(parsed.fields[field], 200).trim().length;
+        }).length : 0;
+        items.push({
+          title: key === REQUEST_DRAFT_KEY ? "Request draft saved" : "Volunteer draft saved",
+          text: fieldCount ? String(fieldCount) + " field(s) can be restored after refresh or connection loss." : "A saved draft is available in local storage."
+        });
+      } catch (error) {
+        console.warn("Could not inspect draft state.", error);
+      }
+    });
+    if (!items.length) {
+      items.push({
+        title: "No unsaved drafts right now",
+        text: "As you type in forms, ResourceFlow keeps local recovery snapshots so operators do not lose work."
+      });
+    }
+    return items;
+  }
+
+  function buildCleanupWarnings(data) {
+    const warnings = [];
+    const requests = Array.isArray(data.requests) ? data.requests : [];
+    const volunteers = Array.isArray(data.volunteers) ? data.volunteers : [];
+
+    requests.forEach(function (request, index) {
+      requests.slice(index + 1).forEach(function (candidate) {
+        if (normalizeText(request.title) === normalizeText(candidate.title) && normalizeText(request.zone) === normalizeText(candidate.zone)) {
+          warnings.push({
+            title: "Possible duplicate request",
+            text: request.title + " appears more than once in " + request.zone + " zone. Merge or archive one copy for cleaner reporting."
+          });
+        }
+      });
+      if (!safeText(request.location, 120).trim() || !(request.skills || []).length) {
+        warnings.push({
+          title: "Incomplete request details",
+          text: request.title + " is missing either a precise location or skill tags, which can reduce matching quality."
+        });
+      }
+    });
+
+    volunteers.forEach(function (volunteer, index) {
+      volunteers.slice(index + 1).forEach(function (candidate) {
+        if (normalizeText(volunteer.name) === normalizeText(candidate.name) && normalizeText(volunteer.zone) === normalizeText(candidate.zone)) {
+          warnings.push({
+            title: "Possible duplicate volunteer",
+            text: volunteer.name + " appears more than once in " + volunteer.zone + " zone. Review before outreach or assignment."
+          });
+        }
+      });
+      if (!(volunteer.skills || []).length || !safeText(volunteer.location, 120).trim()) {
+        warnings.push({
+          title: "Incomplete volunteer profile",
+          text: volunteer.name + " should include both location and skills to improve assignment recommendations."
+        });
+      }
+    });
+
+    return warnings.slice(0, 8);
+  }
+
+  function buildAccessibilityCards() {
+    const prefs = state.uiPreferences || defaultUiPreferences();
+    return [
+      {
+        title: "High contrast " + (prefs.highContrast ? "on" : "off"),
+        text: "Improves separation between cards, inputs, and action buttons for bright screens and projectors."
+      },
+      {
+        title: "Reduced motion " + (prefs.reducedMotion ? "on" : "off"),
+        text: "Removes extra movement for users who prefer calmer transitions during demos or long sessions."
+      },
+      {
+        title: "Readable scaling: " + titleCase(prefs.fontScale === "default" ? "default" : prefs.fontScale),
+        text: "Makes dense coordination screens easier to scan on both laptops and mobile devices."
+      },
+      {
+        title: "Keyboard-ready layout",
+        text: "Skip links, focus states, labeled controls, and large hit targets help operators move quickly without losing context."
+      }
+    ];
+  }
+
+  function buildAccessibilityControlMarkup() {
+    const prefs = state.uiPreferences || defaultUiPreferences();
+    return [
+      '<div class="stack-card"><strong>Display comfort</strong><div class="chip-row">' +
+        renderChip(prefs.highContrast ? "High contrast on" : "High contrast off") +
+        renderChip(prefs.reducedMotion ? "Reduced motion on" : "Reduced motion off") +
+        renderChip("Font: " + (prefs.fontScale === "default" ? "default" : prefs.fontScale)) +
+      '</div></div>',
+      '<div class="button-row compact-controls">',
+      '<button class="ghost-button" type="button" data-action="toggle-high-contrast">Toggle Contrast</button>',
+      '<button class="ghost-button" type="button" data-action="toggle-reduced-motion">Toggle Motion</button>',
+      '<button class="ghost-button" type="button" data-action="cycle-font-scale">Font Size</button>',
+      '<button class="ghost-button" type="button" data-action="enable-browser-notifications">Browser Alerts</button>',
+      '</div>'
+    ].join("");
+  }
+
+  function bindAccessibilityControls() {
+    document.querySelectorAll('[data-action="toggle-high-contrast"]').forEach(function (button) {
+      if (button.dataset.bound === "true") {
+        return;
+      }
+      button.dataset.bound = "true";
+      button.addEventListener("click", function () {
+        setUiPreference("highContrast", !state.uiPreferences.highContrast);
+      });
+    });
+    document.querySelectorAll('[data-action="toggle-reduced-motion"]').forEach(function (button) {
+      if (button.dataset.bound === "true") {
+        return;
+      }
+      button.dataset.bound = "true";
+      button.addEventListener("click", function () {
+        setUiPreference("reducedMotion", !state.uiPreferences.reducedMotion);
+      });
+    });
+    document.querySelectorAll('[data-action="cycle-font-scale"]').forEach(function (button) {
+      if (button.dataset.bound === "true") {
+        return;
+      }
+      button.dataset.bound = "true";
+      button.addEventListener("click", function () {
+        const order = ["default", "large", "xlarge"];
+        const currentIndex = order.indexOf(state.uiPreferences.fontScale || "default");
+        const next = order[(currentIndex + 1) % order.length];
+        setUiPreference("fontScale", next);
+      });
+    });
+    document.querySelectorAll('[data-action="enable-browser-notifications"]').forEach(function (button) {
+      if (button.dataset.bound === "true") {
+        return;
+      }
+      button.dataset.bound = "true";
+      button.addEventListener("click", function () {
+        enableBrowserNotifications();
+      });
+    });
+  }
+
   function deriveNameFromEmail(email) {
     const target = String(email || "").split("@")[0].replace(/[._-]+/g, " ").trim();
     if (!target) {
@@ -2727,6 +2967,7 @@
     state.data = createScenarioDemoState(scenario);
     persistDemoScenario(scenario);
     updateSyncStatus("Demo Loaded", scenarioTitle(scenario) + " sample records and assignments are ready for walkthrough.");
+    sendBrowserNotification("ResourceFlow demo ready", scenarioTitle(scenario) + " mode is loaded and ready for walkthrough.");
     trackEvent("resourceflow_seed_demo", { scenario: scenario });
     state.data = registerActivity(state.data, "system", "Loaded demo workspace data for walkthrough in " + scenarioTitle(scenario) + " mode.", currentActor());
     await persist();
@@ -3143,6 +3384,7 @@
         createdAt: new Date().toISOString()
       });
     }
+    sendBrowserNotification("Approval update", request.title + " is now " + titleCase(nextStatus) + ".");
     await persist();
     renderAll();
   }
@@ -3169,6 +3411,7 @@
       status: "tracked",
       createdAt: new Date().toISOString()
     });
+    sendBrowserNotification("Workflow update", request.title + " moved to " + titleCase(nextStatus.replace(/-/g, " ")) + ".");
     await persist();
     renderAll();
   }
@@ -3677,6 +3920,8 @@
 
   function renderHome() {
     const activityNode = document.getElementById("homeActivity");
+    const homeAccessibilityPanel = document.getElementById("homeAccessibilityPanel");
+    const homePwaPanel = document.getElementById("homePwaPanel");
     if (!activityNode) {
       return;
     }
@@ -3689,6 +3934,20 @@
     activityNode.innerHTML = activity.length
       ? activity.map(renderActivityCard).join("")
       : '<div class="empty-box">No activity yet. Load demo data to populate the workspace.</div>';
+
+    if (homeAccessibilityPanel) {
+      homeAccessibilityPanel.innerHTML = buildAccessibilityCards().map(function (item) {
+        return '<div class="stack-card"><strong>' + escapeHtml(item.title) + '</strong><p class="card-meta">' + escapeHtml(item.text) + '</p></div>';
+      }).join("");
+    }
+
+    if (homePwaPanel) {
+      homePwaPanel.innerHTML = [
+        '<div class="stack-card"><strong>' + escapeHtml(pwaStatus.label) + '</strong><p class="card-meta">' + escapeHtml(pwaStatus.description) + '</p></div>',
+        '<div class="stack-card"><strong>Offline draft recovery</strong><p class="card-meta">Request and volunteer forms save browser drafts automatically so operators can recover after refresh or poor connectivity.</p></div>',
+        '<div class="stack-card"><strong>Install-ready shell</strong><p class="card-meta">Manifest, app icon, standalone display, and theme metadata are configured for a more app-like experience.</p></div>'
+      ].join("");
+    }
   }
 
   function inputControlValue(selector, fallback) {
@@ -4208,6 +4467,9 @@
     const scenarioChart = document.getElementById("scenarioChart");
     const volunteerUtilizationChart = document.getElementById("volunteerUtilizationChart");
     const notificationCenter = document.getElementById("notificationCenter");
+    const dailyBriefingPanel = document.getElementById("dailyBriefingPanel");
+    const handoffNotesPanel = document.getElementById("handoffNotesPanel");
+    const incidentLogPanel = document.getElementById("incidentLogPanel");
     const syncHealth = document.getElementById("syncHealth");
     const collabTimeline = document.getElementById("collabTimeline");
     const artifactUploadStatus = document.getElementById("artifactUploadStatus");
@@ -4315,6 +4577,29 @@
       notificationCenter.innerHTML = items.length
         ? items.map(renderNotificationCard).join("")
         : '<div class="empty-box">Assignments, reminders, and alerts will appear here.</div>';
+    }
+
+    if (dailyBriefingPanel) {
+      const topRisk = metrics.riskRadar[0];
+      dailyBriefingPanel.innerHTML = [
+        '<div class="stack-card"><strong>Morning briefing</strong><p class="card-meta">' + escapeHtml(insights.nextActionText) + '</p></div>',
+        '<div class="stack-card"><strong>Scenario focus</strong><p class="card-meta">Current demo mode: ' + escapeHtml(scenarioTitle(loadDemoScenario())) + '. Coverage sits at ' + escapeHtml(String(metrics.coverage)) + '% with readiness ' + escapeHtml(String(metrics.readinessScore)) + '/100.</p></div>',
+        '<div class="stack-card"><strong>Highest risk gap</strong><p class="card-meta">' + escapeHtml(topRisk ? topRisk.title + " in " + topRisk.zone + " zone needs " + topRisk.deficit + " more responder(s)." : "No uncovered critical requests are visible right now.") + '</p></div>'
+      ].join("");
+    }
+
+    if (handoffNotesPanel) {
+      handoffNotesPanel.innerHTML = (state.data.activityLog || []).slice(0, 3).map(function (event) {
+        return '<div class="stack-card"><strong>' + escapeHtml(titleCase(event.type || "Update")) + '</strong><p class="card-meta">' + escapeHtml(event.message || "Workspace handoff update.") + '</p></div>';
+      }).join("") || '<div class="empty-box">Operator handoff notes will appear here.</div>';
+    }
+
+    if (incidentLogPanel) {
+      incidentLogPanel.innerHTML = metrics.riskRadar.length
+        ? metrics.riskRadar.slice(0, 3).map(function (risk) {
+            return '<div class="stack-card soft-warning"><strong>' + escapeHtml(risk.title) + '</strong><p class="card-meta">' + escapeHtml("Deficit " + risk.deficit + " | severity " + risk.severity + " | zone " + risk.zone) + '</p></div>';
+          }).join("")
+        : '<div class="empty-box">Incident log entries will appear here.</div>';
     }
 
     if (forecastBoard) {
@@ -4499,6 +4784,9 @@
     const communityMessage = document.getElementById("volunteerCommunityMessage");
     const shiftPlanNode = document.getElementById("volunteerShiftPlan");
     const utilizationNode = document.getElementById("volunteerUtilizationSummary");
+    const profileSignalsNode = document.getElementById("volunteerProfileSignals");
+    const draftCenterNode = document.getElementById("volunteerDraftCenter");
+    const accessibilityControlPanel = document.getElementById("accessibilityControlPanel");
     const topGap = buildSkillGapPressure(state.data)[0];
     const topRequest = clone(state.data.requests).sort(function (left, right) {
       return Number(right.urgency || 0) - Number(left.urgency || 0);
@@ -4543,6 +4831,33 @@
       utilizationNode.innerHTML = utilization.length
         ? renderBarChart("Volunteer demand by shift", utilization)
         : '<div class="empty-box">Volunteer utilization metrics will appear here.</div>';
+    }
+
+    if (profileSignalsNode) {
+      const readiness = computeReadinessScore({
+        coverage: computeMetrics(state.data).coverage,
+        criticalFill: computeMetrics(state.data).criticalFill,
+        requests: state.data.requests.length,
+        volunteers: state.data.volunteers.length,
+        assignments: state.data.assignments.length
+      });
+      profileSignalsNode.innerHTML = [
+        '<div class="stack-card"><strong>Readiness score</strong><p class="card-meta">' + escapeHtml(String(readiness)) + '/100 reflects how ready the volunteer network is for the current workload.</p></div>',
+        '<div class="stack-card"><strong>Trust status</strong><p class="card-meta">' + escapeHtml(hasActiveSession() ? "Signed-in profile can participate in guided volunteer flows." : "Guest mode can explore the portal before committing to sign in.") + '</p></div>',
+        '<div class="stack-card"><strong>Language coverage</strong><p class="card-meta">' + escapeHtml((state.data.volunteers || []).some(function (item) { return (item.languages || []).length; }) ? "Multilingual volunteer profiles are available for outreach and field coordination." : "Add language tags to volunteers to improve community-specific outreach.") + '</p></div>',
+        '<div class="stack-card"><strong>Skill badge focus</strong><p class="card-meta">' + escapeHtml(topGap ? titleCase(topGap.skill) + " is the strongest current volunteer badge priority." : "No major skill gap is visible right now.") + '</p></div>'
+      ].join("");
+    }
+
+    if (draftCenterNode) {
+      draftCenterNode.innerHTML = buildDraftRecoveryItems().map(function (item) {
+        return '<div class="stack-card"><strong>' + escapeHtml(item.title) + '</strong><p class="card-meta">' + escapeHtml(item.text) + '</p></div>';
+      }).join("");
+    }
+
+    if (accessibilityControlPanel) {
+      accessibilityControlPanel.innerHTML = buildAccessibilityControlMarkup();
+      bindAccessibilityControls();
     }
 
     setText("#volunteerStatCount", String(filteredVolunteers.length));
@@ -4613,6 +4928,8 @@
     const statusNode = document.getElementById("adminBackendStatus");
     const reviewNode = document.getElementById("adminReviewList");
     const archiveNode = document.getElementById("adminArchiveList");
+    const cleanupNode = document.getElementById("adminCleanupList");
+    const controlNode = document.getElementById("adminControlCenter");
     const snapshot = state.adminSnapshot;
     const reviewItems = buildAdminReviewQueue(state.data);
     const snapshotUsers = snapshot && snapshot.users ? snapshot.users : [];
@@ -4660,6 +4977,13 @@
       if (archiveNode) {
         archiveNode.innerHTML = '<div class="empty-box">Archived requests and volunteers become visible for manager roles.</div>';
       }
+      if (cleanupNode) {
+        cleanupNode.innerHTML = '<div class="empty-box">Data cleanup warnings appear for coordinator or admin sessions.</div>';
+      }
+      if (controlNode) {
+        controlNode.innerHTML = buildAccessibilityControlMarkup();
+        bindAccessibilityControls();
+      }
       return;
     }
     summaryNode.textContent = state.adminLoading
@@ -4699,6 +5023,18 @@
         ? archived.map(renderArchivedCard).join("")
         : '<div class="empty-box">No archived records are waiting for restore.</div>';
     }
+    if (cleanupNode) {
+      const warnings = buildCleanupWarnings(state.data);
+      cleanupNode.innerHTML = warnings.length
+        ? warnings.map(function (item) {
+            return '<div class="stack-card soft-warning"><strong>' + escapeHtml(item.title) + '</strong><p class="card-meta">' + escapeHtml(item.text) + '</p></div>';
+          }).join("")
+        : '<div class="empty-box">No duplicate or incomplete-record warnings are active.</div>';
+    }
+    if (controlNode) {
+      controlNode.innerHTML = buildAccessibilityControlMarkup();
+      bindAccessibilityControls();
+    }
     bindAdminRoleForms();
   }
 
@@ -4714,9 +5050,12 @@
     const workflowNode = document.getElementById("impactWorkflowChart");
     const scenarioNode = document.getElementById("impactScenarioChart");
     const highlightsNode = document.getElementById("impactHighlights");
+    const storyNode = document.getElementById("impactStoryPanel");
+    const snapshotNode = document.getElementById("impactSnapshotPanel");
+    const trustNode = document.getElementById("impactTrustPanel");
 
-    setText("#impactMetricRequests", String(metrics.requests));
-    setText("#impactMetricAssignments", String(metrics.assignments));
+    setText("#impactMetricRequests", String(metrics.totalRequests));
+    setText("#impactMetricAssignments", String(metrics.totalAssignments));
     setText("#impactMetricCoverage", metrics.coverage + "%");
     setText("#impactMetricBeneficiaries", String(metrics.beneficiaries));
     setText("#impactPublicReadiness", "Readiness " + metrics.readinessScore + "/100");
@@ -4746,6 +5085,25 @@
       highlightsNode.innerHTML = report.highlights.map(function (item) {
         return '<div class="stack-card"><strong>' + escapeHtml(item.title + ": " + item.value) + '</strong><p class="card-meta">' + escapeHtml(item.text) + '</p></div>';
       }).join("");
+    }
+    if (storyNode) {
+      storyNode.innerHTML = [
+        '<div class="stack-card"><strong>From fragmented intake to one workspace</strong><p class="card-meta">ResourceFlow replaces scattered calls, sheets, and chats with one readable flow for requests, volunteers, assignments, and verification.</p></div>',
+        '<div class="stack-card"><strong>Visible community reach</strong><p class="card-meta">' + escapeHtml(metrics.totalRequests ? "The current scenario projects support for about " + metrics.beneficiaries + " people across " + metrics.communitiesServed + " zones." : "Load demo data to show projected reach, zone coverage, and staffed requests.") + '</p></div>',
+        '<div class="stack-card"><strong>Operational story</strong><p class="card-meta">' + escapeHtml(insights.nextActionText) + '</p></div>'
+      ].join("");
+    }
+    if (snapshotNode) {
+      snapshotNode.innerHTML = report.bullets.map(function (item) {
+        return '<div class="stack-card"><p class="card-meta">' + escapeHtml(item) + '</p></div>';
+      }).join("");
+    }
+    if (trustNode) {
+      trustNode.innerHTML = [
+        '<div class="stack-card"><strong>Archive-safe records</strong><p class="card-meta">Requests and volunteers can be archived and restored instead of disappearing permanently.</p></div>',
+        '<div class="stack-card"><strong>Revision + audit trail</strong><p class="card-meta">Revision ' + escapeHtml(String(metrics.revision)) + ' with ' + escapeHtml(String(metrics.activityEvents)) + ' tracked activity event(s) supports submission-safe review.</p></div>',
+        '<div class="stack-card"><strong>Open sharing</strong><p class="card-meta">This public page is read-only, making it easier to show judges or NGO partners the story without exposing editing tools.</p></div>'
+      ].join("");
     }
   }
 

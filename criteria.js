@@ -398,6 +398,10 @@
     setText("#judgeSummary", metrics.totalRequests
       ? "ResourceFlow currently shows " + metrics.totalRequests + " active requests, " + metrics.totalVolunteers + " volunteers, " + metrics.totalAssignments + " assignments, " + metrics.coverage + "% coverage, " + metrics.criticalFill + "% critical fill rate, and revision " + metrics.revision + " with " + metrics.activityEvents + " audit events."
       : "Load demo data or add records to generate a live judging summary.");
+    setText("#judgeMetricRequests", String(metrics.totalRequests));
+    setText("#judgeMetricVolunteers", String(metrics.totalVolunteers));
+    setText("#judgeMetricCoverage", metrics.coverage + "%");
+    setText("#judgeMetricReadiness", metrics.readinessScore + "/100");
 
     const technicalNode = document.querySelector("#judgeTechnical");
     if (technicalNode) {
@@ -445,6 +449,33 @@
         renderStackCard("Cloud-ready architecture", metrics.firebaseEnabled ? "Firebase is configured and ready for shared deployment." : "Add real Firebase credentials in firebase-config.js to enable shared cloud sync."),
         renderStackCard("PWA packaging", pwaStatus.description),
         renderStackCard("Auditability", "Workspace data can be exported as JSON and reviewed with activity-log and revision metadata for code-review-safe traceability.")
+      ].join("");
+    }
+
+    const beforeAfterNode = document.querySelector("#judgeBeforeAfter");
+    if (beforeAfterNode) {
+      beforeAfterNode.innerHTML = [
+        renderStackCard("Before ResourceFlow", "Needs lived in scattered forms, chats, calls, and notes. That slowed prioritization and made staffing decisions inconsistent."),
+        renderStackCard("After ResourceFlow", metrics.totalRequests ? "The current workspace centralizes " + metrics.totalRequests + " requests, " + metrics.totalVolunteers + " volunteers, and " + metrics.totalAssignments + " assignments with live analytics." : "A single workspace now supports intake, matching, forecasting, and delivery proof in one product."),
+        renderStackCard("Measured improvement", "Readiness is " + metrics.readinessScore + "/100, coverage is " + metrics.coverage + "%, and critical fill rate is " + metrics.criticalFill + "% in the current scenario.")
+      ].join("");
+    }
+
+    const sdgNode = document.querySelector("#judgeSdgMap");
+    if (sdgNode) {
+      sdgNode.innerHTML = [
+        renderStackCard("SDG 11: Sustainable Cities and Communities", "Supports faster, more coordinated response for neighborhoods facing community-service or disaster pressure."),
+        renderStackCard("SDG 3: Good Health and Well-Being", "Helps route volunteers to medical support, health camps, and urgent beneficiary needs."),
+        renderStackCard("SDG 17: Partnerships for the Goals", "Lets NGOs, volunteers, coordinators, and public partners collaborate in one shared workflow.")
+      ].join("");
+    }
+
+    const proofNode = document.querySelector("#judgeProofPack");
+    if (proofNode) {
+      proofNode.innerHTML = [
+        renderStackCard("Proof card: workflow board", "Pending, approved, assigned, in-progress, delivered, and closed stages make the operational model easy to review."),
+        renderStackCard("Proof card: public impact page", "Judges and NGOs can open a read-only impact view without editing access."),
+        renderStackCard("Proof card: accessibility + drafts", "The app includes quick tour onboarding, draft recovery, browser-safe accessibility controls, and mobile-friendly layouts.")
       ].join("");
     }
   }

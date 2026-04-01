@@ -3511,3 +3511,178 @@ body[data-page="home"] .site-header {
 body[data-page="home"] .site-header::-webkit-scrollbar {
   display: none;
 }
+
+html.rf-high-contrast body {
+  filter: contrast(1.08) saturate(1.08);
+}
+
+html.rf-reduced-motion *,
+html.rf-reduced-motion *::before,
+html.rf-reduced-motion *::after {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}
+
+html.rf-font-lg {
+  font-size: 17px;
+}
+
+html.rf-font-xl {
+  font-size: 18px;
+}
+
+body[data-page] .site-shell {
+  width: min(1540px, calc(100% - 28px)) !important;
+}
+
+body[data-page]:not([data-page="home"]) .site-header {
+  position: static !important;
+  overflow: visible !important;
+  grid-template-columns: minmax(0, 220px) minmax(0, 1fr) !important;
+  grid-template-areas:
+    "brand nav"
+    "actions actions" !important;
+}
+
+body[data-page]:not([data-page="home"]) .site-header .brand {
+  align-self: start;
+}
+
+body[data-page]:not([data-page="home"]) .site-nav {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)) !important;
+  gap: 12px !important;
+}
+
+body[data-page]:not([data-page="home"]) .site-header .header-actions {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(150px, max-content)) !important;
+  gap: 12px !important;
+  align-items: stretch !important;
+}
+
+body[data-page]:not([data-page="home"]) .header-actions > *,
+body[data-page="home"] .header-actions > * {
+  min-height: 54px !important;
+}
+
+body[data-page="home"] .site-header {
+  overflow: visible !important;
+}
+
+body[data-page="home"] .header-actions {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(170px, max-content)) !important;
+  gap: 14px !important;
+}
+
+.three-column {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.chart-card,
+.stack-card,
+.signal-card,
+.evidence-card,
+.guide-card,
+.portal-card,
+.tech-card,
+.impact-card,
+.stat-card,
+.panel {
+  backdrop-filter: blur(18px);
+}
+
+.stack-card,
+.chart-card,
+.panel,
+.portal-card,
+.guide-card {
+  border: 1px solid rgba(110, 195, 255, 0.12) !important;
+  box-shadow:
+    0 18px 45px rgba(3, 14, 24, 0.36),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.stack-list {
+  gap: 14px !important;
+}
+
+.stack-card strong,
+.panel h2,
+.panel h3,
+.page-intro h1,
+.hero-card h1 {
+  text-wrap: balance;
+}
+
+.button-row.compact-controls {
+  flex-wrap: wrap;
+}
+
+.route-map {
+  min-height: 320px;
+  border-radius: 24px;
+  overflow: hidden;
+}
+
+.hero-card {
+  grid-template-columns: minmax(0, 1.25fr) minmax(340px, 0.75fr) !important;
+  gap: 28px !important;
+}
+
+.hero-copy {
+  max-width: 860px;
+}
+
+.hero-card h1 {
+  font-size: clamp(3.8rem, 9vw, 6rem) !important;
+  line-height: 0.98 !important;
+}
+
+.page-intro h1 {
+  font-size: clamp(2.3rem, 5vw, 4rem) !important;
+  line-height: 1.02 !important;
+}
+
+.inline-select {
+  position: relative;
+}
+
+.inline-select::after {
+  content: "";
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  width: 10px;
+  height: 10px;
+  border-right: 2px solid rgba(222, 248, 255, 0.76);
+  border-bottom: 2px solid rgba(222, 248, 255, 0.76);
+  transform: rotate(45deg);
+  pointer-events: none;
+}
+
+.inline-select select {
+  padding-right: 56px !important;
+}
+
+@media (max-width: 1180px) {
+  .three-column,
+  .hero-card {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 860px) {
+  body[data-page="home"] .header-actions,
+  body[data-page]:not([data-page="home"]) .site-header .header-actions {
+    grid-template-columns: 1fr !important;
+  }
+
+  .three-column {
+    grid-template-columns: 1fr;
+  }
+}
