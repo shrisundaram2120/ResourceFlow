@@ -266,6 +266,124 @@
         expect(/resourceflow\.demo/i.test(queue[0].recipients), "Review recipients should be generated for manual outreach.");
       });
 
+      test("Approval queue keeps new requests pending until reviewed", function () {
+        var normalized = window.ResourceFlowTestAPI.sanitizeState({
+          requests: [
+            {
+              id: "req-pending-1",
+              organization: "Flood Relief Desk",
+              title: "Boat marshal support",
+              category: "Logistics",
+              urgency: 5,
+              peopleNeeded: 2,
+              zone: "South",
+              skills: ["logistics"],
+              approvalStatus: "pending",
+              workflowStatus: "pending"
+            },
+            {
+              id: "req-approved-1",
+              organization: "Meal Network",
+              title: "Community kitchen support",
+              category: "Food Distribution",
+              urgency: 4,
+              peopleNeeded: 1,
+              zone: "East",
+              skills: ["coordination"],
+              approvalStatus: "approved",
+              workflowStatus: "assigned"
+            }
+          ]
+        });
+        var queue = window.ResourceFlowTestAPI.buildApprovalQueue(normalized);
+        expect(queue.length === 1, "Expected only the pending request in the approval queue.");
+        expect(queue[0].id === "req-pending-1", "Approval queue should prioritize the pending request.");
+      });
+
+      test("Shift planning groups requests into shared response slots", function () {
+        var normalized = window.ResourceFlowTestAPI.sanitizeState({
+          requests: [
+            {
+              id: "req-shift-1",
+              organization: "Night Shelter",
+              title: "Bed setup support",
+              category: "Shelter Support",
+              urgency: 4,
+              peopleNeeded: 2,
+              zone: "North",
+              skills: ["logistics"],
+              approvalStatus: "approved",
+              shiftLabel: "Today - Evening"
+            },
+            {
+              id: "req-shift-2",
+              organization: "Mobile Health",
+              title: "Registration desk",
+              category: "Medical Support",
+              urgency: 5,
+              peopleNeeded: 1,
+              zone: "Central",
+              skills: ["registration"],
+              approvalStatus: "approved",
+              shiftLabel: "Today - Evening"
+            }
+          ],
+          assignments: [
+            {
+              id: "asg-shift-1",
+              requestId: "req-shift-1",
+              volunteerId: "vol-shift-1",
+              requestTitle: "Bed setup support",
+              volunteerName: "Aarav",
+              organization: "Night Shelter",
+              category: "Shelter Support",
+              zone: "North",
+              urgency: 4,
+              score: 82,
+              reason: "Zone fit",
+              status: "assigned",
+              shiftLabel: "Today - Evening"
+            }
+          ]
+        });
+        var shifts = window.ResourceFlowTestAPI.buildShiftPlan(normalized);
+        expect(shifts.length === 1, "Expected one grouped shift slot.");
+        expect(shifts[0].title === "Today - Evening", "Shift planner should preserve the shift label.");
+        expect(shifts[0].openSlots === 2, "Expected two open slots after one assignment covers three requested positions.");
+      });
+
+      test("Archived overview surfaces soft-deleted records for restore", function () {
+        var normalized = window.ResourceFlowTestAPI.sanitizeState({
+          requests: [
+            {
+              id: "req-arch-1",
+              organization: "Community Desk",
+              title: "Archived request",
+              category: "Food Distribution",
+              urgency: 2,
+              peopleNeeded: 1,
+              zone: "West",
+              skills: ["coordination"],
+              archived: true
+            }
+          ],
+          volunteers: [
+            {
+              id: "vol-arch-1",
+              name: "Archived Volunteer",
+              zone: "West",
+              availability: "Weekend",
+              skills: ["support"],
+              transport: "No",
+              experience: "Beginner",
+              archived: true
+            }
+          ]
+        });
+        var archived = window.ResourceFlowTestAPI.buildArchivedOverview(normalized);
+        expect(archived.length === 2, "Expected both archived request and volunteer to be visible.");
+      });
+
       test("Volunteer outreach supports multilingual free-mode messaging", function () {
         var normalized = window.ResourceFlowTestAPI.sanitizeState({
           requests: [

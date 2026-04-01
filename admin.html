@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#061521">
   <link rel="manifest" href="./manifest.webmanifest">
   <title>ResourceFlow | Admin</title>
-  <link rel="stylesheet" href="./styles.css?v=20260331-authfix3">
+  <link rel="stylesheet" href="./styles.css?v=20260401-future3">
 </head>
 <body data-page="admin">
   <a class="skip-link" href="#mainContent">Skip to content</a>
@@ -32,6 +32,7 @@
       <div class="header-actions">
         <button class="ghost-button" type="button" data-entity-action="refresh-admin">Refresh Snapshot</button>
         <button class="ghost-button" type="button" data-action="export-governance">Export Governance</button>
+        <a class="ghost-link" href="./impact.html">Public Impact</a>
         <a class="primary-link" href="./tests.html">Open Tests</a>
       </div>
     </header>
@@ -156,11 +157,18 @@
           <div class="empty-box">Role changes, workspace sync events, and notification processing activity will appear here.</div>
         </div>
       </section>
+
+      <section class="panel">
+        <p class="eyebrow">Archive Restore</p>
+        <div id="adminArchiveList" class="stack-list">
+          <div class="empty-box">Archived requests and volunteers can be restored from here.</div>
+        </div>
+      </section>
     </main>
   </div>
 
   <script src="./firebase-config.js"></script>
-  <script src="./app.js?v=20260331-authfix3"></script>
+  <script src="./app.js?v=20260401-freebatch1"></script>
   <script src="./criteria.js"></script>
 </body>
 </html>

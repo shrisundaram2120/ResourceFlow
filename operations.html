@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#061521">
   <link rel="manifest" href="./manifest.webmanifest">
   <title>ResourceFlow | Operations</title>
-  <link rel="stylesheet" href="./styles.css?v=20260331-authfix3">
+  <link rel="stylesheet" href="./styles.css?v=20260401-future3">
 </head>
 <body data-page="operations">
   <a class="skip-link" href="#mainContent">Skip to content</a>
@@ -30,10 +30,22 @@
       </nav>
 
       <div class="header-actions">
+        <label class="inline-select">
+          <span>Scenario</span>
+          <select id="demoScenarioSelect">
+            <option value="mixed">Mixed</option>
+            <option value="flood">Flood</option>
+            <option value="medical">Medical Camp</option>
+            <option value="shelter">Shelter</option>
+            <option value="food">Food Distribution</option>
+          </select>
+        </label>
         <button class="ghost-button" data-action="seed-demo">Load Demo</button>
         <button class="ghost-button" data-action="export-json">Export JSON</button>
         <button class="ghost-button" data-action="export-csv">Export CSV</button>
-        <button class="ghost-button" data-action="print-report">Print Report</button>
+        <button class="ghost-button" data-action="print-field-sheet">Field Sheet</button>
+        <button class="ghost-button" data-action="print-judge-report">Judge Report</button>
+        <a class="ghost-link" href="./impact.html">Public Impact</a>
       </div>
     </header>
 
@@ -133,6 +145,28 @@
                 </select>
               </label>
             </div>
+            <div class="split-grid">
+              <label>
+                Approval
+                <select id="operationsApprovalFilter">
+                  <option value="">All approvals</option>
+                  <option value="pending">Pending</option>
+                  <option value="approved">Approved</option>
+                  <option value="rejected">Rejected</option>
+                </select>
+              </label>
+              <label>
+                Workflow
+                <select id="operationsStatusFilter">
+                  <option value="">All workflow stages</option>
+                  <option value="pending">Pending</option>
+                  <option value="assigned">Assigned</option>
+                  <option value="in-progress">In Progress</option>
+                  <option value="delivered">Delivered</option>
+                  <option value="closed">Closed</option>
+                </select>
+              </label>
+            </div>
           </div>
         </article>
 
@@ -220,7 +254,28 @@
                 Beneficiaries
                 <input name="beneficiaries" type="number" min="1" value="50" required>
               </label>
+              <label>
+                Shift Slot
+                <select name="shiftLabel">
+                  <option>Today - Morning</option>
+                  <option>Today - Afternoon</option>
+                  <option>Today - Evening</option>
+                  <option>Tomorrow - Morning</option>
+                  <option>Tomorrow - Afternoon</option>
+                  <option>Tomorrow - Evening</option>
+                </select>
+              </label>
             </div>
+            <label>
+              Scenario Mode
+              <select name="scenario">
+                <option value="mixed">Mixed Response</option>
+                <option value="flood">Flood</option>
+                <option value="medical">Medical Camp</option>
+                <option value="shelter">Shelter</option>
+                <option value="food">Food Distribution</option>
+              </select>
+            </label>
             <label>
               Required Skills
               <input name="skills" type="text" placeholder="first aid, logistics, driving" required>
@@ -271,6 +326,33 @@
           <span class="mini-label">Cause Alignment</span>
           <strong id="impactCauseFit">Loading</strong>
           <p>Summarizes live impact against the selected social problem.</p>
+        </article>
+      </section>
+
+      <section class="two-column">
+        <article class="panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Approval Queue</p>
+              <h2>Approve or reject incoming requests</h2>
+            </div>
+            <button class="ghost-button" data-action="undo-archive">Undo Last Archive</button>
+          </div>
+          <div id="approvalQueue" class="stack-list">
+            <div class="empty-box">Pending requests will appear here for coordinator approval.</div>
+          </div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Shift Planning</p>
+              <h2>Day-wise response calendar</h2>
+            </div>
+          </div>
+          <div id="shiftPlanner" class="stack-list">
+            <div class="empty-box">Shift slots will appear here after requests and assignments are loaded.</div>
+          </div>
         </article>
       </section>
 
@@ -361,6 +443,28 @@
 
       <section class="two-column">
         <article class="panel">
+          <p class="eyebrow">Workflow Analytics</p>
+          <div id="workflowChart" class="stack-list">
+            <div class="empty-box">Workflow distribution will appear here.</div>
+          </div>
+          <div id="scenarioChart" class="stack-list">
+            <div class="empty-box">Scenario mix will appear here.</div>
+          </div>
+        </article>
+
+        <article class="panel">
+          <p class="eyebrow">Volunteer Utilization</p>
+          <div id="volunteerUtilizationChart" class="stack-list">
+            <div class="empty-box">Volunteer utilization analytics will appear here.</div>
+          </div>
+          <div id="notificationCenter" class="stack-list">
+            <div class="empty-box">Assignments, reminders, and alerts will appear here.</div>
+          </div>
+        </article>
+      </section>
+
+      <section class="two-column">
+        <article class="panel">
           <p class="eyebrow">Zone Coverage</p>
           <div id="zoneCoverageList" class="stack-list">
             <div class="empty-box">Zone coverage evidence will appear here.</div>
@@ -370,6 +474,9 @@
           <p class="eyebrow">Maps-Ready Dispatch</p>
           <div id="mapsDispatchList" class="stack-list">
             <div class="empty-box">Google Maps dispatch links will appear here.</div>
+          </div>
+          <div id="routeClusterList" class="stack-list">
+            <div class="empty-box">Route clusters will appear here.</div>
           </div>
         </article>
       </section>
@@ -443,11 +550,23 @@
           </div>
         </article>
       </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">Archive Safety</p>
+            <h2>Archived requests and volunteers</h2>
+          </div>
+        </div>
+        <div id="archivedOverview" class="stack-list">
+          <div class="empty-box">Archived records will appear here instead of being permanently deleted.</div>
+        </div>
+      </section>
     </main>
   </div>
 
   <script src="./firebase-config.js"></script>
-  <script src="./app.js?v=20260331-authfix3"></script>
+  <script src="./app.js?v=20260401-freebatch1"></script>
   <script src="./criteria.js"></script>
 </body>
 </html>

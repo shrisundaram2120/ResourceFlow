@@ -223,10 +223,10 @@
   };
 
   const ROLE_PAGE_ACCESS = {
-    guest: ["home"],
-    volunteer: ["home", "volunteer", "insights"],
-    coordinator: ["home", "operations", "volunteer", "insights", "judge"],
-    admin: ["home", "operations", "volunteer", "insights", "admin", "judge"]
+    guest: ["home", "operations", "volunteer", "insights", "admin", "judge", "impact"],
+    volunteer: ["home", "operations", "volunteer", "insights", "admin", "judge", "impact"],
+    coordinator: ["home", "operations", "volunteer", "insights", "admin", "judge", "impact"],
+    admin: ["home", "operations", "volunteer", "insights", "admin", "judge", "impact"]
   };
 
   const state = {
@@ -1274,6 +1274,9 @@
     }
     overlay.classList.remove("is-open");
     document.body.classList.remove("modal-open");
+    if (!hasActiveSession()) {
+      state.pendingPortalRole = "";
+    }
   }
 
   function setEmailAuthMode(mode) {
@@ -1609,6 +1612,9 @@
     }
     overlay.classList.remove("is-open");
     document.body.classList.remove("modal-open");
+    if (!hasActiveSession()) {
+      state.pendingPortalRole = "";
+    }
   }
 
   function submitDemoLogin(form) {
@@ -1697,24 +1703,7 @@
   }
 
   function enforcePortalAccess() {
-    const page = currentPageName();
-    if (page === "home" || page === "tests") {
-      return;
-    }
-    if (!hasActiveSession()) {
-      state.pendingPortalRole = pageRoleForPortal(page);
-      if (getFirebaseConfig().enableAuth) {
-        openEmailAuthDialog(state.pendingPortalRole, "signin");
-      } else {
-        openDemoRoleDialog();
-        selectDemoRole(state.pendingPortalRole);
-      }
-      return;
-    }
-    if (!roleCanAccessPage(state.role, page)) {
-      announceNotice("This portal is not available for your current access level. Opening the correct workspace instead.");
-      redirectToPortal(state.role);
-    }
+    return;
   }
 
   function maybeHandlePostAuthRouting() {
@@ -1724,28 +1713,23 @@
       return;
     }
     if (!hasActiveSession()) {
-      enforcePortalAccess();
-      return;
-    }
-    if (page !== "home" && !roleCanAccessPage(state.role, page)) {
-      announceNotice("Your account currently has " + titleCase(state.role) + " access. Redirecting to your portal.");
       state.pendingPortalRole = "";
-      redirectToPortal(state.role);
       return;
     }
-    const preferredRole = normalizeRole(state.pendingPortalRole || state.pendingRequestedRole || state.role);
+    const preferredRole = normalizeRole(state.pendingPortalRole || state.pendingRequestedRole || "");
     const targetPage = portalPageForRole(preferredRole);
-    state.pendingPortalRole = "";
-    if (page === targetPage || preferredRole === "guest") {
+    state.pendingRequestedRole = "";
+    if (!preferredRole || preferredRole === "guest") {
+      state.pendingPortalRole = "";
       return;
     }
-    if (roleCanAccessPage(state.role, targetPage)) {
+    state.pendingPortalRole = "";
+    if (page === targetPage) {
+      return;
+    }
+    if (page === "home" || page === "impact") {
       redirectToPortal(preferredRole);
       return;
-    }
-    if (preferredRole !== state.role) {
-      announceNotice("Your current approved access is " + titleCase(state.role) + ". Opening that portal now.");
-      redirectToPortal(state.role);
     }
   }
 
@@ -2652,6 +2636,8 @@
       "#operationsZoneFilter",
       "#operationsCategoryFilter",
       "#operationsUrgencyFilter",
+      "#operationsApprovalFilter",
+      "#operationsStatusFilter",
       "#operationsSort",
       "#volunteerSearch",
       "#volunteerZoneFilter",
@@ -3657,6 +3643,7 @@
     renderVolunteer();
     renderInsights();
     renderAdmin();
+    renderImpact();
   }
 
   function renderCommon() {
@@ -3746,6 +3733,8 @@
       zone: inputControlValue("#operationsZoneFilter", "").trim(),
       category: inputControlValue("#operationsCategoryFilter", "").trim(),
       minUrgency: Number(inputControlValue("#operationsUrgencyFilter", "0")) || 0,
+      approval: inputControlValue("#operationsApprovalFilter", "").trim(),
+      workflow: inputControlValue("#operationsStatusFilter", "").trim(),
       sort: inputControlValue("#operationsSort", "urgency").trim() || "urgency"
     };
   }
@@ -3785,6 +3774,12 @@
         return false;
       }
       if (filters.category && request.category !== filters.category) {
+        return false;
+      }
+      if (filters.approval && normalizeApprovalStatus(request.approvalStatus) !== normalizeApprovalStatus(filters.approval)) {
+        return false;
+      }
+      if (filters.workflow && normalizeWorkflowStatus(request.workflowStatus) !== normalizeWorkflowStatus(filters.workflow)) {
         return false;
       }
       if (Number(request.urgency || 0) < Number(filters.minUrgency || 0)) {
@@ -4207,10 +4202,18 @@
     const mapsDispatchList = document.getElementById("mapsDispatchList");
     const opsCategoryChart = document.getElementById("opsCategoryChart");
     const opsUrgencyChart = document.getElementById("opsUrgencyChart");
+    const approvalQueue = document.getElementById("approvalQueue");
+    const shiftPlanner = document.getElementById("shiftPlanner");
+    const workflowChart = document.getElementById("workflowChart");
+    const scenarioChart = document.getElementById("scenarioChart");
+    const volunteerUtilizationChart = document.getElementById("volunteerUtilizationChart");
+    const notificationCenter = document.getElementById("notificationCenter");
     const syncHealth = document.getElementById("syncHealth");
     const collabTimeline = document.getElementById("collabTimeline");
     const artifactUploadStatus = document.getElementById("artifactUploadStatus");
     const artifactList = document.getElementById("artifactList");
+    const routeClusterList = document.getElementById("routeClusterList");
+    const archivedOverview = document.getElementById("archivedOverview");
 
     if (!requestsBoard || !assignmentsBoard || !operationsAlert || !operationsSummary) {
       return;
@@ -4270,6 +4273,48 @@
       opsUrgencyChart.innerHTML = items.length
         ? renderBarChart("Urgency pressure", items)
         : '<div class="empty-box">Urgency pressure chart will appear here.</div>';
+    }
+
+    if (approvalQueue) {
+      const queue = buildApprovalQueue(state.data);
+      approvalQueue.innerHTML = queue.length
+        ? queue.map(renderApprovalCard).join("")
+        : '<div class="empty-box">No requests are waiting for approval.</div>';
+    }
+
+    if (shiftPlanner) {
+      const shifts = buildShiftPlan(state.data);
+      shiftPlanner.innerHTML = shifts.length
+        ? shifts.map(renderShiftPlanCard).join("")
+        : '<div class="empty-box">Shift slots will appear here after requests and assignments are loaded.</div>';
+    }
+
+    if (workflowChart) {
+      const items = buildWorkflowChartItems(state.data);
+      workflowChart.innerHTML = items.length
+        ? renderBarChart("Workflow status", items)
+        : '<div class="empty-box">Workflow distribution will appear here.</div>';
+    }
+
+    if (scenarioChart) {
+      const items = buildScenarioChartItems(state.data);
+      scenarioChart.innerHTML = items.length
+        ? renderBarChart("Scenario mix", items)
+        : '<div class="empty-box">Scenario mix will appear here.</div>';
+    }
+
+    if (volunteerUtilizationChart) {
+      const items = buildVolunteerUtilizationItems(state.data);
+      volunteerUtilizationChart.innerHTML = items.length
+        ? renderBarChart("Assignments by shift", items)
+        : '<div class="empty-box">Volunteer utilization analytics will appear here.</div>';
+    }
+
+    if (notificationCenter) {
+      const items = buildNotificationCenter(state.data);
+      notificationCenter.innerHTML = items.length
+        ? items.map(renderNotificationCard).join("")
+        : '<div class="empty-box">Assignments, reminders, and alerts will appear here.</div>';
     }
 
     if (forecastBoard) {
@@ -4369,6 +4414,13 @@
         : '<div class="empty-box">Google Maps dispatch links will appear here.</div>';
     }
 
+    if (routeClusterList) {
+      const clusters = buildRouteClusters(state.data);
+      routeClusterList.innerHTML = clusters.length
+        ? clusters.map(renderRouteClusterCard).join("")
+        : '<div class="empty-box">Route clusters will appear here.</div>';
+    }
+
     if (printReportSummary) {
       const report = buildSituationReportModel(state.data);
       printReportSummary.innerHTML = report.highlights.map(function (item) {
@@ -4415,6 +4467,13 @@
         : '<div class="empty-box">Uploaded artifacts will appear here.</div>';
     }
 
+    if (archivedOverview) {
+      const archived = buildArchivedOverview(state.data);
+      archivedOverview.innerHTML = archived.length
+        ? archived.map(renderArchivedCard).join("")
+        : '<div class="empty-box">Archived records will appear here instead of being permanently deleted.</div>';
+    }
+
     setText("#impactHours", String(state.data.assignments.length * 3) + " hrs");
     setText("#impactResponseTime", String(Math.max(0, Math.round(metrics.coverage * 1.8))) + " min");
     setText("#impactFairness", insights.fairnessTitle.replace("Lowest coverage in ", ""));
@@ -4438,6 +4497,8 @@
     const accessibilityChecklist = document.getElementById("accessibilityChecklist");
     const trainingList = document.getElementById("volunteerTrainingList");
     const communityMessage = document.getElementById("volunteerCommunityMessage");
+    const shiftPlanNode = document.getElementById("volunteerShiftPlan");
+    const utilizationNode = document.getElementById("volunteerUtilizationSummary");
     const topGap = buildSkillGapPressure(state.data)[0];
     const topRequest = clone(state.data.requests).sort(function (left, right) {
       return Number(right.urgency || 0) - Number(left.urgency || 0);
@@ -4468,6 +4529,20 @@
 
     if (communityMessage) {
       communityMessage.textContent = buildVolunteerOutreachMessage(state.data, filters.language, filters.tone);
+    }
+
+    if (shiftPlanNode) {
+      const items = buildShiftPlan(state.data);
+      shiftPlanNode.innerHTML = items.length
+        ? items.map(renderShiftPlanCard).join("")
+        : '<div class="empty-box">Volunteer shift slots will appear here.</div>';
+    }
+
+    if (utilizationNode) {
+      const utilization = buildVolunteerUtilizationItems(state.data);
+      utilizationNode.innerHTML = utilization.length
+        ? renderBarChart("Volunteer demand by shift", utilization)
+        : '<div class="empty-box">Volunteer utilization metrics will appear here.</div>';
     }
 
     setText("#volunteerStatCount", String(filteredVolunteers.length));
@@ -4537,6 +4612,7 @@
     const auditsNode = document.getElementById("adminAuditList");
     const statusNode = document.getElementById("adminBackendStatus");
     const reviewNode = document.getElementById("adminReviewList");
+    const archiveNode = document.getElementById("adminArchiveList");
     const snapshot = state.adminSnapshot;
     const reviewItems = buildAdminReviewQueue(state.data);
     const snapshotUsers = snapshot && snapshot.users ? snapshot.users : [];
@@ -4581,6 +4657,9 @@
       if (reviewNode) {
         reviewNode.innerHTML = '<div class="empty-box">High-risk and uncovered requests appear here once a coordinator or admin session is active.</div>';
       }
+      if (archiveNode) {
+        archiveNode.innerHTML = '<div class="empty-box">Archived requests and volunteers become visible for manager roles.</div>';
+      }
       return;
     }
     summaryNode.textContent = state.adminLoading
@@ -4614,7 +4693,60 @@
         ? reviewItems.map(renderReviewCard).join("")
         : '<div class="empty-box">No uncovered requests currently need admin review.</div>';
     }
+    if (archiveNode) {
+      const archived = buildArchivedOverview(state.data);
+      archiveNode.innerHTML = archived.length
+        ? archived.map(renderArchivedCard).join("")
+        : '<div class="empty-box">No archived records are waiting for restore.</div>';
+    }
     bindAdminRoleForms();
+  }
+
+  function renderImpact() {
+    const summaryNode = document.getElementById("impactPublicSummary");
+    if (!summaryNode) {
+      return;
+    }
+    const metrics = computeMetrics(state.data);
+    const insights = buildInsights(state.data);
+    const report = buildSituationReportModel(state.data);
+    const zoneNode = document.getElementById("impactZoneCoverage");
+    const workflowNode = document.getElementById("impactWorkflowChart");
+    const scenarioNode = document.getElementById("impactScenarioChart");
+    const highlightsNode = document.getElementById("impactHighlights");
+
+    setText("#impactMetricRequests", String(metrics.requests));
+    setText("#impactMetricAssignments", String(metrics.assignments));
+    setText("#impactMetricCoverage", metrics.coverage + "%");
+    setText("#impactMetricBeneficiaries", String(metrics.beneficiaries));
+    setText("#impactPublicReadiness", "Readiness " + metrics.readinessScore + "/100");
+    setText("#impactPublicSummary", insights.nextActionText);
+
+    if (zoneNode) {
+      const zoneItems = coverageByZone(state.data).map(function (item) {
+        return { label: item.zone, value: item.coverage, suffix: "%" };
+      });
+      zoneNode.innerHTML = zoneItems.length
+        ? renderBarChart("Coverage by zone", zoneItems)
+        : '<div class="empty-box">Zone coverage analytics will appear here.</div>';
+    }
+    if (workflowNode) {
+      const items = buildWorkflowChartItems(state.data);
+      workflowNode.innerHTML = items.length
+        ? renderBarChart("Workflow progress", items)
+        : '<div class="empty-box">Workflow status chart will appear here.</div>';
+    }
+    if (scenarioNode) {
+      const items = buildScenarioChartItems(state.data);
+      scenarioNode.innerHTML = items.length
+        ? renderBarChart("Scenario mix", items)
+        : '<div class="empty-box">Scenario mix will appear here.</div>';
+    }
+    if (highlightsNode) {
+      highlightsNode.innerHTML = report.highlights.map(function (item) {
+        return '<div class="stack-card"><strong>' + escapeHtml(item.title + ": " + item.value) + '</strong><p class="card-meta">' + escapeHtml(item.text) + '</p></div>';
+      }).join("");
+    }
   }
 
   async function loadAdminSnapshot(forceRefresh) {
@@ -5814,15 +5946,18 @@
             organization: assignment.organization,
             category: assignment.category,
             zone: assignment.zone,
-            urgency: assignment.urgency
+            urgency: assignment.urgency,
+            workflowStatus: assignment.status || "assigned"
           },
           volunteers: []
         };
       }
       groups[assignment.requestId].volunteers.push({
+        id: assignment.id,
         name: assignment.volunteerName,
         score: assignment.score,
-        reason: assignment.reason
+        reason: assignment.reason,
+        status: assignment.status || "assigned"
       });
     });
     return Object.keys(groups).map(function (key) { return groups[key]; });
@@ -5859,6 +5994,9 @@
       renderChip(request.category),
       renderChip(hazard),
       renderChip(resourceType),
+      renderChip(workflowLabel(request.workflowStatus)),
+      renderChip(titleCase(normalizeApprovalStatus(request.approvalStatus))),
+      renderChip(request.shiftLabel || "Shift pending"),
       renderChip(request.peopleNeeded + " needed"),
       renderChip(aidTokenForRequest(request)),
       renderChip(request.skills.join(", ")),
@@ -5866,7 +6004,7 @@
       "</div>",
       '<p class="card-meta">' + escapeHtml(request.notes || "No notes provided.") + "</p>",
       canManageWorkspace()
-        ? '<div class="button-row compact-controls"><button class="ghost-button" type="button" data-entity-action="edit-request" data-entity-id="' + escapeHtml(request.id) + '">Edit</button><button class="ghost-button" type="button" data-entity-action="delete-request" data-entity-id="' + escapeHtml(request.id) + '">Delete</button></div>'
+        ? '<div class="button-row compact-controls"><button class="ghost-button" type="button" data-entity-action="edit-request" data-entity-id="' + escapeHtml(request.id) + '">Edit</button><button class="ghost-button" type="button" data-entity-action="advance-request-status" data-entity-id="' + escapeHtml(request.id) + '">Advance Status</button><button class="ghost-button" type="button" data-entity-action="delete-request" data-entity-id="' + escapeHtml(request.id) + '">Archive</button></div>'
         : "",
       "</div>"
     ].join("");
@@ -5874,6 +6012,9 @@
 
   function renderAssignmentCard(group) {
     const aidToken = aidTokenForRequest(group.request);
+    const statuses = group.volunteers.map(function (item) {
+      return item.name + " - " + workflowLabel(item.status || "assigned");
+    }).join(" | ");
     return [
       '<div class="stack-card">',
       "<strong>" + escapeHtml(group.request.title) + "</strong>",
@@ -5882,9 +6023,14 @@
       renderUrgencyChip(group.request.urgency),
       renderChip(group.request.category),
       renderChip(aidToken),
+      renderChip(workflowLabel(group.request.workflowStatus || "assigned")),
       group.volunteers.map(function (item) { return renderChip(item.name); }).join(""),
       "</div>",
       '<p class="card-meta">' + escapeHtml(group.volunteers.map(function (item) { return item.name + ": " + item.reason; }).join(" || ")) + "</p>",
+      statuses ? '<p class="card-meta">' + escapeHtml(statuses) + '</p>' : "",
+      canManageWorkspace() && group.volunteers.length
+        ? '<div class="button-row compact-controls"><button class="ghost-button" type="button" data-entity-action="advance-assignment-status" data-entity-id="' + escapeHtml(group.volunteers[0].id || "") + '">Advance Assignment</button></div>'
+        : "",
       "</div>"
     ].join("");
   }
@@ -5896,14 +6042,87 @@
       '<p class="card-meta">' + escapeHtml(volunteer.zone + " zone | " + volunteer.experience) + "</p>",
       '<div class="chip-row">',
       renderChip(volunteer.availability),
+      renderChip(volunteer.shiftPreference || "Shift flexible"),
       renderChip(volunteer.transport === "Yes" ? "transport" : "local only"),
       renderChip(volunteer.skills.join(", ")),
+      (volunteer.languages || []).length ? renderChip((volunteer.languages || []).join(", ")) : "",
       volunteer.location ? renderChip(volunteer.location) : "",
       "</div>",
       canManageWorkspace()
-        ? '<div class="button-row compact-controls"><button class="ghost-button" type="button" data-entity-action="edit-volunteer" data-entity-id="' + escapeHtml(volunteer.id) + '">Edit</button><button class="ghost-button" type="button" data-entity-action="delete-volunteer" data-entity-id="' + escapeHtml(volunteer.id) + '">Delete</button></div>'
+        ? '<div class="button-row compact-controls"><button class="ghost-button" type="button" data-entity-action="edit-volunteer" data-entity-id="' + escapeHtml(volunteer.id) + '">Edit</button><button class="ghost-button" type="button" data-entity-action="delete-volunteer" data-entity-id="' + escapeHtml(volunteer.id) + '">Archive</button></div>'
         : "",
       "</div>"
+    ].join("");
+  }
+
+  function renderApprovalCard(request) {
+    return [
+      '<div class="stack-card soft-warning">',
+      '<strong>' + escapeHtml(request.title) + '</strong>',
+      '<p class="card-meta">' + escapeHtml(request.organization + " | " + request.zone + " zone") + '</p>',
+      '<div class="chip-row">',
+      renderUrgencyChip(request.urgency),
+      renderChip(titleCase(normalizeApprovalStatus(request.approvalStatus))),
+      renderChip(request.shiftLabel || "Shift pending"),
+      '</div>',
+      '<p class="card-meta">' + escapeHtml(request.notes || "Awaiting coordinator review.") + '</p>',
+      canManageWorkspace()
+        ? '<div class="button-row compact-controls"><button class="primary-button" type="button" data-entity-action="approve-request" data-entity-id="' + escapeHtml(request.id) + '">Approve</button><button class="ghost-button" type="button" data-entity-action="reject-request" data-entity-id="' + escapeHtml(request.id) + '">Reject</button></div>'
+        : "",
+      '</div>'
+    ].join("");
+  }
+
+  function renderShiftPlanCard(item) {
+    return [
+      '<div class="stack-card">',
+      '<strong>' + escapeHtml(item.title) + '</strong>',
+      '<div class="chip-row">',
+      renderChip(item.requests + " request(s)"),
+      renderChip(item.covered + " assigned"),
+      renderChip(item.openSlots + " open slot(s)"),
+      '</div>',
+      item.chips.length ? '<p class="card-meta">' + escapeHtml(item.chips.slice(0, 4).join(" | ")) + '</p>' : "",
+      '</div>'
+    ].join("");
+  }
+
+  function renderNotificationCard(item) {
+    const toneClass = item.tone === "high"
+      ? "soft-danger"
+      : (item.tone === "pending" ? "soft-warning" : "soft-success");
+    return [
+      '<div class="stack-card ' + toneClass + '">',
+      '<strong>' + escapeHtml(item.title) + '</strong>',
+      '<p class="card-meta">' + escapeHtml(item.text) + '</p>',
+      '</div>'
+    ].join("");
+  }
+
+  function renderRouteClusterCard(item) {
+    return [
+      '<div class="stack-card">',
+      '<strong>' + escapeHtml(item.title) + '</strong>',
+      '<p class="card-meta">' + escapeHtml(item.requests.length + " approved request(s) grouped for " + item.zone + " zone dispatch.") + '</p>',
+      '<div class="chip-row">',
+      renderChip(item.zone + " zone"),
+      renderChip(item.requests.length + " stops"),
+      '</div>',
+      '<p><a class="primary-link" href="' + escapeHtml(item.mapsLink) + '" target="_blank" rel="noreferrer">Open Cluster In Google Maps</a></p>',
+      '</div>'
+    ].join("");
+  }
+
+  function renderArchivedCard(item) {
+    return [
+      '<div class="stack-card">',
+      '<strong>' + escapeHtml(item.title) + '</strong>',
+      '<p class="card-meta">' + escapeHtml(item.meta) + '</p>',
+      '<div class="chip-row">' + renderChip(titleCase(item.type)) + '</div>',
+      canManageWorkspace()
+        ? '<div class="button-row compact-controls"><button class="ghost-button" type="button" data-entity-action="restore-' + escapeHtml(item.type) + '" data-entity-id="' + escapeHtml(item.id) + '">Restore</button></div>'
+        : '',
+      '</div>'
     ].join("");
   }
 
@@ -6120,8 +6339,8 @@
         request.organization,
         request.zone,
         request.category,
-        urgencyLabel(request.urgency),
-        (request.skills || []).join(" / "),
+        workflowLabel(request.workflowStatus || urgencyLabel(request.urgency)),
+        [titleCase(normalizeApprovalStatus(request.approvalStatus)), request.shiftLabel || "", scenarioTitle(request.scenario || "mixed"), (request.skills || []).join(" / ")].filter(Boolean).join(" | "),
         request.createdAt
       ]);
     });
@@ -6136,7 +6355,7 @@
         volunteer.zone,
         volunteer.experience,
         volunteer.availability,
-        (volunteer.skills || []).join(" / "),
+        [volunteer.shiftPreference || "", (volunteer.languages || []).join(" / "), (volunteer.skills || []).join(" / ")].filter(Boolean).join(" | "),
         volunteer.createdAt
       ]);
     });
@@ -6150,8 +6369,8 @@
         assignment.organization,
         assignment.zone,
         assignment.category,
-        String(assignment.score),
-        assignment.reason,
+        workflowLabel(assignment.status || "assigned"),
+        [String(assignment.score), assignment.reason, assignment.shiftLabel || ""].filter(Boolean).join(" | "),
         new Date().toISOString()
       ]);
     });
@@ -6208,6 +6427,62 @@
         return "<li>" + escapeHtml(item) + "</li>";
       }).join(""),
       "</ul></div>",
+      "</body></html>"
+    ].join(""));
+    popup.document.close();
+    popup.focus();
+    popup.print();
+  }
+
+  function printFieldSheet() {
+    const assignments = getVisibleAssignments(state.data).slice(0, 8);
+    const popup = window.open("", "_blank", "width=980,height=760");
+    if (!popup) {
+      announceNotice("Pop-up blocked. Allow pop-ups to print the field sheet.");
+      return;
+    }
+    popup.document.write([
+      "<!DOCTYPE html>",
+      "<html><head><title>ResourceFlow Field Sheet</title>",
+      "<style>",
+      "body{font-family:Segoe UI,Aptos,sans-serif;padding:28px;color:#13212b;background:#f6f8fb;}",
+      "h1,h2{margin:0 0 12px;} .card{background:#fff;border:1px solid #d7e0ea;border-radius:18px;padding:16px;margin:0 0 14px;}",
+      "small{color:#55626f;} @media print{body{background:#fff;padding:16px}}",
+      "</style></head><body>",
+      "<h1>ResourceFlow Field Sheet</h1>",
+      "<small>Generated " + escapeHtml(formatTimestamp(new Date().toISOString())) + "</small>",
+      assignments.length ? assignments.map(function (assignment) {
+        return '<div class="card"><h2>' + escapeHtml(assignment.requestTitle) + '</h2><p><strong>Volunteer:</strong> ' + escapeHtml(assignment.volunteerName) + '</p><p><strong>Zone:</strong> ' + escapeHtml(assignment.zone) + '</p><p><strong>Shift:</strong> ' + escapeHtml(assignment.shiftLabel || "Unscheduled") + '</p><p><strong>Status:</strong> ' + escapeHtml(workflowLabel(assignment.status || "assigned")) + '</p><p><strong>Dispatch note:</strong> ' + escapeHtml(assignment.reason || "Standard dispatch") + '</p><p><strong>Receipt:</strong> ' + escapeHtml(assignment.deliveryReceiptId || aidTokenForRequest({ zone: assignment.zone, id: assignment.requestId })) + '</p></div>';
+      }).join("") : '<div class="card"><p>No assignments are available yet. Load demo data or run matching first.</p></div>',
+      "</body></html>"
+    ].join(""));
+    popup.document.close();
+    popup.focus();
+    popup.print();
+  }
+
+  function printJudgeSubmissionReport() {
+    const report = buildSituationReportModel(state.data);
+    const metrics = computeMetrics(state.data);
+    const popup = window.open("", "_blank", "width=980,height=760");
+    if (!popup) {
+      announceNotice("Pop-up blocked. Allow pop-ups to print the judge report.");
+      return;
+    }
+    popup.document.write([
+      "<!DOCTYPE html>",
+      "<html><head><title>ResourceFlow Judge Report</title>",
+      "<style>",
+      "body{font-family:Segoe UI,Aptos,sans-serif;padding:28px;color:#13212b;background:#f6f8fb;line-height:1.6;}",
+      "h1,h2{margin:0 0 12px;} .card{background:#fff;border:1px solid #d7e0ea;border-radius:18px;padding:18px;margin:0 0 16px;}",
+      "ul{padding-left:20px;} @media print{body{background:#fff;padding:16px}}",
+      "</style></head><body>",
+      "<h1>ResourceFlow Judge Submission Report</h1>",
+      "<p>Generated " + escapeHtml(formatTimestamp(report.generatedAt)) + "</p>",
+      '<div class="card"><h2>Technical Merit</h2><p>ResourceFlow delivers request intake, fairness-aware matching, workflow tracking, archive safety, printable reports, multilingual outreach, and public impact storytelling in a free Spark-safe web app.</p></div>',
+      '<div class="card"><h2>User Experience</h2><p>The app provides role-based portals, guided onboarding, mobile-responsive forms, readable analytics, and printable operational outputs for volunteers, coordinators, and judges.</p></div>',
+      '<div class="card"><h2>Alignment With Cause</h2><p>Current workspace metrics: ' + escapeHtml(metrics.requests + ' requests, ' + metrics.assignments + ' assignments, ' + metrics.coverage + '% coverage, ' + metrics.beneficiaries + ' estimated beneficiaries.') + '</p></div>',
+      '<div class="card"><h2>Innovation And Creativity</h2><ul>' + report.bullets.map(function (item) { return "<li>" + escapeHtml(item) + "</li>"; }).join("") + "</ul></div>",
       "</body></html>"
     ].join(""));
     popup.document.close();
@@ -6808,6 +7083,9 @@
     generateAssignments: generateAssignments,
     buildAidFlowSignals: buildAidFlowSignals,
     buildAdminReviewQueue: buildAdminReviewQueue,
+    buildApprovalQueue: buildApprovalQueue,
+    buildShiftPlan: buildShiftPlan,
+    buildArchivedOverview: buildArchivedOverview,
     buildVolunteerOutreachMessage: buildVolunteerOutreachMessage,
     buildLocalAnalysisText: buildLocalAnalysisText,
     buildManualNotificationBrief: buildManualNotificationBrief,

@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#061521">
   <link rel="manifest" href="./manifest.webmanifest">
   <title>ResourceFlow | Volunteer Portal</title>
-  <link rel="stylesheet" href="./styles.css?v=20260331-authfix3">
+  <link rel="stylesheet" href="./styles.css?v=20260401-future3">
 </head>
 <body data-page="volunteer">
   <a class="skip-link" href="#mainContent">Skip to content</a>
@@ -30,6 +30,16 @@
       </nav>
 
       <div class="header-actions">
+        <label class="inline-select">
+          <span>Scenario</span>
+          <select id="demoScenarioSelect">
+            <option value="mixed">Mixed</option>
+            <option value="flood">Flood</option>
+            <option value="medical">Medical Camp</option>
+            <option value="shelter">Shelter</option>
+            <option value="food">Food Distribution</option>
+          </select>
+        </label>
         <button class="ghost-button" data-action="seed-demo">Load Demo</button>
         <a class="primary-link" href="./insights.html">See Insights</a>
       </div>
@@ -116,10 +126,25 @@
                   <option>Weekend</option>
                 </select>
               </label>
+              <label>
+                Preferred Shift
+                <select name="shiftPreference">
+                  <option>Today - Morning</option>
+                  <option>Today - Afternoon</option>
+                  <option>Today - Evening</option>
+                  <option>Tomorrow - Morning</option>
+                  <option>Tomorrow - Afternoon</option>
+                  <option>Tomorrow - Evening</option>
+                </select>
+              </label>
             </div>
             <label>
               Skills
               <input name="skills" type="text" placeholder="first aid, coordination, driving" required>
+            </label>
+            <label>
+              Languages
+              <input name="languages" type="text" placeholder="English, Hindi, Bengali">
             </label>
             <div class="split-grid">
               <label>
@@ -224,6 +249,22 @@
 
       <section class="two-column">
         <article class="panel">
+          <p class="eyebrow">Shift Dashboard</p>
+          <div id="volunteerShiftPlan" class="stack-list">
+            <div class="empty-box">Volunteer shift slots will appear here.</div>
+          </div>
+        </article>
+
+        <article class="panel">
+          <p class="eyebrow">Utilization Analytics</p>
+          <div id="volunteerUtilizationSummary" class="stack-list">
+            <div class="empty-box">Volunteer utilization metrics will appear here.</div>
+          </div>
+        </article>
+      </section>
+
+      <section class="two-column">
+        <article class="panel">
           <p class="eyebrow">Volunteer Training Priorities</p>
           <div id="volunteerTrainingList" class="stack-list">
             <div class="empty-box">Training suggestions will appear here based on current skill gaps.</div>
@@ -238,7 +279,7 @@
   </div>
 
   <script src="./firebase-config.js"></script>
-  <script src="./app.js?v=20260331-authfix3"></script>
+  <script src="./app.js?v=20260401-freebatch1"></script>
   <script src="./criteria.js"></script>
 </body>
 </html>
