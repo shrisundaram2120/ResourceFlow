@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#061521">
   <link rel="manifest" href="./manifest.webmanifest">
   <title>ResourceFlow | Overview</title>
-  <link rel="stylesheet" href="./styles.css?v=20260402-overview1">
+  <link rel="stylesheet" href="./styles.css?v=20260402-rolelock1">
 </head>
 <body data-page="home">
   <a class="skip-link" href="#mainContent">Skip to content</a>
@@ -32,8 +32,8 @@
       </nav>
 
       <div class="header-actions">
-        <button class="ghost-button" data-action="seed-demo">Load Demo</button>
-        <a class="primary-link" href="./operations.html">Open App</a>
+        <button class="ghost-button" data-action="seed-demo" data-manager-action="true">Load Demo</button>
+        <a class="primary-link" id="overviewEntryLink" href="./operations.html">Open App</a>
       </div>
     </header>
 
@@ -46,8 +46,8 @@
             ResourceFlow centralizes requests, volunteers, approvals, assignment tracking, and impact proof so community organizations can respond faster and more clearly.
           </p>
           <div class="button-row">
-            <a class="primary-link" href="./operations.html">Go To Command Center</a>
-            <a class="ghost-link" href="./judge.html">Open Judge Mode</a>
+            <a class="primary-link" id="overviewPrimaryAction" href="./operations.html">Go To Command Center</a>
+            <a class="ghost-link" id="overviewSecondaryAction" href="./judge.html">Open Judge Mode</a>
           </div>
           <ul class="hero-points">
             <li>Capture and approve requests in one place</li>
@@ -191,15 +191,15 @@
           <p class="eyebrow">Quick Links</p>
           <h2>Open the key workspaces</h2>
           <div class="stack-list">
-            <a class="stack-card" href="./operations.html">
+            <a class="stack-card" data-access-page="operations" href="./operations.html">
               <strong>Operations Center</strong>
               <p class="card-meta">Command center for approvals, matching, and request management.</p>
             </a>
-            <a class="stack-card" href="./volunteer.html">
+            <a class="stack-card" data-access-page="volunteer" href="./volunteer.html">
               <strong>Volunteer Portal</strong>
               <p class="card-meta">Readiness, registration, and opportunity discovery.</p>
             </a>
-            <a class="stack-card" href="./impact.html">
+            <a class="stack-card" data-access-page="impact" href="./impact.html">
               <strong>Public Impact</strong>
               <p class="card-meta">Community-facing results, summaries, and proof for partners or judges.</p>
             </a>
@@ -210,7 +210,7 @@
   </div>
 
   <script src="./firebase-config.js"></script>
-  <script src="./app.js?v=20260402-overview1"></script>
-  <script src="./criteria.js?v=20260402-overview1"></script>
+  <script src="./app.js?v=20260402-rolelock1"></script>
+  <script src="./criteria.js?v=20260402-rolelock1"></script>
 </body>
 </html>

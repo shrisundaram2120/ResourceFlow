@@ -245,6 +245,39 @@
     admin: ["home", "operations", "volunteer", "insights", "admin", "judge", "impact"]
   };
 
+  const ROLE_PORTAL_META = {
+    user: {
+      label: "Community User",
+      summary: "View public updates, impact proof, and trusted response summaries.",
+      badges: ["Overview", "Public Impact", "Read-only access"]
+    },
+    volunteer: {
+      label: "Volunteer",
+      summary: "Register availability, update your responder profile, and review guided opportunities.",
+      badges: ["Volunteer Portal", "AI Insights", "Impact view"]
+    },
+    government: {
+      label: "Government",
+      summary: "Review requests, manage operations, and coordinate field response across zones.",
+      badges: ["Operations", "AI Insights", "Impact view"]
+    },
+    coordinator: {
+      label: "Coordinator",
+      summary: "Manage response queues, staffing, and delivery planning in the shared workspace.",
+      badges: ["Operations", "AI Insights", "Impact view"]
+    },
+    admin: {
+      label: "Admin",
+      summary: "Oversee the full platform, role management, audit history, and judging story.",
+      badges: ["All workspaces", "Admin Console", "Judge Mode"]
+    },
+    guest: {
+      label: "Guest",
+      summary: "Secure access is still being checked for this workspace.",
+      badges: ["Access check"]
+    }
+  };
+
   const state = {
     data: createEmptyState(),
     adapter: null,
@@ -1173,8 +1206,10 @@
     authPanel.className = "auth-panel";
     authPanel.innerHTML = [
       '<div class="auth-copy">',
-      '<strong id="authUserLabel">Secure access available</strong>',
-      '<small id="authRoleLabel">Sign in or create your account to enter the workspace.</small>',
+      '<span class="mini-label">Workspace Access</span>',
+      '<strong id="authUserLabel">Checking workspace access</strong>',
+      '<small id="authRoleLabel">Verifying your selected portal and permissions.</small>',
+      '<div class="chip-row auth-role-badges" id="authRoleBadges" aria-live="polite"></div>',
       "</div>",
       '<label class="inline-select auth-language-select" aria-label="Workspace language">',
       '<span>Workspace Language</span>',
@@ -1186,13 +1221,32 @@
       "</select>",
       "</label>",
       '<div class="auth-actions">',
-      '<button class="ghost-button" id="signInButton" type="button">Sign In</button>',
+      '<button class="ghost-button" id="signInButton" type="button" hidden>Secure Access</button>',
       '<button class="ghost-button" id="tourButton" type="button">Quick Tour</button>',
       '<button class="ghost-button" id="switchRoleButton" type="button" hidden>Switch Portal</button>',
       '<button class="ghost-button" id="signOutButton" type="button" hidden>Sign Out</button>',
       "</div>"
     ].join("");
     headerActions.prepend(authPanel);
+  }
+
+  function currentRoleMeta(role) {
+    return ROLE_PORTAL_META[normalizeRole(role)] || ROLE_PORTAL_META.guest;
+  }
+
+  function renderRoleBadges(node, role, requestedRole) {
+    if (!node) {
+      return;
+    }
+    const meta = currentRoleMeta(role);
+    const badges = Array.isArray(meta.badges) ? meta.badges.slice() : [];
+    const normalizedRequested = normalizeRole(requestedRole);
+    if (normalizedRequested && normalizedRequested !== "guest" && normalizedRequested !== normalizeRole(role)) {
+      badges.push("Requested: " + titleCase(normalizedRequested));
+    }
+    node.innerHTML = badges.map(function (badge) {
+      return renderChip(badge);
+    }).join("");
   }
 
   function ensureScreenLockOverlay() {
@@ -1870,48 +1924,62 @@
 
   function renderAuthUi() {
     ensureAuthShell();
-    renderScreenLock();
-    renderPortalSelection();
+    if (!getFirebaseConfig().enableAuth) {
+      renderScreenLock();
+      renderPortalSelection();
+    }
     const userLabel = document.getElementById("authUserLabel");
     const roleLabel = document.getElementById("authRoleLabel");
+    const roleBadges = document.getElementById("authRoleBadges");
     const signInButton = document.getElementById("signInButton");
     const tourButton = document.getElementById("tourButton");
     const switchRoleButton = document.getElementById("switchRoleButton");
     const signOutButton = document.getElementById("signOutButton");
     const uiLanguageSelect = document.getElementById("uiLanguageSelect");
-    if (!userLabel || !roleLabel || !signInButton || !tourButton || !switchRoleButton || !signOutButton || !uiLanguageSelect) {
+    if (!userLabel || !roleLabel || !roleBadges || !signInButton || !tourButton || !switchRoleButton || !signOutButton || !uiLanguageSelect) {
       return;
     }
     const accessRole = activeAccessRole();
     const profileSummary = activePortalProfile();
+    const roleMeta = currentRoleMeta(accessRole);
+
+    userLabel.textContent = "Checking workspace access";
+    roleLabel.textContent = "Verifying your selected portal and permissions.";
+    renderRoleBadges(roleBadges, "guest", "");
+    signInButton.hidden = true;
+    switchRoleButton.hidden = true;
+    signOutButton.hidden = true;
 
     if (state.user) {
       const requestedRole = normalizeRole(state.userProfile && state.userProfile.requestedRole);
       userLabel.textContent = safeText(state.user.displayName || state.user.email || "Signed in", 60);
       roleLabel.textContent = requestedRole && requestedRole !== accessRole && requestedRole !== "user"
-        ? titleCase(accessRole) + " access - " + titleCase(requestedRole) + " portal request is waiting for approval"
-        : titleCase(accessRole) + " access" + (profileSummary && profileSummary.primarySummary
-          ? " - " + profileSummary.primarySummary
-          : (canManageWorkspace() ? " - workspace tools enabled" : " - limited role view"));
-      signInButton.hidden = true;
+        ? roleMeta.label + " access - " + titleCase(requestedRole) + " portal request is waiting for approval"
+        : roleMeta.label + " access - " + (profileSummary && profileSummary.primarySummary
+          ? profileSummary.primarySummary
+          : roleMeta.summary);
+      renderRoleBadges(roleBadges, accessRole, requestedRole);
       switchRoleButton.hidden = false;
       signOutButton.hidden = false;
     } else if (state.demoSession) {
       userLabel.textContent = safeText(state.demoSession.displayName, 60);
-      roleLabel.textContent = titleCase(state.role) + " demo session" + (canManageWorkspace() ? " - manager tools enabled" : " - volunteer workspace enabled") + (getFirebaseConfig().enableAuth ? " - use Cloud Sign In for saved access" : "");
-      signInButton.textContent = getFirebaseConfig().enableAuth ? "Cloud Sign In" : "Portal Login";
-      signInButton.hidden = !getFirebaseConfig().enableAuth;
+      roleLabel.textContent = roleMeta.label + " demo session - " + roleMeta.summary;
+      renderRoleBadges(roleBadges, state.role, "");
       switchRoleButton.hidden = false;
       signOutButton.hidden = false;
     } else {
-      userLabel.textContent = getFirebaseConfig().enableAuth ? "Guest mode" : "Demo access required";
-      roleLabel.textContent = getFirebaseConfig().enableAuth
-        ? "Sign in with email/password or Google to unlock the shared workspace."
-        : "Choose Volunteer, Coordinator, or Admin to enter the prototype workspace.";
-      signInButton.textContent = "Portal Login";
-      signInButton.hidden = false;
-      switchRoleButton.hidden = true;
-      signOutButton.hidden = true;
+      if (!state.authResolved) {
+        userLabel.textContent = "Checking workspace access";
+        roleLabel.textContent = "Verifying your sign-in state before opening the selected portal.";
+      } else if (getFirebaseConfig().enableAuth) {
+        userLabel.textContent = "Secure access required";
+        roleLabel.textContent = "This workspace now redirects through the dedicated sign-in page.";
+      } else {
+        userLabel.textContent = "Demo access required";
+        roleLabel.textContent = "Choose a demo role to open the prototype workspace.";
+        signInButton.textContent = "Portal Login";
+        signInButton.hidden = false;
+      }
     }
 
     if (signInButton.dataset.bound !== "true") {
@@ -4498,9 +4566,22 @@
     const role = getFirebaseConfig().enableAuth
       ? activeAccessRole()
       : (state.demoSession ? normalizeRole(state.role) : "guest");
+    document.body.dataset.accessRole = role;
     document.querySelectorAll("[data-nav]").forEach(function (node) {
       const allowed = roleCanAccessPage(role, node.dataset.nav || "home");
       node.hidden = !allowed;
+      node.classList.toggle("is-hidden-access", !allowed);
+      node.classList.toggle("active", !allowed ? false : (node.dataset.nav || "home") === currentPageName());
+    });
+    document.querySelectorAll("[data-access-page]").forEach(function (node) {
+      const allowed = roleCanAccessPage(role, node.dataset.accessPage || "home");
+      node.hidden = !allowed;
+    });
+    document.querySelectorAll("[data-manager-action]").forEach(function (node) {
+      node.hidden = !canManageWorkspace();
+    });
+    document.querySelectorAll("[data-admin-action]").forEach(function (node) {
+      node.hidden = activeAccessRole() !== "admin";
     });
   }
 
@@ -4512,6 +4593,53 @@
     const guidedDemoPanel = document.getElementById("guidedDemoPanel");
     const primaryAction = document.querySelector("body[data-page='home'] .button-row .primary-link");
     const secondaryAction = document.querySelector("body[data-page='home'] .button-row .ghost-link");
+    const overviewEntryLink = document.getElementById("overviewEntryLink");
+    const role = activeAccessRole();
+
+    if (primaryAction) {
+      if (role === "admin") {
+        primaryAction.textContent = "Open Admin Console";
+        primaryAction.href = "./admin.html";
+      } else if (role === "government" || role === "coordinator") {
+        primaryAction.textContent = "Open Operations";
+        primaryAction.href = "./operations.html";
+      } else if (role === "volunteer") {
+        primaryAction.textContent = "Open Volunteer Portal";
+        primaryAction.href = "./volunteer.html";
+      } else {
+        primaryAction.textContent = "View Public Impact";
+        primaryAction.href = "./impact.html";
+      }
+    }
+    if (secondaryAction) {
+      secondaryAction.hidden = false;
+      if (role === "admin") {
+        secondaryAction.textContent = "Open Judge Mode";
+        secondaryAction.href = "./judge.html";
+      } else if (role === "user") {
+        secondaryAction.textContent = "Impact Story";
+        secondaryAction.href = "./impact.html";
+      } else {
+        secondaryAction.textContent = "See Insights";
+        secondaryAction.href = "./insights.html";
+      }
+    }
+    if (overviewEntryLink) {
+      if (role === "admin") {
+        overviewEntryLink.textContent = "Open Admin Console";
+        overviewEntryLink.href = "./admin.html";
+      } else if (role === "government" || role === "coordinator") {
+        overviewEntryLink.textContent = "Open Operations";
+        overviewEntryLink.href = "./operations.html";
+      } else if (role === "volunteer") {
+        overviewEntryLink.textContent = "Open Volunteer Portal";
+        overviewEntryLink.href = "./volunteer.html";
+      } else {
+        overviewEntryLink.textContent = "View Public Impact";
+        overviewEntryLink.href = "./impact.html";
+      }
+    }
+
     if (!activityNode) {
       return;
     }

@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#061521">
   <link rel="manifest" href="./manifest.webmanifest">
   <title>ResourceFlow | Volunteer Portal</title>
-  <link rel="stylesheet" href="./styles.css?v=20260402-authhero1">
+  <link rel="stylesheet" href="./styles.css?v=20260402-rolelock1">
 </head>
 <body data-page="volunteer">
   <a class="skip-link" href="#mainContent">Skip to content</a>
@@ -30,7 +30,7 @@
       </nav>
 
       <div class="header-actions">
-        <label class="inline-select">
+        <label class="inline-select" data-manager-action="true">
           <span>Scenario</span>
           <select id="demoScenarioSelect">
             <option value="mixed">Mixed</option>
@@ -40,7 +40,7 @@
             <option value="food">Food Distribution</option>
           </select>
         </label>
-        <button class="ghost-button" data-action="seed-demo">Load Demo</button>
+        <button class="ghost-button" data-action="seed-demo" data-manager-action="true">Load Demo</button>
         <a class="primary-link" href="./insights.html">See Insights</a>
       </div>
     </header>
@@ -315,7 +315,7 @@
   </div>
 
   <script src="./firebase-config.js"></script>
-  <script src="./app.js?v=20260402-authhero1"></script>
+  <script src="./app.js?v=20260402-rolelock1"></script>
   <script src="./criteria.js"></script>
 </body>
 </html>
