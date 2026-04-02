@@ -6,13 +6,13 @@
   <meta name="theme-color" content="#061521">
   <link rel="manifest" href="./manifest.webmanifest">
   <title>ResourceFlow | AI Insights</title>
-  <link rel="stylesheet" href="./styles.css?v=20260401-future3">
+  <link rel="stylesheet" href="./styles.css?v=20260402-authhero1">
 </head>
 <body data-page="insights">
   <a class="skip-link" href="#mainContent">Skip to content</a>
   <div class="site-shell">
     <header class="site-header">
-      <a class="brand" href="./index.html" aria-label="ResourceFlow home">
+      <a class="brand" href="./overview.html" aria-label="ResourceFlow overview">
         <span class="brand-mark">RF</span>
         <span>
           <strong>ResourceFlow</strong>
@@ -21,7 +21,7 @@
       </a>
 
       <nav class="site-nav" aria-label="Primary">
-        <a class="nav-link" data-nav="home" href="./index.html">Overview</a>
+        <a class="nav-link" data-nav="home" href="./overview.html">Overview</a>
         <a class="nav-link" data-nav="operations" href="./operations.html">Operations</a>
         <a class="nav-link" data-nav="volunteer" href="./volunteer.html">Volunteer Portal</a>
         <a class="nav-link" data-nav="insights" href="./insights.html">AI Insights</a>
@@ -188,78 +188,82 @@
         </article>
       </section>
 
-      <section class="two-column">
-        <article class="panel">
-          <p class="eyebrow">Gemini-Ready Prompt</p>
-          <pre id="geminiPrompt" class="brief-box">No data yet.</pre>
-        </article>
+      <details class="advanced-disclosure">
+        <summary>Advanced insight tools</summary>
 
-        <article class="panel">
-          <p class="eyebrow">Scale Strategy</p>
-          <pre id="scaleStrategy" class="brief-box">No data yet.</pre>
-        </article>
-      </section>
+        <section class="two-column">
+          <article class="panel">
+            <p class="eyebrow">Gemini-Ready Prompt</p>
+            <pre id="geminiPrompt" class="brief-box">No data yet.</pre>
+          </article>
 
-      <section class="two-column">
-        <article class="panel">
-          <div class="panel-head">
-            <div>
-              <p class="eyebrow">Live Gemini Analysis</p>
-              <h2>Call Gemini for real workspace recommendations</h2>
+          <article class="panel">
+            <p class="eyebrow">Scale Strategy</p>
+            <pre id="scaleStrategy" class="brief-box">No data yet.</pre>
+          </article>
+        </section>
+
+        <section class="two-column">
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Live Gemini Analysis</p>
+                <h2>Call Gemini for real workspace recommendations</h2>
+              </div>
+              <button class="primary-button" data-action="run-gemini-live">Run Gemini</button>
             </div>
-            <button class="primary-button" data-action="run-gemini-live">Run Gemini</button>
-          </div>
-          <div id="geminiLiveStatus" class="subtle-banner">Add a Gemini API key in `firebase-config.js` to enable live model analysis.</div>
-          <pre id="geminiLiveResponse" class="brief-box">Gemini output will appear here.</pre>
-        </article>
+            <div id="geminiLiveStatus" class="subtle-banner">Add a Gemini API key in `firebase-config.js` to enable live model analysis.</div>
+            <pre id="geminiLiveResponse" class="brief-box">Gemini output will appear here.</pre>
+          </article>
 
-        <article class="panel">
-          <p class="eyebrow">Analytics Charts</p>
-          <div id="zoneChart" class="stack-list">
-            <div class="empty-box">Zone coverage chart will appear here.</div>
-          </div>
-          <div id="skillChart" class="stack-list">
-            <div class="empty-box">Skill gap chart will appear here.</div>
-          </div>
-        </article>
-      </section>
-
-      <section class="two-column">
-        <article class="panel">
-          <div class="panel-head">
-            <div>
-              <p class="eyebrow">Risk Radar</p>
-              <h2>High-risk requests and gaps</h2>
+          <article class="panel">
+            <p class="eyebrow">Analytics Charts</p>
+            <div id="zoneChart" class="stack-list">
+              <div class="empty-box">Zone coverage chart will appear here.</div>
             </div>
-            <button class="ghost-button" data-action="download-analysis">Download Analysis Pack</button>
-          </div>
-          <div id="riskRadarList" class="stack-list">
-            <div class="empty-box">Risk-ranked requests will appear here.</div>
-          </div>
-        </article>
+            <div id="skillChart" class="stack-list">
+              <div class="empty-box">Skill gap chart will appear here.</div>
+            </div>
+          </article>
+        </section>
 
-        <article class="panel">
-          <p class="eyebrow">Trend History</p>
-          <div id="trendHistoryList" class="stack-list">
-            <div class="empty-box">Revision trend history will appear here.</div>
-          </div>
-        </article>
-      </section>
+        <section class="two-column">
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Risk Radar</p>
+                <h2>High-risk requests and gaps</h2>
+              </div>
+              <button class="ghost-button" data-action="download-analysis">Download Analysis Pack</button>
+            </div>
+            <div id="riskRadarList" class="stack-list">
+              <div class="empty-box">Risk-ranked requests will appear here.</div>
+            </div>
+          </article>
 
-      <section class="panel">
-        <p class="eyebrow">Innovation Evidence</p>
-        <div id="innovationEvidenceGrid" class="criteria-grid">
-          <article class="evidence-card"><h3>Novel Workflow</h3><p>Innovation evidence will appear here.</p></article>
-          <article class="evidence-card"><h3>Creative Use Of AI</h3><p>AI evidence will appear here.</p></article>
-          <article class="evidence-card"><h3>Scalability</h3><p>Scaling evidence will appear here.</p></article>
-          <article class="evidence-card"><h3>Community Value</h3><p>Impact evidence will appear here.</p></article>
-        </div>
-      </section>
+          <article class="panel">
+            <p class="eyebrow">Trend History</p>
+            <div id="trendHistoryList" class="stack-list">
+              <div class="empty-box">Revision trend history will appear here.</div>
+            </div>
+          </article>
+        </section>
+
+        <section class="panel">
+          <p class="eyebrow">Innovation Evidence</p>
+          <div id="innovationEvidenceGrid" class="criteria-grid">
+            <article class="evidence-card"><h3>Novel Workflow</h3><p>Innovation evidence will appear here.</p></article>
+            <article class="evidence-card"><h3>Creative Use Of AI</h3><p>AI evidence will appear here.</p></article>
+            <article class="evidence-card"><h3>Scalability</h3><p>Scaling evidence will appear here.</p></article>
+            <article class="evidence-card"><h3>Community Value</h3><p>Impact evidence will appear here.</p></article>
+          </div>
+        </section>
+      </details>
     </main>
   </div>
 
   <script src="./firebase-config.js"></script>
-  <script src="./app.js?v=20260401-upgrade4"></script>
+  <script src="./app.js?v=20260402-authhero1"></script>
   <script src="./criteria.js"></script>
 </body>
 </html>

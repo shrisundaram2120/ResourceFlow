@@ -1,6 +1,8 @@
 ﻿(function () {
   const STORAGE_KEY = "resourceflow-state-v4";
   const DEMO_AUTH_KEY = "resourceflow-demo-auth-v1";
+  const PORTAL_SELECTION_KEY = "resourceflow-portal-selection-v1";
+  const PORTAL_PROFILE_KEY = "resourceflow-portal-profile-v1";
   const REQUEST_DRAFT_KEY = "resourceflow-request-draft-v1";
   const VOLUNTEER_DRAFT_KEY = "resourceflow-volunteer-draft-v1";
   const ONBOARDING_KEY = "resourceflow-onboarding-v1";
@@ -192,6 +194,14 @@
   ];
 
   const DEMO_ROLE_PROFILES = {
+    user: {
+      role: "user",
+      title: "Community User",
+      displayName: "Aditi Das",
+      email: "user@resourceflow.demo",
+      summary: "Check trusted updates, browse public impact, and view response progress in your area.",
+      bullets: ["Citizen access", "Read-only updates", "Impact and help desk views"]
+    },
     volunteer: {
       role: "volunteer",
       title: "Volunteer Responder",
@@ -200,11 +210,11 @@
       summary: "Register availability, discover high-impact tasks, and join field response safely.",
       bullets: ["Volunteer Portal access", "Opportunity guidance", "Training and outreach tools"]
     },
-    coordinator: {
-      role: "coordinator",
-      title: "Field Coordinator",
+    government: {
+      role: "government",
+      title: "Government Officer",
       displayName: "Ravi Sen",
-      email: "coordinator@resourceflow.demo",
+      email: "gov@resourceflow.demo",
       summary: "Manage requests, run matching, review forecasts, and coordinate ground operations.",
       bullets: ["Operations dashboard", "Matching controls", "AidFlow forecast and dispatch"]
     },
@@ -219,15 +229,19 @@
   };
 
   const DEMO_PORTAL_ROUTES = {
+    user: "./overview.html",
     volunteer: "./volunteer.html",
+    government: "./operations.html",
     coordinator: "./operations.html",
     admin: "./admin.html"
   };
 
   const ROLE_PAGE_ACCESS = {
-    guest: ["home", "operations", "volunteer", "insights", "admin", "judge", "impact"],
-    volunteer: ["home", "operations", "volunteer", "insights", "admin", "judge", "impact"],
-    coordinator: ["home", "operations", "volunteer", "insights", "admin", "judge", "impact"],
+    guest: [],
+    user: ["home", "impact"],
+    volunteer: ["home", "volunteer", "insights", "impact"],
+    government: ["home", "operations", "insights", "impact"],
+    coordinator: ["home", "operations", "insights", "impact"],
     admin: ["home", "operations", "volunteer", "insights", "admin", "judge", "impact"]
   };
 
@@ -246,6 +260,10 @@
     pendingDemoRole: "",
     pendingRequestedRole: "",
     pendingPortalRole: "",
+    selectedPortalRole: "",
+    portalProfiles: {},
+    authResolved: false,
+    pendingSignupLocation: "",
     pendingAuthMode: "signin",
     role: "guest",
     userProfile: null,
@@ -294,11 +312,14 @@
     ensureEmailAuthModal();
     ensureTourDialog();
     loadDemoSession();
+    loadSelectedPortal();
+    loadPortalProfiles();
     loadOnboardingState();
     loadUiLanguage();
     loadUiPreferences();
     loadOpsNotes();
     applyUiPreferences();
+    renderAuthUi();
     bindGlobalActions();
     bindEntityActions();
     bindCrossTabSync();
@@ -888,6 +909,7 @@
       initializeAuth();
     } catch (error) {
       console.warn("Firebase runtime initialization failed.", error);
+      state.authResolved = true;
       renderAuthUi();
     }
   }
@@ -925,6 +947,56 @@
         state.role = "guest";
         state.userProfile = null;
       }
+    }
+  }
+
+  function loadSelectedPortal() {
+    try {
+      const stored = localStorage.getItem(PORTAL_SELECTION_KEY);
+      state.selectedPortalRole = normalizeRole(stored);
+      if (state.selectedPortalRole === "guest") {
+        state.selectedPortalRole = "";
+      }
+    } catch (error) {
+      state.selectedPortalRole = "";
+    }
+  }
+
+  function loadPortalProfiles() {
+    try {
+      const raw = localStorage.getItem(PORTAL_PROFILE_KEY);
+      const parsed = raw ? JSON.parse(raw) : {};
+      state.portalProfiles = parsed && typeof parsed === "object" ? parsed : {};
+    } catch (error) {
+      state.portalProfiles = {};
+    }
+  }
+
+  function activeAccessRole() {
+    return normalizeRole(state.selectedPortalRole || state.role || "guest");
+  }
+
+  function activePortalProfile() {
+    const role = activeAccessRole();
+    return state.portalProfiles && state.portalProfiles[role] && typeof state.portalProfiles[role] === "object"
+      ? state.portalProfiles[role]
+      : {};
+  }
+
+  function activePortalSummary(fallback) {
+    const profile = activePortalProfile();
+    return safeText(profile.primarySummary || profile.secondarySummary || fallback || "", 180);
+  }
+
+  function persistSelectedPortal() {
+    try {
+      if (state.selectedPortalRole) {
+        localStorage.setItem(PORTAL_SELECTION_KEY, state.selectedPortalRole);
+      } else {
+        localStorage.removeItem(PORTAL_SELECTION_KEY);
+      }
+    } catch (error) {
+      console.warn("Could not persist portal selection.", error);
     }
   }
 
@@ -1000,6 +1072,7 @@
   function initializeAuth() {
     const config = getFirebaseConfig();
     if (!config.enableAuth || !window.firebase.auth) {
+      state.authResolved = true;
       renderAuthUi();
       return;
     }
@@ -1010,11 +1083,17 @@
 
     window.__resourceFlowAuthBound = true;
     window.firebase.auth().onAuthStateChanged(async function (user) {
+      state.authResolved = true;
+      const previousUid = state.user && state.user.uid ? state.user.uid : "";
       state.user = user || null;
       if (user) {
+      if (!previousUid || previousUid !== user.uid) {
+        state.selectedPortalRole = "";
+        persistSelectedPortal();
+      }
         state.demoSession = null;
         persistDemoSession();
-        state.role = resolveRoleForEmail(user.email || "");
+        state.role = normalizeRole(state.selectedPortalRole || state.role || "user");
         await syncUserProfile(user);
         trackEvent("resourceflow_sign_in", {
           role: state.role
@@ -1025,6 +1104,8 @@
         } else {
           state.role = "guest";
           state.userProfile = null;
+          state.selectedPortalRole = "";
+          persistSelectedPortal();
         }
       }
       renderAuthUi();
@@ -1043,14 +1124,13 @@
       const profileRef = db.collection("resourceflowUsers").doc(user.uid);
       const snapshot = await profileRef.get();
       const existing = snapshot.exists && snapshot.data() ? snapshot.data() : {};
-      const systemRole = resolveRoleForEmail(user.email || "");
-      const requestedRole = systemRole !== "volunteer"
-        ? systemRole
-        : normalizeRole(state.pendingRequestedRole || existing.requestedRole || "volunteer");
+      const capabilityRole = resolveRoleForEmail(user.email || "");
+      const preferredRole = normalizeRole(state.selectedPortalRole || state.pendingRequestedRole || existing.role || "user");
+      const requestedRole = normalizeRole(state.pendingRequestedRole || existing.requestedRole || preferredRole || "user");
       const claimedRole = await resolveRoleFromClaims(user);
-      const baseRole = systemRole !== "volunteer"
-        ? systemRole
-        : normalizeRole(existing.role || "volunteer");
+      const baseRole = preferredRole === "admin" && capabilityRole !== "admin"
+        ? normalizeRole(existing.role || "user")
+        : preferredRole;
       const currentRole = hasSecureBackend()
         ? (claimedRole !== "guest" ? claimedRole : baseRole)
         : baseRole;
@@ -1059,6 +1139,7 @@
         email: safeText(user.email || "", 140),
         displayName: safeText(user.displayName || deriveNameFromEmail(user.email || "ResourceFlow User"), 80),
         photoURL: safeText(user.photoURL || "", 300),
+        location: safeText(existing.location || state.pendingSignupLocation || "", 120),
         role: currentRole,
         requestedRole: requestedRole,
         updatedAt: new Date().toISOString(),
@@ -1068,6 +1149,7 @@
       state.userProfile = profile;
       state.role = currentRole;
       state.pendingRequestedRole = "";
+      state.pendingSignupLocation = "";
       if (state.storageMode === "local" && getFirebaseConfig().enabled) {
         state.adapter = await createAdapter();
         state.storageMode = state.adapter.mode;
@@ -1092,7 +1174,7 @@
     authPanel.innerHTML = [
       '<div class="auth-copy">',
       '<strong id="authUserLabel">Secure access available</strong>',
-      '<small id="authRoleLabel">Sign in, create an account, or use demo mode to enter the workspace.</small>',
+      '<small id="authRoleLabel">Sign in or create your account to enter the workspace.</small>',
       "</div>",
       '<label class="inline-select auth-language-select" aria-label="Workspace language">',
       '<span>Workspace Language</span>',
@@ -1111,6 +1193,304 @@
       "</div>"
     ].join("");
     headerActions.prepend(authPanel);
+  }
+
+  function ensureScreenLockOverlay() {
+    var overlay = document.getElementById("screenLockOverlay");
+    if (!overlay) {
+      overlay = document.createElement("div");
+      overlay.id = "screenLockOverlay";
+      overlay.className = "screen-lock-overlay";
+      overlay.innerHTML = [
+        '<div class="screen-lock-card auth-surface" role="dialog" aria-modal="true" aria-labelledby="screenLockTitle">',
+        '<section class="screen-lock-form-panel">',
+        '<div class="screen-lock-brand-row">',
+        '<div class="screen-lock-brand"><span class="brand-mark">RF</span><div><strong>ResourceFlow</strong><small>Human-centered response platform</small></div></div>',
+        '<button class="screen-lock-close" id="screenLockClose" type="button" aria-label="Close lock screen">×</button>',
+        '</div>',
+        '<p class="eyebrow">Secure Access</p>',
+        '<h1 id="screenLockTitle">Enter your workspace</h1>',
+        '<p id="screenLockText" class="card-meta">Sign in with your email/password or Google account before entering the live coordination interface.</p>',
+        '<div class="screen-lock-mode-tabs">',
+        '<button class="ghost-button is-active" type="button" data-lock-auth-mode="signin">Sign In</button>',
+        '<button class="ghost-button" type="button" data-lock-auth-mode="signup">Create Account</button>',
+        '<button class="ghost-button" type="button" data-lock-auth-mode="reset">Reset</button>',
+        '</div>',
+        '<p id="screenLockStatus" class="screen-lock-status" role="status" aria-live="polite">Sign in with your existing account to continue.</p>',
+        '<form id="screenLockForm" class="screen-lock-form" aria-label="Workspace sign in form">',
+        '<label class="screen-lock-signup-only">Full name<input id="screenLockNameInput" name="displayName" type="text" placeholder="Shri Sundaram"></label>',
+        '<label class="screen-lock-signup-only">Location<input id="screenLockLocationInput" name="location" type="text" placeholder="Kolkata, West Bengal"></label>',
+        '<label>Email<input id="screenLockEmailInput" name="email" type="email" placeholder="you@example.com" required></label>',
+        '<label class="screen-lock-password-wrap">Password<input id="screenLockPasswordInput" name="password" type="password" placeholder="Enter your password" required></label>',
+        '<button class="primary-button screen-lock-submit" id="screenLockSubmit" type="submit">Sign In</button>',
+        '</form>',
+        '<div class="screen-lock-secondary-actions">',
+        '<button class="ghost-button" id="screenLockGoogle" type="button">Continue with Google</button>',
+        '<button class="ghost-button" id="screenLockDemo" type="button">Preview Demo Access</button>',
+        '</div>',
+        '<p id="screenLockFootnote" class="card-meta screen-lock-footnote">Use your email and password to enter the shared workspace. New accounts begin as community users until they choose a working portal.</p>',
+        '</section>',
+        '<aside class="screen-lock-visual-panel" aria-hidden="true">',
+        '<div class="screen-lock-visual-backdrop"></div>',
+        '<div class="screen-lock-hero-card">',
+        '<div class="screen-lock-floating screen-lock-floating-top"><strong>Task review with field team</strong><span>09:30 AM - 10:00 AM</span></div>',
+        '<div class="screen-lock-visual-copy">',
+        '<p class="eyebrow">Live coordination</p>',
+        '<h2>Move from scattered requests to calm, visible response operations.</h2>',
+        '<p>ResourceFlow brings approvals, assignments, volunteer readiness, and impact proof into one clean system for communities, volunteers, agencies, and admins.</p>',
+        '</div>',
+        '<div class="screen-lock-mini-calendar">',
+        '<span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>',
+        '<strong>22</strong><strong>23</strong><strong>24</strong><strong>25</strong><strong>26</strong><strong>27</strong><strong>28</strong>',
+        '</div>',
+        '<div class="screen-lock-floating screen-lock-floating-bottom"><strong>Daily briefing</strong><span>Three priority zones, two mobile units, one delayed supply route.</span></div>',
+        '</div>',
+        '</aside>',
+        '</div>'
+      ].join("");
+      document.body.appendChild(overlay);
+    }
+    if (overlay.dataset.bound === "true") {
+      return;
+    }
+    overlay.dataset.bound = "true";
+    overlay.addEventListener("click", function (event) {
+      var modeButton = event.target.closest("[data-lock-auth-mode]");
+      if (modeButton) {
+        setScreenLockAuthMode(modeButton.dataset.lockAuthMode || "signin");
+        return;
+      }
+      if (event.target.closest("#screenLockGoogle")) {
+        signInWithGoogle();
+        return;
+      }
+      if (event.target.closest("#screenLockDemo")) {
+        openDemoRoleDialog();
+        return;
+      }
+      if (event.target.closest("#screenLockClose")) {
+        openDemoRoleDialog();
+      }
+    });
+
+    const form = document.getElementById("screenLockForm");
+    if (form) {
+      form.addEventListener("submit", function (event) {
+        event.preventDefault();
+        submitScreenLockForm(form);
+      });
+    }
+  }
+
+  function renderScreenLock() {
+    ensureScreenLockOverlay();
+    const overlay = document.getElementById("screenLockOverlay");
+    if (!overlay) {
+      return;
+    }
+    const locked = !hasActiveSession();
+    document.body.classList.toggle("site-locked", locked);
+    overlay.hidden = !locked;
+    setText("#screenLockText", getFirebaseConfig().enableAuth
+      ? "Sign in with email/password or Google before entering the live coordination interface."
+      : "Choose a demo role and password to unlock the prototype workspace.");
+    setScreenLockAuthMode(currentEmailAuthMode());
+  }
+
+  function ensurePortalSelectionOverlay() {
+    if (document.getElementById("portalSelectionOverlay")) {
+      return;
+    }
+    const overlay = document.createElement("div");
+    overlay.id = "portalSelectionOverlay";
+    overlay.className = "portal-selection-overlay";
+    overlay.hidden = true;
+    overlay.innerHTML = [
+      '<div class="portal-selection-card" role="dialog" aria-modal="true" aria-labelledby="portalSelectionTitle">',
+      '<div class="portal-selection-header">',
+      '<div>',
+      '<p class="eyebrow">Choose Portal</p>',
+      '<h2 id="portalSelectionTitle">Select how you want to enter ResourceFlow</h2>',
+      '<p class="card-meta">Pick the portal that matches your work today. You can switch later after signing in.</p>',
+      '</div>',
+      '<button class="ghost-button" id="portalSelectionSignOut" type="button">Sign Out</button>',
+      '</div>',
+      '<div class="portal-selection-grid">',
+      renderPortalOptionCard("user", "Community User", "Read trusted updates, impact summaries, and public response information.", ["Read-only access", "Public impact", "Safe community view"], "citizen"),
+      renderPortalOptionCard("volunteer", "Volunteer", "Register availability, track assignments, and support active response work.", ["Volunteer portal", "Opportunities", "Readiness tools"], "volunteer"),
+      renderPortalOptionCard("government", "Government", "Coordinate requests, run matching, and monitor zone-level operations.", ["Operations center", "Analytics", "Dispatch tools"], "government"),
+      renderPortalOptionCard("admin", "Admin", "Review approvals, users, governance, and full workspace control.", ["Admin console", "Role review", "Audit oversight"], "admin"),
+      '</div>',
+      '</div>'
+    ].join("");
+    document.body.appendChild(overlay);
+    overlay.querySelectorAll("[data-portal-choice]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        completePortalSelection(button.dataset.portalChoice || "user");
+      });
+    });
+    const signOutButton = document.getElementById("portalSelectionSignOut");
+    if (signOutButton) {
+      signOutButton.addEventListener("click", function () {
+        signOutSession();
+      });
+    }
+  }
+
+  function renderPortalOptionCard(role, title, summary, bullets, tone) {
+    return [
+      '<article class="portal-selection-option portal-selection-option-' + escapeHtml(tone || role) + '">',
+      '<p class="eyebrow">' + escapeHtml(title) + '</p>',
+      '<h3>' + escapeHtml(title) + '</h3>',
+      '<p>' + escapeHtml(summary) + '</p>',
+      '<ul>',
+      bullets.map(function (item) { return '<li>' + escapeHtml(item) + '</li>'; }).join(""),
+      '</ul>',
+      '<button class="primary-button" type="button" data-portal-choice="' + escapeHtml(role) + '">Open ' + escapeHtml(title) + '</button>',
+      '</article>'
+    ].join("");
+  }
+
+  function shouldShowPortalSelection() {
+    return hasActiveSession() && !state.selectedPortalRole && currentPageName() !== "tests";
+  }
+
+  function renderPortalSelection() {
+    ensurePortalSelectionOverlay();
+    const overlay = document.getElementById("portalSelectionOverlay");
+    if (!overlay) {
+      return;
+    }
+    const visible = shouldShowPortalSelection();
+    overlay.hidden = !visible;
+    document.body.classList.toggle("portal-selection-open", visible);
+  }
+
+  function completePortalSelection(role) {
+    const normalized = normalizeRole(role);
+    state.selectedPortalRole = normalized;
+    state.pendingPortalRole = normalized;
+    persistSelectedPortal();
+    renderPortalSelection();
+    redirectToPortal(normalized);
+  }
+
+  function setScreenLockAuthMode(mode) {
+    const normalized = ["signin", "signup", "reset"].indexOf(String(mode || "").toLowerCase()) >= 0
+      ? String(mode || "").toLowerCase()
+      : "signin";
+    state.pendingAuthMode = normalized;
+    const submitButton = document.getElementById("screenLockSubmit");
+    const footnoteNode = document.getElementById("screenLockFootnote");
+    const statusNode = document.getElementById("screenLockStatus");
+    const passwordWrap = document.querySelector(".screen-lock-password-wrap");
+    const passwordInput = document.getElementById("screenLockPasswordInput");
+    document.querySelectorAll("[data-lock-auth-mode]").forEach(function (button) {
+      button.classList.toggle("is-active", button.dataset.lockAuthMode === normalized);
+    });
+    document.querySelectorAll(".screen-lock-signup-only").forEach(function (node) {
+      node.hidden = normalized !== "signup";
+    });
+    if (passwordWrap) {
+      passwordWrap.hidden = normalized === "reset";
+    }
+    if (passwordInput) {
+      passwordInput.required = normalized !== "reset";
+      passwordInput.placeholder = normalized === "signup" ? "Create a password" : "Enter your password";
+    }
+    if (submitButton) {
+      submitButton.textContent = normalized === "signup"
+        ? "Create Account"
+        : (normalized === "reset" ? "Send Reset Link" : "Sign In");
+    }
+    if (footnoteNode) {
+      footnoteNode.textContent = normalized === "signup"
+        ? "New users begin as volunteers. Coordinator and admin requests appear in the admin review flow until approved."
+        : (normalized === "reset"
+          ? "Reset links are sent through Firebase Authentication if the provider is enabled in your project."
+          : "Use your email and password to enter the shared workspace. New accounts begin as volunteers unless an admin approves a higher role.");
+    }
+    if (statusNode) {
+      statusNode.textContent = normalized === "signup"
+        ? "Create your account first, then choose your portal after login."
+        : (normalized === "reset"
+          ? "Enter your email to send a password reset link."
+          : "Sign in with your existing account to continue.");
+      statusNode.classList.remove("is-error", "is-success");
+    }
+  }
+
+  async function submitScreenLockForm(form) {
+    if (!getFirebaseConfig().enableAuth) {
+      openDemoRoleDialog();
+      return;
+    }
+    if (!await ensureAuthReady()) {
+      announceScreenLockStatus("Authentication could not start right now. Please wait a moment and try again.", "error");
+      return;
+    }
+    const mode = currentEmailAuthMode();
+    const formData = new FormData(form);
+    const email = textValue(formData, "email");
+    const password = textValue(formData, "password");
+    const displayName = textValue(formData, "displayName") || deriveNameFromEmail(email);
+    const location = textValue(formData, "location");
+    state.pendingSignupLocation = location;
+    state.pendingRequestedRole = "user";
+    try {
+      if (mode === "signup") {
+        if (!email || !password) {
+          announceScreenLockStatus("Enter an email and password to create your account.", "error");
+          announceNotice("Enter an email and password to create your account.");
+          return;
+        }
+        const credential = await window.firebase.auth().createUserWithEmailAndPassword(email, password);
+        if (credential && credential.user && typeof credential.user.updateProfile === "function") {
+          await credential.user.updateProfile({ displayName: displayName });
+        }
+        announceScreenLockStatus("Account created. Signing you in now.", "success");
+        announceNotice("Account created. ResourceFlow is signing you in now.");
+      } else if (mode === "reset") {
+        if (!email) {
+          announceScreenLockStatus("Enter the email address that should receive the reset link.", "error");
+          announceNotice("Enter the email address that should receive the reset link.");
+          return;
+        }
+        await window.firebase.auth().sendPasswordResetEmail(email);
+        form.reset();
+        announceScreenLockStatus("Password reset email sent.", "success");
+        announceNotice("Password reset email sent.");
+        return;
+      } else {
+        if (!email || !password) {
+          announceScreenLockStatus("Enter your email and password to sign in.", "error");
+          announceNotice("Enter your email and password to sign in.");
+          return;
+        }
+        await window.firebase.auth().signInWithEmailAndPassword(email, password);
+        announceScreenLockStatus("Signed in successfully.", "success");
+        announceNotice("Signed in successfully.");
+      }
+      form.reset();
+    } catch (error) {
+      console.warn("Screen lock auth failed.", error);
+      announceScreenLockStatus(authErrorMessage(error), "error");
+      announceNotice(authErrorMessage(error));
+    }
+  }
+
+  function announceScreenLockStatus(message, tone) {
+    const node = document.getElementById("screenLockStatus");
+    if (!node) {
+      return;
+    }
+    node.textContent = safeText(message || "", 220);
+    node.classList.remove("is-error", "is-success");
+    if (tone === "error") {
+      node.classList.add("is-error");
+    } else if (tone === "success") {
+      node.classList.add("is-success");
+    }
   }
 
   function ensureDemoAuthModal() {
@@ -1490,6 +1870,8 @@
 
   function renderAuthUi() {
     ensureAuthShell();
+    renderScreenLock();
+    renderPortalSelection();
     const userLabel = document.getElementById("authUserLabel");
     const roleLabel = document.getElementById("authRoleLabel");
     const signInButton = document.getElementById("signInButton");
@@ -1500,15 +1882,19 @@
     if (!userLabel || !roleLabel || !signInButton || !tourButton || !switchRoleButton || !signOutButton || !uiLanguageSelect) {
       return;
     }
+    const accessRole = activeAccessRole();
+    const profileSummary = activePortalProfile();
 
     if (state.user) {
       const requestedRole = normalizeRole(state.userProfile && state.userProfile.requestedRole);
       userLabel.textContent = safeText(state.user.displayName || state.user.email || "Signed in", 60);
-      roleLabel.textContent = requestedRole && requestedRole !== state.role && requestedRole !== "volunteer"
-        ? titleCase(state.role) + " access - " + titleCase(requestedRole) + " portal request is waiting for approval"
-        : titleCase(state.role) + " access" + (canManageWorkspace() ? " - workspace tools enabled" : " - volunteer-safe mode");
+      roleLabel.textContent = requestedRole && requestedRole !== accessRole && requestedRole !== "user"
+        ? titleCase(accessRole) + " access - " + titleCase(requestedRole) + " portal request is waiting for approval"
+        : titleCase(accessRole) + " access" + (profileSummary && profileSummary.primarySummary
+          ? " - " + profileSummary.primarySummary
+          : (canManageWorkspace() ? " - workspace tools enabled" : " - limited role view"));
       signInButton.hidden = true;
-      switchRoleButton.hidden = true;
+      switchRoleButton.hidden = false;
       signOutButton.hidden = false;
     } else if (state.demoSession) {
       userLabel.textContent = safeText(state.demoSession.displayName, 60);
@@ -1520,7 +1906,7 @@
     } else {
       userLabel.textContent = getFirebaseConfig().enableAuth ? "Guest mode" : "Demo access required";
       roleLabel.textContent = getFirebaseConfig().enableAuth
-        ? "Sign in with email/password, Google, or demo mode to unlock the shared workspace."
+        ? "Sign in with email/password or Google to unlock the shared workspace."
         : "Choose Volunteer, Coordinator, or Admin to enter the prototype workspace.";
       signInButton.textContent = "Portal Login";
       signInButton.hidden = false;
@@ -1546,6 +1932,10 @@
         if (state.demoSession) {
           openDemoRoleDialog();
           selectDemoRole(state.role || "coordinator");
+          return;
+        }
+        if (getFirebaseConfig().enableAuth) {
+          window.location.assign("./index.html");
         }
       });
     }
@@ -1587,17 +1977,19 @@
       openDemoRoleDialog();
       return;
     }
-    if (!window.firebase || !window.firebase.auth) {
-      announceNotice("Firebase Auth is not available in this environment yet.");
+    if (!await ensureAuthReady()) {
+      announceScreenLockStatus("Google sign-in is not ready yet. Please wait a moment and try again.", "error");
       return;
     }
     try {
       const provider = new window.firebase.auth.GoogleAuthProvider();
       provider.setCustomParameters({ prompt: "select_account" });
       await window.firebase.auth().signInWithPopup(provider);
+      announceScreenLockStatus("Google sign-in completed. Opening portal selection.", "success");
       closeEmailAuthDialog();
     } catch (error) {
       console.warn("Sign in failed.", error);
+      announceScreenLockStatus(authErrorMessage(error), "error");
       announceNotice(authErrorMessage(error));
     }
   }
@@ -1609,6 +2001,8 @@
       state.user = null;
       state.role = "guest";
       state.userProfile = null;
+      state.selectedPortalRole = "";
+      persistSelectedPortal();
       persistDemoSession();
       renderAuthUi();
       renderAll();
@@ -1620,6 +2014,8 @@
       state.demoSession = null;
       state.role = "guest";
       state.userProfile = null;
+      state.selectedPortalRole = "";
+      persistSelectedPortal();
       persistDemoSession();
       renderAuthUi();
       renderAll();
@@ -1658,7 +2054,7 @@
   }
 
   function submitDemoLogin(form) {
-    const normalized = normalizeRole(state.pendingDemoRole || "coordinator");
+    const normalized = normalizeRole(state.pendingDemoRole || "government");
     const emailInput = form.elements.namedItem("email");
     const passwordInput = form.elements.namedItem("password");
     const email = safeText(emailInput ? emailInput.value : "", 140);
@@ -1681,6 +2077,8 @@
     state.user = null;
     state.demoSession = createDemoSession(normalized, overrides);
     state.role = normalized;
+    state.selectedPortalRole = "";
+    persistSelectedPortal();
     state.userProfile = {
       uid: state.demoSession.uid,
       email: state.demoSession.email,
@@ -1693,13 +2091,12 @@
     renderAuthUi();
     renderAll();
     announceNotice("Signed in as " + titleCase(normalized) + " for the demo workspace.");
-    redirectToPortal(normalized);
   }
 
   function redirectToPortal(role) {
-    const nextPath = DEMO_PORTAL_ROUTES[normalizeRole(role)] || "./index.html";
+    const nextPath = DEMO_PORTAL_ROUTES[normalizeRole(role)] || "./overview.html";
     const currentPage = currentPageName();
-    if (nextPath === "./index.html" || currentPage === portalPageForRole(role)) {
+    if (nextPath === "./overview.html" || currentPage === portalPageForRole(role)) {
       return;
     }
     if (window.location && typeof window.location.assign === "function") {
@@ -1709,7 +2106,9 @@
 
   function portalPageForRole(role) {
     return {
+      user: "home",
       volunteer: "volunteer",
+      government: "operations",
       coordinator: "operations",
       admin: "admin"
     }[normalizeRole(role)] || "home";
@@ -1727,7 +2126,9 @@
 
   function portalLabelForRole(role) {
     return {
+      user: "Community Portal",
       volunteer: "Volunteer Portal",
+      government: "Government Operations",
       coordinator: "Operations Center",
       admin: "Admin Console"
     }[normalizeRole(role)] || "Overview";
@@ -1743,7 +2144,31 @@
   }
 
   function enforcePortalAccess() {
-    return;
+    const page = currentPageName();
+    if (page === "tests") {
+      return false;
+    }
+    if (!getFirebaseConfig().enableAuth) {
+      return false;
+    }
+    if (!state.authResolved) {
+      return false;
+    }
+    if (!hasActiveSession()) {
+      if (window.location && typeof window.location.assign === "function") {
+        window.location.assign("./index.html");
+      }
+      return true;
+    }
+    if (!state.selectedPortalRole) {
+      state.selectedPortalRole = normalizeRole((state.userProfile && state.userProfile.role) || state.role || "user");
+      persistSelectedPortal();
+    }
+    if (!roleCanAccessPage(activeAccessRole(), page)) {
+      redirectToPortal(activeAccessRole());
+      return true;
+    }
+    return false;
   }
 
   function maybeHandlePostAuthRouting() {
@@ -1756,20 +2181,15 @@
       state.pendingPortalRole = "";
       return;
     }
-    const preferredRole = normalizeRole(state.pendingPortalRole || state.pendingRequestedRole || "");
-    const targetPage = portalPageForRole(preferredRole);
+    const preferredRole = normalizeRole(state.pendingPortalRole || state.selectedPortalRole || state.pendingRequestedRole || "");
     state.pendingRequestedRole = "";
-    if (!preferredRole || preferredRole === "guest") {
+    if (!preferredRole || preferredRole === "guest" || !state.selectedPortalRole) {
       state.pendingPortalRole = "";
       return;
     }
     state.pendingPortalRole = "";
-    if (page === targetPage) {
-      return;
-    }
-    if (page === "home" || page === "impact") {
+    if (!roleCanAccessPage(preferredRole, page)) {
       redirectToPortal(preferredRole);
-      return;
     }
   }
 
@@ -2272,15 +2692,21 @@
       return "admin";
     }
     if (target && coordinators.indexOf(target) >= 0) {
-      return "coordinator";
+      return "government";
     }
-    return target ? "volunteer" : "guest";
+    return target ? "user" : "guest";
   }
 
   function normalizeRole(value) {
     const target = String(value || "").trim().toLowerCase();
-    if (target === "admin" || target === "coordinator" || target === "volunteer") {
+    if (target === "admin" || target === "coordinator" || target === "volunteer" || target === "user" || target === "government") {
       return target;
+    }
+    if (target === "citizen" || target === "normal" || target === "normal user") {
+      return "user";
+    }
+    if (target === "gov" || target === "government employee" || target === "employee") {
+      return "government";
     }
     return target ? "volunteer" : "guest";
   }
@@ -2377,9 +2803,9 @@
   function canManageWorkspace() {
     const config = getFirebaseConfig();
     if (!config.enableAuth) {
-      return Boolean(state.demoSession && (state.role === "admin" || state.role === "coordinator"));
+      return Boolean(state.demoSession && (state.role === "admin" || state.role === "coordinator" || state.role === "government"));
     }
-    return state.role === "admin" || state.role === "coordinator";
+    return activeAccessRole() === "admin" || activeAccessRole() === "coordinator" || activeAccessRole() === "government";
   }
 
   function hasActiveSession() {
@@ -2401,6 +2827,29 @@
 
   function getFirebaseConfig() {
     return window.RESOURCEFLOW_FIREBASE_CONFIG || {};
+  }
+
+  async function ensureAuthReady() {
+    const config = getFirebaseConfig();
+    if (!config.enabled || !config.enableAuth) {
+      return false;
+    }
+    try {
+      await ensureFirebaseScripts();
+      if (!window.firebase.apps.length) {
+        window.firebase.initializeApp(config);
+      }
+      state.functions = getFunctionsClient();
+      initializeAppCheck();
+      initializeAnalytics();
+      if (window.__resourceFlowAuthBound !== true) {
+        initializeAuth();
+      }
+      return Boolean(window.firebase && window.firebase.auth);
+    } catch (error) {
+      console.warn("Auth readiness failed.", error);
+      return false;
+    }
   }
 
   function getFirestoreDb() {
@@ -2482,7 +2931,7 @@
     const authEnabled = getFirebaseConfig().enableAuth;
     const requestLocked = !canManageWorkspace();
     const uploadLocked = !canManageWorkspace();
-    const volunteerLocked = !hasActiveSession();
+    const volunteerLocked = !(hasActiveSession() && (activeAccessRole() === "volunteer" || canManageWorkspace()));
     const operationsAccessNote = document.getElementById("operationsAccessNote");
     const volunteerAccessNote = document.getElementById("volunteerAccessNote");
 
@@ -2521,8 +2970,8 @@
     if (volunteerAccessNote) {
       volunteerAccessNote.textContent = volunteerLocked
         ? (authEnabled
-          ? "Sign in to register volunteers into the shared Firebase workspace."
-          : "Choose any demo role to register volunteers and explore the portal.")
+          ? "Volunteer registration is limited to volunteer, government, coordinator, or admin sessions."
+          : "Choose a volunteer or manager demo role to register volunteers and explore the portal.")
         : (authEnabled
           ? "Volunteer registration is connected to the shared Firebase workspace."
           : "Volunteer registration is active for the current demo session.");
@@ -2541,6 +2990,29 @@
         field.removeAttribute("disabled");
       }
     });
+  }
+
+  function prefillVolunteerFormFromPortalProfile() {
+    const form = document.getElementById("volunteerForm");
+    const profile = state.portalProfiles && state.portalProfiles.volunteer ? state.portalProfiles.volunteer : null;
+    if (!form || !profile || state.volunteerEditId || activeAccessRole() !== "volunteer") {
+      return;
+    }
+    setFieldValue(form.elements.name, profile.displayName || profile.name || "");
+    setFieldValue(form.elements.zone, profile.zone || "");
+    setFieldValue(form.elements.location, profile.location || "");
+    setFieldValue(form.elements.availability, profile.availability || "");
+    setFieldValue(form.elements.skills, profile.skills || "");
+    setFieldValue(form.elements.languages, profile.languages || "");
+    setFieldValue(form.elements.transport, profile.transport || "");
+    setFieldValue(form.elements.experience, profile.experience || "");
+  }
+
+  function setFieldValue(field, value) {
+    if (!field || !value || safeText(field.value || "", 120).trim()) {
+      return;
+    }
+    field.value = value;
   }
 
   function hasSecureBackend() {
@@ -2801,25 +3273,21 @@
   function openPortalChooser(role) {
     const normalized = normalizeRole(role);
     if (!getFirebaseConfig().enableAuth) {
-      if (normalized && state.demoSession && normalizeRole(state.role) === normalized) {
-        redirectToPortal(normalized);
-        return;
-      }
-      openDemoRoleDialog();
-      if (normalized) {
-        selectDemoRole(normalized);
+      if (state.demoSession) {
+        state.selectedPortalRole = "";
+        renderPortalSelection();
+      } else {
+        openDemoRoleDialog();
+        if (normalized) {
+          selectDemoRole(normalized);
+        }
       }
       return;
     }
     if (hasActiveSession()) {
-      const targetRole = normalized || state.role;
-      const targetPage = portalPageForRole(targetRole);
-      if (roleCanAccessPage(state.role, targetPage)) {
-        redirectToPortal(targetRole);
-      } else {
-        announceNotice("Your approved access is currently " + titleCase(state.role) + ". Opening that portal instead.");
-        redirectToPortal(state.role);
-      }
+      state.selectedPortalRole = "";
+      state.pendingPortalRole = normalized || "";
+      renderPortalSelection();
       return;
     }
     openEmailAuthDialog(normalized || pageRoleForPortal(currentPageName()), "signin");
@@ -3993,6 +4461,9 @@
     };
   }
   function renderAll() {
+    if (enforcePortalAccess()) {
+      return;
+    }
     renderAuthUi();
     syncNavigationAccess();
     renderCommon();
@@ -4025,7 +4496,7 @@
 
   function syncNavigationAccess() {
     const role = getFirebaseConfig().enableAuth
-      ? normalizeRole(state.role)
+      ? activeAccessRole()
       : (state.demoSession ? normalizeRole(state.role) : "guest");
     document.querySelectorAll("[data-nav]").forEach(function (node) {
       const allowed = roleCanAccessPage(role, node.dataset.nav || "home");
@@ -4039,6 +4510,8 @@
     const homePwaPanel = document.getElementById("homePwaPanel");
     const globalSearchResults = document.getElementById("globalSearchResults");
     const guidedDemoPanel = document.getElementById("guidedDemoPanel");
+    const primaryAction = document.querySelector("body[data-page='home'] .button-row .primary-link");
+    const secondaryAction = document.querySelector("body[data-page='home'] .button-row .ghost-link");
     if (!activityNode) {
       return;
     }
@@ -4057,6 +4530,28 @@
       "ResourceFlow NGOs, relief teams, shelters aur community organizers ko requests capture karne, volunteers onboard karne, shortages forecast karne, urgency prioritize karne aur verified aid delivery ko ek hi platform par coordinate karne me madad karta hai.",
       "ResourceFlow NGOs, relief teams, shelters aur samudayik sangathanon ko requests capture karne, volunteers onboard karne, shortage ka anuman lagane, urgency ko prioritize karne aur verified aid delivery ko ek hi platform par coordinate karne me madad karta hai."
     ));
+    if (primaryAction) {
+      const nextRoute = {
+        user: "./impact.html",
+        volunteer: "./volunteer.html",
+        government: "./operations.html",
+        coordinator: "./operations.html",
+        admin: "./admin.html"
+      }[activeAccessRole()] || "./overview.html";
+      const nextLabel = {
+        user: "View Public Impact",
+        volunteer: "Open Volunteer Portal",
+        government: "Open Operations",
+        coordinator: "Open Operations",
+        admin: "Open Admin Console"
+      }[activeAccessRole()] || "Open Workspace";
+      primaryAction.setAttribute("href", nextRoute);
+      primaryAction.textContent = nextLabel;
+    }
+    if (secondaryAction) {
+      secondaryAction.setAttribute("href", activeAccessRole() === "admin" ? "./judge.html" : "./insights.html");
+      secondaryAction.textContent = activeAccessRole() === "admin" ? "Open Judge Mode" : "See Insights";
+    }
 
     const activity = buildActivityFeed(state.data);
     activityNode.innerHTML = activity.length
@@ -4760,6 +5255,7 @@
     const artifactList = document.getElementById("artifactList");
     const routeClusterList = document.getElementById("routeClusterList");
     const archivedOverview = document.getElementById("archivedOverview");
+    const operationsAccessNote = document.getElementById("operationsAccessNote");
 
     if (!requestsBoard || !assignmentsBoard || !operationsAlert || !operationsSummary) {
       return;
@@ -4774,6 +5270,7 @@
     const insights = buildInsights(state.data);
     const metrics = computeMetrics(state.data);
     const aidSignals = buildAidFlowSignals(state.data);
+    const operatorSummary = activePortalSummary("");
     const filters = getOperationsFilterState();
     const filteredRequests = sortRequests(filterRequests(state.data.requests, filters), filters.sort);
     const allowedRequestIds = new Set(filteredRequests.map(function (item) { return item.id; }));
@@ -4792,6 +5289,9 @@
     }) || filteredVerifications[0] || null;
 
     operationsAlert.textContent = insights.nextActionText;
+    if (operationsAccessNote && operatorSummary && canManageWorkspace()) {
+      operationsAccessNote.textContent = "Operator profile: " + operatorSummary + ". Shared manager tools are enabled for this session.";
+    }
     operationsSummary.innerHTML = insights.actionList.length
       ? insights.actionList.map(renderSummaryCard).join("")
       : '<div class="empty-box">Assignments will appear here after matching runs.</div>';
@@ -5115,6 +5615,7 @@
     if (!roster || !list) {
       return;
     }
+    prefillVolunteerFormFromPortalProfile();
     setText("body[data-page='volunteer'] .page-intro .eyebrow", uiText("Volunteer Experience", "Volunteer Experience", "Volunteer Experience"));
     setText("body[data-page='volunteer'] .page-intro h1", uiText(
       "Register responders with the right skills, availability, and location fit.",
@@ -5227,9 +5728,9 @@
     setText("#volunteerStatZoneText", topRequest
       ? "Highest-urgency request is currently concentrated here."
       : "Load demo data or add requests to reveal zone demand.");
-    setText("#volunteerStatReadiness", hasActiveSession() ? titleCase(state.role) : "Guest");
+    setText("#volunteerStatReadiness", hasActiveSession() ? titleCase(activeAccessRole()) : "Guest");
     setText("#volunteerStatReadinessText", hasActiveSession()
-      ? "You are signed in and can use the volunteer workflow."
+      ? activePortalSummary("You are signed in and can use the volunteer workflow.")
       : "Sign in to save volunteers into the shared workspace.");
 
     updateVolunteerEditorUi();
@@ -5297,14 +5798,17 @@
     const pendingRoleRequests = snapshotUsers.filter(function (user) {
       return normalizeRole(user.requestedRole) !== normalizeRole(user.role);
     }).length;
+    const adminSummary = activePortalSummary("");
 
     if (roleNode) {
-      roleNode.textContent = titleCase(state.role) + " access";
+      roleNode.textContent = titleCase(activeAccessRole()) + " access";
     }
     if (statusNode) {
-      statusNode.textContent = hasSecureBackend()
+      statusNode.textContent = adminSummary
+        ? adminSummary
+        : (hasSecureBackend()
         ? "Secure backend functions are configured."
-        : "Spark-safe mode is active. Admin tools use Firestore and local fallbacks instead of Cloud Functions.";
+        : "Spark-safe mode is active. Admin tools use Firestore and local fallbacks instead of Cloud Functions.");
     }
 
     setText("#adminStatUsers", String(snapshotUsers.length || Object.keys(DEMO_ROLE_PROFILES).length));

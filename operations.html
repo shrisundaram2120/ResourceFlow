@@ -6,13 +6,13 @@
   <meta name="theme-color" content="#061521">
   <link rel="manifest" href="./manifest.webmanifest">
   <title>ResourceFlow | Operations</title>
-  <link rel="stylesheet" href="./styles.css?v=20260401-future3">
+  <link rel="stylesheet" href="./styles.css?v=20260402-authhero1">
 </head>
 <body data-page="operations">
   <a class="skip-link" href="#mainContent">Skip to content</a>
   <div class="site-shell">
     <header class="site-header">
-      <a class="brand" href="./index.html" aria-label="ResourceFlow home">
+      <a class="brand" href="./overview.html" aria-label="ResourceFlow overview">
         <span class="brand-mark">RF</span>
         <span>
           <strong>ResourceFlow</strong>
@@ -21,7 +21,7 @@
       </a>
 
       <nav class="site-nav" aria-label="Primary">
-        <a class="nav-link" data-nav="home" href="./index.html">Overview</a>
+        <a class="nav-link" data-nav="home" href="./overview.html">Overview</a>
         <a class="nav-link" data-nav="operations" href="./operations.html">Operations</a>
         <a class="nav-link" data-nav="volunteer" href="./volunteer.html">Volunteer Portal</a>
         <a class="nav-link" data-nav="insights" href="./insights.html">AI Insights</a>
@@ -358,136 +358,6 @@
 
       <section class="two-column">
         <article class="panel">
-          <p class="eyebrow">Response Calendar</p>
-          <h2>Weekly shift and workload view</h2>
-          <div id="responseCalendar" class="stack-list">
-            <div class="empty-box">Calendar view will appear here after requests and assignments are loaded.</div>
-          </div>
-        </article>
-        <article class="panel">
-          <div class="panel-head">
-            <div>
-              <p class="eyebrow">Operator Notes</p>
-              <h2>Pinned notes and handoff memory</h2>
-            </div>
-          </div>
-          <form id="opsNotesForm" class="form-grid" aria-label="Operator notes form">
-            <label>
-              Daily Briefing Note
-              <textarea name="briefing" rows="3" placeholder="Key update for the next operator shift"></textarea>
-            </label>
-            <label>
-              Handoff Note
-              <textarea name="handoff" rows="3" placeholder="What the next coordinator must know"></textarea>
-            </label>
-            <label>
-              Incident Note
-              <textarea name="incident" rows="3" placeholder="Route issue, shortage alert, or beneficiary concern"></textarea>
-            </label>
-            <div class="button-row">
-              <button class="primary-button" type="submit">Save Notes</button>
-            </div>
-          </form>
-        </article>
-      </section>
-
-      <section class="three-column">
-        <article class="panel">
-          <p class="eyebrow">Workflow Board</p>
-          <h2>Kanban-style request pipeline</h2>
-          <div id="workflowChart" class="stack-list">
-            <div class="empty-box">Workflow distribution will appear here.</div>
-          </div>
-        </article>
-        <article class="panel">
-          <p class="eyebrow">Scenario Mix</p>
-          <h2>Demand by response mode</h2>
-          <div id="scenarioChart" class="stack-list">
-            <div class="empty-box">Scenario mix will appear here.</div>
-          </div>
-        </article>
-        <article class="panel">
-          <p class="eyebrow">Volunteer Utilization</p>
-          <h2>Shift load and staffing pressure</h2>
-          <div id="volunteerUtilizationChart" class="stack-list">
-            <div class="empty-box">Volunteer utilization analytics will appear here.</div>
-          </div>
-        </article>
-      </section>
-
-      <section class="panel">
-        <div class="panel-head">
-          <div>
-            <p class="eyebrow">Kanban Workflow</p>
-            <h2>See every request by stage at a glance</h2>
-          </div>
-        </div>
-        <div id="workflowKanban" class="kanban-board">
-          <div class="empty-box">Workflow board will appear here.</div>
-        </div>
-      </section>
-
-      <section class="two-column">
-        <article class="panel">
-          <div class="panel-head">
-            <div>
-              <p class="eyebrow">AidFlow Forecast</p>
-              <h2>Predictive resource allocation</h2>
-            </div>
-          </div>
-          <div id="forecastBoard" class="stack-list">
-            <div class="empty-box">Forecasted shortages and pre-positioning suggestions will appear here.</div>
-          </div>
-        </article>
-
-        <article class="panel">
-          <div class="panel-head">
-            <div>
-              <p class="eyebrow">Delivery Verification</p>
-              <h2>QR-ready field trail</h2>
-            </div>
-          </div>
-          <div id="verificationBoard" class="stack-list">
-            <div class="empty-box">Delivery tokens and verification trail will appear here.</div>
-          </div>
-          <div id="qrPreviewPanel" class="stack-list">
-            <div class="empty-box">Select a token to preview its QR code.</div>
-          </div>
-        </article>
-      </section>
-
-      <section class="two-column">
-        <article class="panel">
-          <div class="panel-head">
-            <div>
-              <p class="eyebrow">QR Verification Scanner</p>
-              <h2>Scan a delivery token</h2>
-            </div>
-          </div>
-          <form id="qrVerifyForm" class="form-grid" aria-label="QR verification form">
-            <label>
-              Upload QR Image
-              <input id="qrScanFile" name="qrScanFile" type="file" accept="image/*">
-            </label>
-            <label>
-              Or Enter Token Manually
-              <input id="qrManualToken" name="qrManualToken" type="text" placeholder="RF-EAS-AB12">
-            </label>
-            <button class="primary-button" type="submit">Verify Token</button>
-          </form>
-          <div id="qrScanResult" class="highlight-box">Scan result will appear here.</div>
-        </article>
-
-        <article class="panel">
-          <p class="eyebrow">Printable Situation Report</p>
-          <div id="printReportSummary" class="stack-list">
-            <div class="empty-box">The report summary will update as requests, assignments, and forecasts change.</div>
-          </div>
-        </article>
-      </section>
-
-      <section class="two-column">
-        <article class="panel">
           <div class="panel-head">
             <div>
               <p class="eyebrow">Requests Board</p>
@@ -512,134 +382,268 @@
         </article>
       </section>
 
-      <section class="two-column">
-        <article class="panel">
-          <p class="eyebrow">Notification Center</p>
-          <h2>Free browser-safe reminders and alerts</h2>
-          <div id="notificationCenter" class="stack-list">
-            <div class="empty-box">Assignments, reminders, and alerts will appear here.</div>
-          </div>
-        </article>
+      <details class="advanced-disclosure">
+        <summary>Advanced response tools</summary>
 
-        <article class="panel">
-          <p class="eyebrow">Field Collaboration</p>
-          <h2>Daily briefing, handoff, and incident notes</h2>
-          <div id="dailyBriefingPanel" class="stack-list">
-            <div class="empty-box">Daily briefing notes will appear here.</div>
-          </div>
-          <div id="handoffNotesPanel" class="stack-list">
-            <div class="empty-box">Operator handoff notes will appear here.</div>
-          </div>
-          <div id="incidentLogPanel" class="stack-list">
-            <div class="empty-box">Incident log entries will appear here.</div>
-          </div>
-        </article>
-      </section>
-
-      <section class="two-column">
-        <article class="panel">
-          <p class="eyebrow">Zone Coverage</p>
-          <div id="zoneCoverageList" class="stack-list">
-            <div class="empty-box">Zone coverage evidence will appear here.</div>
-          </div>
-        </article>
-        <article class="panel">
-          <p class="eyebrow">Maps-Ready Dispatch</p>
-          <div id="mapsDispatchList" class="stack-list">
-            <div class="empty-box">Google Maps dispatch links will appear here.</div>
-          </div>
-          <div id="routeClusterList" class="stack-list">
-            <div class="empty-box">Route clusters will appear here.</div>
-          </div>
-        </article>
-      </section>
-
-      <section class="two-column">
-        <article class="panel">
-          <div class="panel-head">
-            <div>
-              <p class="eyebrow">Cloud Evidence Uploads</p>
-              <h2>Upload proofs, photos, and field documents</h2>
+        <section class="two-column">
+          <article class="panel">
+            <p class="eyebrow">Response Calendar</p>
+            <h2>Weekly shift and workload view</h2>
+            <div id="responseCalendar" class="stack-list">
+              <div class="empty-box">Calendar view will appear here after requests and assignments are loaded.</div>
             </div>
-          </div>
-          <form id="artifactForm" class="form-grid" aria-label="Artifact upload form">
-            <div class="split-grid">
+          </article>
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Operator Notes</p>
+                <h2>Pinned notes and handoff memory</h2>
+              </div>
+            </div>
+            <form id="opsNotesForm" class="form-grid" aria-label="Operator notes form">
               <label>
-                Artifact Type
-                <select name="artifactType" required>
-                  <option value="field-photo">Field Photo</option>
-                  <option value="request-proof">Request Proof</option>
-                  <option value="volunteer-proof">Volunteer Proof</option>
-                  <option value="report">Report / PDF</option>
-                </select>
+                Daily Briefing Note
+                <textarea name="briefing" rows="3" placeholder="Key update for the next operator shift"></textarea>
               </label>
               <label>
-                Related Record
-                <input name="relatedTo" type="text" placeholder="East meal distribution" required>
+                Handoff Note
+                <textarea name="handoff" rows="3" placeholder="What the next coordinator must know"></textarea>
               </label>
-            </div>
-            <label>
-              Notes
-              <input name="artifactNotes" type="text" placeholder="Proof of meal kit dispatch">
-            </label>
-            <label>
-              File
-              <input name="artifactFile" type="file" accept=".png,.jpg,.jpeg,.pdf,.txt" required>
-            </label>
-            <button class="primary-button" type="submit">Upload To Cloud Storage</button>
-          </form>
-          <div id="artifactUploadStatus" class="subtle-banner">Sign in to upload evidence into Cloud Storage.</div>
-          <div id="artifactList" class="stack-list">
-            <div class="empty-box">Uploaded artifacts will appear here.</div>
-          </div>
-        </article>
+              <label>
+                Incident Note
+                <textarea name="incident" rows="3" placeholder="Route issue, shortage alert, or beneficiary concern"></textarea>
+              </label>
+              <div class="button-row">
+                <button class="primary-button" type="submit">Save Notes</button>
+              </div>
+            </form>
+          </article>
+        </section>
 
-        <article class="panel">
+        <section class="three-column">
+          <article class="panel">
+            <p class="eyebrow">Workflow Board</p>
+            <h2>Kanban-style request pipeline</h2>
+            <div id="workflowChart" class="stack-list">
+              <div class="empty-box">Workflow distribution will appear here.</div>
+            </div>
+          </article>
+          <article class="panel">
+            <p class="eyebrow">Scenario Mix</p>
+            <h2>Demand by response mode</h2>
+            <div id="scenarioChart" class="stack-list">
+              <div class="empty-box">Scenario mix will appear here.</div>
+            </div>
+          </article>
+          <article class="panel">
+            <p class="eyebrow">Volunteer Utilization</p>
+            <h2>Shift load and staffing pressure</h2>
+            <div id="volunteerUtilizationChart" class="stack-list">
+              <div class="empty-box">Volunteer utilization analytics will appear here.</div>
+            </div>
+          </article>
+        </section>
+
+        <section class="panel">
           <div class="panel-head">
             <div>
-              <p class="eyebrow">Live Route Planner</p>
-              <h2>Google Maps routing for top dispatch</h2>
+              <p class="eyebrow">Kanban Workflow</p>
+              <h2>See every request by stage at a glance</h2>
             </div>
-            <button class="ghost-button" data-action="refresh-route">Refresh Route</button>
           </div>
-          <div id="routeSummary" class="highlight-box">Route summary will appear here when assignments and map access are available.</div>
-          <div id="routeMap" class="route-map" aria-label="Route map view"></div>
-        </article>
-      </section>
+          <div id="workflowKanban" class="kanban-board">
+            <div class="empty-box">Workflow board will appear here.</div>
+          </div>
+        </section>
 
-      <section class="two-column">
-        <article class="panel">
-          <p class="eyebrow">Collaboration Timeline</p>
-          <h2>Live team activity log</h2>
-          <div id="collabTimeline" class="stack-list">
-            <div class="empty-box">Collaboration events appear here after actions are performed.</div>
-          </div>
-        </article>
-        <article class="panel">
-          <p class="eyebrow">Sync Health</p>
-          <h2>Submission-safe reliability checks</h2>
-          <div id="syncHealth" class="sys-grid">
-            <div class="empty-box">Sync health indicators will appear here.</div>
-          </div>
-        </article>
-      </section>
+        <section class="two-column">
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">AidFlow Forecast</p>
+                <h2>Predictive resource allocation</h2>
+              </div>
+            </div>
+            <div id="forecastBoard" class="stack-list">
+              <div class="empty-box">Forecasted shortages and pre-positioning suggestions will appear here.</div>
+            </div>
+          </article>
 
-      <section class="panel">
-        <div class="panel-head">
-          <div>
-            <p class="eyebrow">Archive Safety</p>
-            <h2>Archived requests and volunteers</h2>
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Delivery Verification</p>
+                <h2>QR-ready field trail</h2>
+              </div>
+            </div>
+            <div id="verificationBoard" class="stack-list">
+              <div class="empty-box">Delivery tokens and verification trail will appear here.</div>
+            </div>
+            <div id="qrPreviewPanel" class="stack-list">
+              <div class="empty-box">Select a token to preview its QR code.</div>
+            </div>
+          </article>
+        </section>
+
+        <section class="two-column">
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">QR Verification Scanner</p>
+                <h2>Scan a delivery token</h2>
+              </div>
+            </div>
+            <form id="qrVerifyForm" class="form-grid" aria-label="QR verification form">
+              <label>
+                Upload QR Image
+                <input id="qrScanFile" name="qrScanFile" type="file" accept="image/*">
+              </label>
+              <label>
+                Or Enter Token Manually
+                <input id="qrManualToken" name="qrManualToken" type="text" placeholder="RF-EAS-AB12">
+              </label>
+              <button class="primary-button" type="submit">Verify Token</button>
+            </form>
+            <div id="qrScanResult" class="highlight-box">Scan result will appear here.</div>
+          </article>
+
+          <article class="panel">
+            <p class="eyebrow">Printable Situation Report</p>
+            <div id="printReportSummary" class="stack-list">
+              <div class="empty-box">The report summary will update as requests, assignments, and forecasts change.</div>
+            </div>
+          </article>
+        </section>
+
+        <section class="two-column">
+          <article class="panel">
+            <p class="eyebrow">Notification Center</p>
+            <h2>Free browser-safe reminders and alerts</h2>
+            <div id="notificationCenter" class="stack-list">
+              <div class="empty-box">Assignments, reminders, and alerts will appear here.</div>
+            </div>
+          </article>
+
+          <article class="panel">
+            <p class="eyebrow">Field Collaboration</p>
+            <h2>Daily briefing, handoff, and incident notes</h2>
+            <div id="dailyBriefingPanel" class="stack-list">
+              <div class="empty-box">Daily briefing notes will appear here.</div>
+            </div>
+            <div id="handoffNotesPanel" class="stack-list">
+              <div class="empty-box">Operator handoff notes will appear here.</div>
+            </div>
+            <div id="incidentLogPanel" class="stack-list">
+              <div class="empty-box">Incident log entries will appear here.</div>
+            </div>
+          </article>
+        </section>
+
+        <section class="two-column">
+          <article class="panel">
+            <p class="eyebrow">Zone Coverage</p>
+            <div id="zoneCoverageList" class="stack-list">
+              <div class="empty-box">Zone coverage evidence will appear here.</div>
+            </div>
+          </article>
+          <article class="panel">
+            <p class="eyebrow">Maps-Ready Dispatch</p>
+            <div id="mapsDispatchList" class="stack-list">
+              <div class="empty-box">Google Maps dispatch links will appear here.</div>
+            </div>
+            <div id="routeClusterList" class="stack-list">
+              <div class="empty-box">Route clusters will appear here.</div>
+            </div>
+          </article>
+        </section>
+
+        <section class="two-column">
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Cloud Evidence Uploads</p>
+                <h2>Upload proofs, photos, and field documents</h2>
+              </div>
+            </div>
+            <form id="artifactForm" class="form-grid" aria-label="Artifact upload form">
+              <div class="split-grid">
+                <label>
+                  Artifact Type
+                  <select name="artifactType" required>
+                    <option value="field-photo">Field Photo</option>
+                    <option value="request-proof">Request Proof</option>
+                    <option value="volunteer-proof">Volunteer Proof</option>
+                    <option value="report">Report / PDF</option>
+                  </select>
+                </label>
+                <label>
+                  Related Record
+                  <input name="relatedTo" type="text" placeholder="East meal distribution" required>
+                </label>
+              </div>
+              <label>
+                Notes
+                <input name="artifactNotes" type="text" placeholder="Proof of meal kit dispatch">
+              </label>
+              <label>
+                File
+                <input name="artifactFile" type="file" accept=".png,.jpg,.jpeg,.pdf,.txt" required>
+              </label>
+              <button class="primary-button" type="submit">Upload To Cloud Storage</button>
+            </form>
+            <div id="artifactUploadStatus" class="subtle-banner">Sign in to upload evidence into Cloud Storage.</div>
+            <div id="artifactList" class="stack-list">
+              <div class="empty-box">Uploaded artifacts will appear here.</div>
+            </div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Live Route Planner</p>
+                <h2>Google Maps routing for top dispatch</h2>
+              </div>
+              <button class="ghost-button" data-action="refresh-route">Refresh Route</button>
+            </div>
+            <div id="routeSummary" class="highlight-box">Route summary will appear here when assignments and map access are available.</div>
+            <div id="routeMap" class="route-map" aria-label="Route map view"></div>
+          </article>
+        </section>
+
+        <section class="two-column">
+          <article class="panel">
+            <p class="eyebrow">Collaboration Timeline</p>
+            <h2>Live team activity log</h2>
+            <div id="collabTimeline" class="stack-list">
+              <div class="empty-box">Collaboration events appear here after actions are performed.</div>
+            </div>
+          </article>
+          <article class="panel">
+            <p class="eyebrow">Sync Health</p>
+            <h2>Submission-safe reliability checks</h2>
+            <div id="syncHealth" class="sys-grid">
+              <div class="empty-box">Sync health indicators will appear here.</div>
+            </div>
+          </article>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Archive Safety</p>
+              <h2>Archived requests and volunteers</h2>
+            </div>
           </div>
-        </div>
-        <div id="archivedOverview" class="stack-list">
-          <div class="empty-box">Archived records will appear here instead of being permanently deleted.</div>
-        </div>
-      </section>
+          <div id="archivedOverview" class="stack-list">
+            <div class="empty-box">Archived records will appear here instead of being permanently deleted.</div>
+          </div>
+        </section>
+      </details>
     </main>
   </div>
 
   <script src="./firebase-config.js"></script>
-  <script src="./app.js?v=20260401-upgrade4"></script>
+  <script src="./app.js?v=20260402-authhero1"></script>
   <script src="./criteria.js"></script>
 </body>
 </html>

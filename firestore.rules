@@ -56,6 +56,7 @@ service cloud.firestore {
         "email",
         "displayName",
         "photoURL",
+        "location",
         "role",
         "requestedRole",
         "updatedAt",
@@ -65,9 +66,13 @@ service cloud.firestore {
         && request.resource.data.email is string
         && request.resource.data.displayName is string
         && request.resource.data.photoURL is string
+        && request.resource.data.location is string
         && request.resource.data.role is string
         && request.resource.data.requestedRole is string
-        && request.resource.data.updatedAt is string;
+        && request.resource.data.updatedAt is string
+        && request.resource.data.updatedBy is string
+        && request.resource.data.role in ["user", "volunteer", "government", "coordinator", "admin"]
+        && request.resource.data.requestedRole in ["user", "volunteer", "government", "coordinator", "admin"];
     }
 
     match /resourceflow/{workspaceId} {
@@ -82,13 +87,16 @@ service cloud.firestore {
         && request.auth.uid == userId
         && validProfileShape(userId)
         && (
-          request.resource.data.role == "volunteer"
+          request.resource.data.role in ["user", "volunteer", "government", "coordinator"]
           || (request.resource.data.role == "admin" && isAdminEmail())
         );
       allow update: if validProfileShape(userId) && (
         (signedIn()
           && request.auth.uid == userId
-          && request.resource.data.role == resource.data.role)
+          && (
+            request.resource.data.role == resource.data.role
+            || request.resource.data.role in ["user", "volunteer", "government", "coordinator"]
+          ))
         || isAdminEmail()
       );
       allow delete: if isAdminEmail();

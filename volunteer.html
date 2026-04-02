@@ -6,13 +6,13 @@
   <meta name="theme-color" content="#061521">
   <link rel="manifest" href="./manifest.webmanifest">
   <title>ResourceFlow | Volunteer Portal</title>
-  <link rel="stylesheet" href="./styles.css?v=20260401-future3">
+  <link rel="stylesheet" href="./styles.css?v=20260402-authhero1">
 </head>
 <body data-page="volunteer">
   <a class="skip-link" href="#mainContent">Skip to content</a>
   <div class="site-shell">
     <header class="site-header">
-      <a class="brand" href="./index.html" aria-label="ResourceFlow home">
+      <a class="brand" href="./overview.html" aria-label="ResourceFlow overview">
         <span class="brand-mark">RF</span>
         <span>
           <strong>ResourceFlow</strong>
@@ -21,7 +21,7 @@
       </a>
 
       <nav class="site-nav" aria-label="Primary">
-        <a class="nav-link" data-nav="home" href="./index.html">Overview</a>
+        <a class="nav-link" data-nav="home" href="./overview.html">Overview</a>
         <a class="nav-link" data-nav="operations" href="./operations.html">Operations</a>
         <a class="nav-link" data-nav="volunteer" href="./volunteer.html">Volunteer Portal</a>
         <a class="nav-link" data-nav="insights" href="./insights.html">AI Insights</a>
@@ -178,140 +178,144 @@
         </article>
       </section>
 
-      <section class="two-column">
-        <article class="panel">
-          <p class="eyebrow">Volunteer Filters</p>
-          <div class="form-grid compact-controls">
-            <label>
-              Search Volunteers
-              <input id="volunteerSearch" type="text" placeholder="Search by name, skill, location, or experience">
-            </label>
-            <div class="split-grid">
+      <details class="advanced-disclosure">
+        <summary>Advanced volunteer tools</summary>
+
+        <section class="two-column">
+          <article class="panel">
+            <p class="eyebrow">Volunteer Filters</p>
+            <div class="form-grid compact-controls">
               <label>
-                Zone
-                <select id="volunteerZoneFilter">
-                  <option value="">All zones</option>
-                  <option>North</option>
-                  <option>South</option>
-                  <option>East</option>
-                  <option>West</option>
-                  <option>Central</option>
-                </select>
+                Search Volunteers
+                <input id="volunteerSearch" type="text" placeholder="Search by name, skill, location, or experience">
               </label>
-              <label>
-                Skill Focus
-                <input id="volunteerSkillFilter" type="text" placeholder="first aid, logistics, driving">
-              </label>
+              <div class="split-grid">
+                <label>
+                  Zone
+                  <select id="volunteerZoneFilter">
+                    <option value="">All zones</option>
+                    <option>North</option>
+                    <option>South</option>
+                    <option>East</option>
+                    <option>West</option>
+                    <option>Central</option>
+                  </select>
+                </label>
+                <label>
+                  Skill Focus
+                  <input id="volunteerSkillFilter" type="text" placeholder="first aid, logistics, driving">
+                </label>
+              </div>
             </div>
-          </div>
-        </article>
+          </article>
 
-        <article class="panel">
-          <p class="eyebrow">Multilingual Outreach</p>
-          <div class="form-grid compact-controls">
-            <div class="split-grid">
-              <label>
-                Language
-                <select id="volunteerLanguage">
-                  <option value="English">English</option>
-                  <option value="Hinglish">Hinglish</option>
-                  <option value="HindiRoman">Hindi (Romanized)</option>
-                </select>
-              </label>
-              <label>
-                Tone
-                <select id="volunteerTone">
-                  <option value="Warm">Warm</option>
-                  <option value="Urgent">Urgent</option>
-                  <option value="Formal">Formal</option>
-                </select>
-              </label>
+          <article class="panel">
+            <p class="eyebrow">Multilingual Outreach</p>
+            <div class="form-grid compact-controls">
+              <div class="split-grid">
+                <label>
+                  Language
+                  <select id="volunteerLanguage">
+                    <option value="English">English</option>
+                    <option value="Hinglish">Hinglish</option>
+                    <option value="HindiRoman">Hindi (Romanized)</option>
+                  </select>
+                </label>
+                <label>
+                  Tone
+                  <select id="volunteerTone">
+                    <option value="Warm">Warm</option>
+                    <option value="Urgent">Urgent</option>
+                    <option value="Formal">Formal</option>
+                  </select>
+                </label>
+              </div>
             </div>
-          </div>
-        </article>
-      </section>
+          </article>
+        </section>
 
-      <section class="two-column">
-        <article class="panel">
-          <p class="eyebrow">Current Volunteers</p>
-          <div id="volunteerRoster" class="stack-list">
-            <div class="empty-box">No volunteers registered yet.</div>
-          </div>
-        </article>
+        <section class="two-column">
+          <article class="panel">
+            <p class="eyebrow">Current Volunteers</p>
+            <div id="volunteerRoster" class="stack-list">
+              <div class="empty-box">No volunteers registered yet.</div>
+            </div>
+          </article>
 
-        <article class="panel">
-          <p class="eyebrow">Accessibility And Trust</p>
-          <div id="accessibilityChecklist" class="stack-list">
-            <div class="empty-box">Accessibility evidence will appear here.</div>
-          </div>
-        </article>
-      </section>
+          <article class="panel">
+            <p class="eyebrow">Accessibility And Trust</p>
+            <div id="accessibilityChecklist" class="stack-list">
+              <div class="empty-box">Accessibility evidence will appear here.</div>
+            </div>
+          </article>
+        </section>
 
-      <section class="two-column">
-        <article class="panel">
-          <p class="eyebrow">Shift Dashboard</p>
-          <div id="volunteerShiftPlan" class="stack-list">
-            <div class="empty-box">Volunteer shift slots will appear here.</div>
-          </div>
-        </article>
+        <section class="two-column">
+          <article class="panel">
+            <p class="eyebrow">Shift Dashboard</p>
+            <div id="volunteerShiftPlan" class="stack-list">
+              <div class="empty-box">Volunteer shift slots will appear here.</div>
+            </div>
+          </article>
 
-        <article class="panel">
-          <p class="eyebrow">Utilization Analytics</p>
-          <div id="volunteerUtilizationSummary" class="stack-list">
-            <div class="empty-box">Volunteer utilization metrics will appear here.</div>
-          </div>
-        </article>
-      </section>
+          <article class="panel">
+            <p class="eyebrow">Utilization Analytics</p>
+            <div id="volunteerUtilizationSummary" class="stack-list">
+              <div class="empty-box">Volunteer utilization metrics will appear here.</div>
+            </div>
+          </article>
+        </section>
 
-      <section class="two-column">
-        <article class="panel">
-          <p class="eyebrow">Volunteer Training Priorities</p>
-          <div id="volunteerTrainingList" class="stack-list">
-            <div class="empty-box">Training suggestions will appear here based on current skill gaps.</div>
-          </div>
-        </article>
-        <article class="panel">
-          <p class="eyebrow">Community Outreach Draft</p>
-          <pre id="volunteerCommunityMessage" class="brief-box">Outreach support message will appear here.</pre>
-        </article>
-      </section>
+        <section class="two-column">
+          <article class="panel">
+            <p class="eyebrow">Volunteer Training Priorities</p>
+            <div id="volunteerTrainingList" class="stack-list">
+              <div class="empty-box">Training suggestions will appear here based on current skill gaps.</div>
+            </div>
+          </article>
+          <article class="panel">
+            <p class="eyebrow">Community Outreach Draft</p>
+            <pre id="volunteerCommunityMessage" class="brief-box">Outreach support message will appear here.</pre>
+          </article>
+        </section>
 
-      <section class="panel">
-        <p class="eyebrow">Best-fit Volunteer Ranking</p>
-        <h2>Top responders for the current highest-priority requests</h2>
-        <div id="volunteerRankingPanel" class="stack-list">
-          <div class="empty-box">Volunteer ranking insights will appear here.</div>
-        </div>
-      </section>
+        <section class="panel">
+          <p class="eyebrow">Best-fit Volunteer Ranking</p>
+          <h2>Top responders for the current highest-priority requests</h2>
+          <div id="volunteerRankingPanel" class="stack-list">
+            <div class="empty-box">Volunteer ranking insights will appear here.</div>
+          </div>
+        </section>
 
-      <section class="three-column">
-        <article class="panel">
-          <p class="eyebrow">Volunteer Profile Signals</p>
-          <h2>Badges, readiness, and trust view</h2>
-          <div id="volunteerProfileSignals" class="stack-list">
-            <div class="empty-box">Volunteer profile badges and readiness insights will appear here.</div>
-          </div>
-        </article>
-        <article class="panel">
-          <p class="eyebrow">Draft Recovery</p>
-          <h2>Offline-first form safety</h2>
-          <div id="volunteerDraftCenter" class="stack-list">
-            <div class="empty-box">Saved volunteer drafts and recovery guidance will appear here.</div>
-          </div>
-        </article>
-        <article class="panel">
-          <p class="eyebrow">Accessibility Controls</p>
-          <h2>Readable, keyboard-friendly workspace</h2>
-          <div id="accessibilityControlPanel" class="stack-list">
-            <div class="empty-box">Accessibility controls will appear here.</div>
-          </div>
-        </article>
-      </section>
+        <section class="three-column">
+          <article class="panel">
+            <p class="eyebrow">Volunteer Profile Signals</p>
+            <h2>Badges, readiness, and trust view</h2>
+            <div id="volunteerProfileSignals" class="stack-list">
+              <div class="empty-box">Volunteer profile badges and readiness insights will appear here.</div>
+            </div>
+          </article>
+          <article class="panel">
+            <p class="eyebrow">Draft Recovery</p>
+            <h2>Offline-first form safety</h2>
+            <div id="volunteerDraftCenter" class="stack-list">
+              <div class="empty-box">Saved volunteer drafts and recovery guidance will appear here.</div>
+            </div>
+          </article>
+          <article class="panel">
+            <p class="eyebrow">Accessibility Controls</p>
+            <h2>Readable, keyboard-friendly workspace</h2>
+            <div id="accessibilityControlPanel" class="stack-list">
+              <div class="empty-box">Accessibility controls will appear here.</div>
+            </div>
+          </article>
+        </section>
+      </details>
     </main>
   </div>
 
   <script src="./firebase-config.js"></script>
-  <script src="./app.js?v=20260401-upgrade4"></script>
+  <script src="./app.js?v=20260402-authhero1"></script>
   <script src="./criteria.js"></script>
 </body>
 </html>
