@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#061521">
   <link rel="manifest" href="./manifest.webmanifest">
   <title>ResourceFlow | Operations</title>
-  <link rel="stylesheet" href="./styles.css?v=20260402-rolelock1">
+  <link rel="stylesheet" href="./styles.css?v=20260402-rolelock2">
 </head>
 <body data-page="operations">
   <a class="skip-link" href="#mainContent">Skip to content</a>
@@ -21,7 +21,7 @@
       </a>
 
       <nav class="site-nav" aria-label="Primary">
-        <a class="nav-link" data-nav="home" href="./overview.html">Overview</a>
+        <a class="nav-link" data-nav="home" href="./overview.html">Community Portal</a>
         <a class="nav-link" data-nav="operations" href="./operations.html">Operations</a>
         <a class="nav-link" data-nav="volunteer" href="./volunteer.html">Volunteer Portal</a>
         <a class="nav-link" data-nav="insights" href="./insights.html">AI Insights</a>
@@ -45,7 +45,7 @@
         <button class="ghost-button" data-action="export-csv">Export CSV</button>
         <button class="ghost-button" data-action="print-field-sheet">Field Sheet</button>
         <button class="ghost-button" data-action="print-judge-report">Judge Report</button>
-        <a class="ghost-link" href="./impact.html">Public Impact</a>
+        <a class="ghost-link" data-access-page="impact" href="./impact.html">Public Impact</a>
       </div>
     </header>
 
@@ -101,9 +101,9 @@
             </label>
             <div class="split-grid">
               <label>
-                Zone
-                <select id="operationsZoneFilter">
-                  <option value="">All zones</option>
+                  District
+                  <select id="operationsZoneFilter">
+                    <option value="">All districts</option>
                   <option>North</option>
                   <option>South</option>
                   <option>East</option>
@@ -140,7 +140,7 @@
                 <select id="operationsSort">
                   <option value="urgency">Urgency</option>
                   <option value="beneficiaries">Beneficiaries</option>
-                  <option value="zone">Zone</option>
+                  <option value="zone">District</option>
                   <option value="recent">Most recent</option>
                 </select>
               </label>
@@ -202,7 +202,7 @@
             </label>
             <label>
               Request Title
-              <input name="title" type="text" placeholder="Food delivery support in East Zone" required>
+              <input name="title" type="text" placeholder="Food delivery support in East District" required>
             </label>
             <label>
               Category
@@ -234,9 +234,9 @@
             </div>
             <div class="split-grid">
               <label>
-                Zone
+                District
                 <select name="zone" required>
-                  <option value="">Choose zone</option>
+                  <option value="">Choose district</option>
                   <option>North</option>
                   <option>South</option>
                   <option>East</option>
@@ -643,7 +643,7 @@
   </div>
 
   <script src="./firebase-config.js"></script>
-  <script src="./app.js?v=20260402-rolelock1"></script>
+  <script src="./app.js?v=20260403-rolelock3"></script>
   <script src="./criteria.js"></script>
 </body>
 </html>

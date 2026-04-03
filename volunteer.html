@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#061521">
   <link rel="manifest" href="./manifest.webmanifest">
   <title>ResourceFlow | Volunteer Portal</title>
-  <link rel="stylesheet" href="./styles.css?v=20260402-rolelock1">
+  <link rel="stylesheet" href="./styles.css?v=20260402-rolelock2">
 </head>
 <body data-page="volunteer">
   <a class="skip-link" href="#mainContent">Skip to content</a>
@@ -21,7 +21,7 @@
       </a>
 
       <nav class="site-nav" aria-label="Primary">
-        <a class="nav-link" data-nav="home" href="./overview.html">Overview</a>
+        <a class="nav-link" data-nav="home" href="./overview.html">Community Portal</a>
         <a class="nav-link" data-nav="operations" href="./operations.html">Operations</a>
         <a class="nav-link" data-nav="volunteer" href="./volunteer.html">Volunteer Portal</a>
         <a class="nav-link" data-nav="insights" href="./insights.html">AI Insights</a>
@@ -30,7 +30,7 @@
       </nav>
 
       <div class="header-actions">
-        <label class="inline-select" data-manager-action="true">
+        <label class="inline-select">
           <span>Scenario</span>
           <select id="demoScenarioSelect">
             <option value="mixed">Mixed</option>
@@ -40,8 +40,8 @@
             <option value="food">Food Distribution</option>
           </select>
         </label>
-        <button class="ghost-button" data-action="seed-demo" data-manager-action="true">Load Demo</button>
-        <a class="primary-link" href="./insights.html">See Insights</a>
+        <button class="ghost-button" data-action="seed-demo">Load Demo</button>
+        <a class="primary-link" data-access-page="insights" href="./insights.html">See Insights</a>
       </div>
     </header>
 
@@ -59,24 +59,67 @@
 
       <section class="stats-grid role-stats">
         <article class="stat-card role-stat-card">
-          <p class="eyebrow">Visible Responders</p>
+          <p class="eyebrow" id="volunteerStatCountLabel">Visible Responders</p>
           <strong id="volunteerStatCount">0</strong>
           <p id="volunteerStatCountText" class="card-meta">Responders visible in the current workspace.</p>
         </article>
         <article class="stat-card role-stat-card">
-          <p class="eyebrow">Top Skill Focus</p>
+          <p class="eyebrow" id="volunteerStatFocusLabel">Top Skill Focus</p>
           <strong id="volunteerStatFocus">Balanced</strong>
           <p id="volunteerStatFocusText" class="card-meta">Current skill pressure is distributed evenly.</p>
         </article>
         <article class="stat-card role-stat-card">
-          <p class="eyebrow">Priority Zone</p>
-          <strong id="volunteerStatZone">No Zone Yet</strong>
+          <p class="eyebrow" id="volunteerStatZoneLabel">Priority District</p>
+          <strong id="volunteerStatZone">No District Yet</strong>
           <p id="volunteerStatZoneText" class="card-meta">Urgent demand will appear here once requests are loaded.</p>
         </article>
         <article class="stat-card role-stat-card">
-          <p class="eyebrow">Portal Status</p>
+          <p class="eyebrow" id="volunteerStatReadinessLabel">Portal Status</p>
           <strong id="volunteerStatReadiness">Guest</strong>
           <p id="volunteerStatReadinessText" class="card-meta">Sign in to save volunteers into the shared workspace.</p>
+        </article>
+      </section>
+
+      <section class="two-column volunteer-personal-grid">
+        <article class="panel compact">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">My Volunteer Snapshot</p>
+              <h2>Track your points, completed work, and attendance</h2>
+            </div>
+          </div>
+          <div class="stats-grid volunteer-personal-stats">
+            <article class="stat-card">
+              <span>Volunteer ID</span>
+              <strong id="volunteerPersonalId">Pending</strong>
+              <small id="volunteerPersonalIdText">Create or link your responder profile.</small>
+            </article>
+            <article class="stat-card">
+              <span>Points</span>
+              <strong id="volunteerPersonalPoints">0</strong>
+              <small id="volunteerPersonalPointsText">Points will appear after your first assignment.</small>
+            </article>
+            <article class="stat-card">
+              <span>Completed Work</span>
+              <strong id="volunteerPersonalWork">0</strong>
+              <small id="volunteerPersonalWorkText">Finished tasks will appear here.</small>
+            </article>
+            <article class="stat-card">
+              <span>Attendance Days</span>
+              <strong id="volunteerPersonalAttendance">0</strong>
+              <small id="volunteerPersonalAttendanceText">Attendance starts once shifts are linked.</small>
+            </article>
+          </div>
+          <div id="volunteerProgressList" class="stack-list">
+            <div class="empty-box">Your completed work and current assignments will appear here.</div>
+          </div>
+        </article>
+
+        <article class="panel compact">
+          <p class="eyebrow">Volunteer Profile Summary</p>
+          <div id="volunteerProfileSummary" class="stack-list">
+            <div class="empty-box">Sign in and save your volunteer profile to see your personal summary here.</div>
+          </div>
         </article>
       </section>
 
@@ -101,9 +144,9 @@
             </label>
             <div class="split-grid">
               <label>
-                Zone
+                District
                 <select name="zone" required>
-                  <option value="">Choose zone</option>
+                  <option value="">Choose district</option>
                   <option>North</option>
                   <option>South</option>
                   <option>East</option>
@@ -154,14 +197,6 @@
                   <option value="No">No transport</option>
                 </select>
               </label>
-              <label>
-                Experience
-                <select name="experience" required>
-                  <option>Advanced</option>
-                  <option>Intermediate</option>
-                  <option>Beginner</option>
-                </select>
-              </label>
             </div>
             <div class="button-row">
               <button class="primary-button" id="volunteerSubmitButton" type="submit">Register Volunteer</button>
@@ -178,7 +213,7 @@
         </article>
       </section>
 
-      <details class="advanced-disclosure">
+      <details id="volunteerAdvancedTools" class="advanced-disclosure">
         <summary>Advanced volunteer tools</summary>
 
         <section class="two-column">
@@ -187,13 +222,13 @@
             <div class="form-grid compact-controls">
               <label>
                 Search Volunteers
-                <input id="volunteerSearch" type="text" placeholder="Search by name, skill, location, or experience">
+                <input id="volunteerSearch" type="text" placeholder="Search by name, skill, location, or language">
               </label>
               <div class="split-grid">
                 <label>
-                  Zone
+                  District
                   <select id="volunteerZoneFilter">
-                    <option value="">All zones</option>
+                    <option value="">All districts</option>
                     <option>North</option>
                     <option>South</option>
                     <option>East</option>
@@ -311,11 +346,19 @@
           </article>
         </section>
       </details>
+
+      <section class="panel">
+        <p class="eyebrow">Volunteer Work Archive</p>
+        <h2>See who completed what work across the response network</h2>
+        <div id="volunteerArchiveList" class="stack-list">
+          <div class="empty-box">Completed work from the volunteer network will appear here.</div>
+        </div>
+      </section>
     </main>
   </div>
 
   <script src="./firebase-config.js"></script>
-  <script src="./app.js?v=20260402-rolelock1"></script>
+  <script src="./app.js?v=20260403-rolelock3"></script>
   <script src="./criteria.js"></script>
 </body>
 </html>

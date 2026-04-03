@@ -10,6 +10,7 @@
   const UI_LANGUAGE_KEY = "resourceflow-ui-language-v1";
   const UI_PREFERENCES_KEY = "resourceflow-ui-preferences-v1";
   const OPS_NOTES_KEY = "resourceflow-ops-notes-v1";
+  const ACCESS_NOTICE_KEY = "resourceflow-access-notice-v1";
   const MAX_ACTIVITY_LOG = 48;
   const MAX_HISTORY_SNAPSHOTS = 30;
   const MAX_TEXT_FIELD = 180;
@@ -238,33 +239,33 @@
 
   const ROLE_PAGE_ACCESS = {
     guest: [],
-    user: ["home", "impact"],
-    volunteer: ["home", "volunteer", "insights", "impact"],
-    government: ["home", "operations", "insights", "impact"],
-    coordinator: ["home", "operations", "insights", "impact"],
+    user: ["home"],
+    volunteer: ["home", "volunteer"],
+    government: ["home", "operations"],
+    coordinator: ["home", "operations"],
     admin: ["home", "operations", "volunteer", "insights", "admin", "judge", "impact"]
   };
 
   const ROLE_PORTAL_META = {
     user: {
       label: "Community User",
-      summary: "View public updates, impact proof, and trusted response summaries.",
-      badges: ["Overview", "Public Impact", "Read-only access"]
+      summary: "View trusted community summaries and read-only response progress.",
+      badges: ["Community Portal", "Read-only access", "Overview only"]
     },
     volunteer: {
       label: "Volunteer",
-      summary: "Register availability, update your responder profile, and review guided opportunities.",
-      badges: ["Volunteer Portal", "AI Insights", "Impact view"]
+      summary: "Track your own assignments, completed work, attendance, and responder profile.",
+      badges: ["Volunteer Portal", "Personal tasks", "No admin tools"]
     },
     government: {
       label: "Government",
-      summary: "Review requests, manage operations, and coordinate field response across zones.",
-      badges: ["Operations", "AI Insights", "Impact view"]
+      summary: "Coordinate requests, staffing, and live response operations for your district team.",
+      badges: ["Operations", "Approvals", "Dispatch access"]
     },
     coordinator: {
       label: "Coordinator",
       summary: "Manage response queues, staffing, and delivery planning in the shared workspace.",
-      badges: ["Operations", "AI Insights", "Impact view"]
+      badges: ["Operations", "Approvals", "Dispatch access"]
     },
     admin: {
       label: "Admin",
@@ -1006,7 +1007,7 @@
   }
 
   function activeAccessRole() {
-    return normalizeRole(state.selectedPortalRole || state.role || "guest");
+    return normalizeRole(state.selectedPortalRole || (state.userProfile && state.userProfile.requestedRole) || state.role || "guest");
   }
 
   function activePortalProfile() {
@@ -1120,17 +1121,27 @@
       const previousUid = state.user && state.user.uid ? state.user.uid : "";
       state.user = user || null;
       if (user) {
-      if (!previousUid || previousUid !== user.uid) {
-        state.selectedPortalRole = "";
-        persistSelectedPortal();
-      }
+        if (previousUid && previousUid !== user.uid) {
+          state.selectedPortalRole = "";
+          persistSelectedPortal();
+        }
         state.demoSession = null;
         persistDemoSession();
         state.role = normalizeRole(state.selectedPortalRole || state.role || "user");
-        await syncUserProfile(user);
-        trackEvent("resourceflow_sign_in", {
-          role: state.role
+        renderAuthUi();
+        renderAll();
+        maybeHandlePostAuthRouting();
+        syncUserProfile(user).then(function () {
+          trackEvent("resourceflow_sign_in", {
+            role: state.role
+          });
+          renderAuthUi();
+          renderAll();
+          maybeHandlePostAuthRouting();
+        }).catch(function (error) {
+          console.warn("Background user profile sync failed.", error);
         });
+        return;
       } else {
         if (state.demoSession) {
           applyDemoSessionState();
@@ -1222,7 +1233,6 @@
       "</label>",
       '<div class="auth-actions">',
       '<button class="ghost-button" id="signInButton" type="button" hidden>Secure Access</button>',
-      '<button class="ghost-button" id="tourButton" type="button">Quick Tour</button>',
       '<button class="ghost-button" id="switchRoleButton" type="button" hidden>Switch Portal</button>',
       '<button class="ghost-button" id="signOutButton" type="button" hidden>Sign Out</button>',
       "</div>"
@@ -1932,11 +1942,10 @@
     const roleLabel = document.getElementById("authRoleLabel");
     const roleBadges = document.getElementById("authRoleBadges");
     const signInButton = document.getElementById("signInButton");
-    const tourButton = document.getElementById("tourButton");
     const switchRoleButton = document.getElementById("switchRoleButton");
     const signOutButton = document.getElementById("signOutButton");
     const uiLanguageSelect = document.getElementById("uiLanguageSelect");
-    if (!userLabel || !roleLabel || !roleBadges || !signInButton || !tourButton || !switchRoleButton || !signOutButton || !uiLanguageSelect) {
+    if (!userLabel || !roleLabel || !roleBadges || !signInButton || !switchRoleButton || !signOutButton || !uiLanguageSelect) {
       return;
     }
     const accessRole = activeAccessRole();
@@ -1986,12 +1995,6 @@
       signInButton.dataset.bound = "true";
       signInButton.addEventListener("click", function () {
         handlePrimarySignIn();
-      });
-    }
-    if (tourButton.dataset.bound !== "true") {
-      tourButton.dataset.bound = "true";
-      tourButton.addEventListener("click", function () {
-        openTourDialog(0);
       });
     }
     if (switchRoleButton.dataset.bound !== "true") {
@@ -2164,7 +2167,7 @@
   function redirectToPortal(role) {
     const nextPath = DEMO_PORTAL_ROUTES[normalizeRole(role)] || "./overview.html";
     const currentPage = currentPageName();
-    if (nextPath === "./overview.html" || currentPage === portalPageForRole(role)) {
+    if (currentPage === portalPageForRole(role)) {
       return;
     }
     if (window.location && typeof window.location.assign === "function") {
@@ -2199,7 +2202,58 @@
       government: "Government Operations",
       coordinator: "Operations Center",
       admin: "Admin Console"
-    }[normalizeRole(role)] || "Overview";
+    }[normalizeRole(role)] || "Community Portal";
+  }
+
+  function pageLabelForAccess(page) {
+    return {
+      home: "Community Portal",
+      volunteer: "Volunteer Portal",
+      operations: "Operations",
+      insights: "AI Insights",
+      admin: "Admin Portal",
+      judge: "Judge Mode",
+      impact: "Public Impact"
+    }[String(page || "").toLowerCase()] || "this page";
+  }
+
+  function allowedPageLabels(role) {
+    return (ROLE_PAGE_ACCESS[normalizeRole(role)] || []).map(pageLabelForAccess);
+  }
+
+  function queueAccessRestrictedNotice(role, page) {
+    const labels = allowedPageLabels(role);
+    const message = "Access restricted. " + currentRoleMeta(role).label + " accounts can open only " + (labels.length ? labels.join(", ") : "their assigned workspace") + ".";
+    try {
+      localStorage.setItem(ACCESS_NOTICE_KEY, JSON.stringify({
+        message: message,
+        page: String(page || ""),
+        role: normalizeRole(role),
+        at: new Date().toISOString()
+      }));
+    } catch (error) {
+      console.warn("Could not persist access notice.", error);
+    }
+  }
+
+  function consumeAccessRestrictedNotice() {
+    try {
+      const raw = localStorage.getItem(ACCESS_NOTICE_KEY);
+      if (!raw) {
+        return "";
+      }
+      localStorage.removeItem(ACCESS_NOTICE_KEY);
+      const parsed = JSON.parse(raw);
+      return safeText(parsed && parsed.message ? parsed.message : "", 220);
+    } catch (error) {
+      console.warn("Could not read access notice.", error);
+      return "";
+    }
+  }
+
+  function districtText(value) {
+    const district = String(value || "").trim();
+    return district ? district + " District" : "District not set";
   }
 
   function currentPageName() {
@@ -2229,10 +2283,11 @@
       return true;
     }
     if (!state.selectedPortalRole) {
-      state.selectedPortalRole = normalizeRole((state.userProfile && state.userProfile.role) || state.role || "user");
+      state.selectedPortalRole = normalizeRole((state.userProfile && state.userProfile.requestedRole) || state.pendingPortalRole || state.pendingRequestedRole || "user");
       persistSelectedPortal();
     }
     if (!roleCanAccessPage(activeAccessRole(), page)) {
+      queueAccessRestrictedNotice(activeAccessRole(), page);
       redirectToPortal(activeAccessRole());
       return true;
     }
@@ -3000,6 +3055,7 @@
     const requestLocked = !canManageWorkspace();
     const uploadLocked = !canManageWorkspace();
     const volunteerLocked = !(hasActiveSession() && (activeAccessRole() === "volunteer" || canManageWorkspace()));
+    const demoLocked = !hasActiveSession();
     const operationsAccessNote = document.getElementById("operationsAccessNote");
     const volunteerAccessNote = document.getElementById("volunteerAccessNote");
 
@@ -3023,8 +3079,8 @@
     });
 
     document.querySelectorAll('[data-action="seed-demo"]').forEach(function (button) {
-      button.disabled = requestLocked;
-      button.classList.toggle("is-disabled", requestLocked);
+      button.disabled = demoLocked;
+      button.classList.toggle("is-disabled", demoLocked);
     });
 
     if (operationsAccessNote) {
@@ -3073,7 +3129,9 @@
     setFieldValue(form.elements.skills, profile.skills || "");
     setFieldValue(form.elements.languages, profile.languages || "");
     setFieldValue(form.elements.transport, profile.transport || "");
-    setFieldValue(form.elements.experience, profile.experience || "");
+    if (form.elements.experience) {
+      setFieldValue(form.elements.experience, profile.experience || "");
+    }
   }
 
   function setFieldValue(field, value) {
@@ -3271,6 +3329,13 @@
   function bindGlobalActions() {
     document.querySelectorAll('[data-action="seed-demo"]').forEach(function (button) {
       button.addEventListener("click", function () { seedDemo(); });
+    });
+    document.querySelectorAll('[data-action="quick-tour"]').forEach(function (button) {
+      if (button.dataset.bound === "true") {
+        return;
+      }
+      button.dataset.bound = "true";
+      button.addEventListener("click", function () { openTourDialog(0); });
     });
     const scenarioSelect = document.getElementById("demoScenarioSelect");
     if (scenarioSelect && scenarioSelect.dataset.bound !== "true") {
@@ -3598,7 +3663,10 @@
   }
 
   async function seedDemo() {
-    if (!ensureWorkspaceAccess("Only coordinators or admins can load demo data into the shared workspace.")) {
+    if (!hasActiveSession()) {
+      announceNotice(getFirebaseConfig().enableAuth
+        ? "Sign in first to load the demo workspace."
+        : "Choose a demo role first to load the walkthrough data.");
       return;
     }
     const scenario = readDemoScenarioControl();
@@ -3716,7 +3784,7 @@
       return false;
     }
     if (!state.volunteerEditId && isDuplicateVolunteer(state.data, nextVolunteer)) {
-      announceNotice("A volunteer with the same name and zone is already registered.");
+      announceNotice("A volunteer with the same name and district is already registered.");
       return false;
     }
 
@@ -3748,6 +3816,15 @@
     } else {
       nextVolunteer.archived = false;
       nextVolunteer.shiftPreference = nextVolunteer.shiftPreference || inferVolunteerShift(nextVolunteer.availability);
+      nextVolunteer.ownerUid = activeAccessRole() === "volunteer" && state.user && state.user.uid ? state.user.uid : "";
+      nextVolunteer.ownerEmail = activeAccessRole() === "volunteer"
+        ? safeText(
+            state.user && state.user.email
+              ? state.user.email
+              : (state.demoSession && state.demoSession.email ? state.demoSession.email : ""),
+            140
+          )
+        : "";
       state.data.volunteers.unshift(nextVolunteer);
     }
     state.data.assignments = generateAssignments(state.data);
@@ -3755,7 +3832,7 @@
     state.data = registerActivity(
       state.data,
       "volunteer",
-      (state.volunteerEditId ? "Updated volunteer: " : "Registered volunteer: ") + nextVolunteer.name + " (" + nextVolunteer.zone + " zone).",
+      (state.volunteerEditId ? "Updated volunteer: " : "Registered volunteer: ") + nextVolunteer.name + " (" + nextVolunteer.zone + " district).",
       currentActor()
     );
     trackEvent("resourceflow_add_volunteer", {
@@ -4169,6 +4246,10 @@
     const formData = new FormData(form);
     return {
       id: uid(),
+      ownerUid: activeAccessRole() === "volunteer" && state.user && state.user.uid ? state.user.uid : "",
+      ownerEmail: activeAccessRole() === "volunteer"
+        ? (state.user && state.user.email ? state.user.email : (state.demoSession && state.demoSession.email ? state.demoSession.email : ""))
+        : "",
       name: textValue(formData, "name"),
       zone: textValue(formData, "zone"),
       location: textValue(formData, "location"),
@@ -4180,6 +4261,160 @@
       shiftPreference: textValue(formData, "shiftPreference"),
       createdAt: new Date().toISOString()
     };
+  }
+
+  function shiftDayLabel(value) {
+    const text = String(value || "").trim();
+    if (!text) {
+      return "";
+    }
+    return text.indexOf(" - ") >= 0 ? text.split(" - ")[0].trim() : text;
+  }
+
+  function currentVolunteerRecord() {
+    const volunteers = getVisibleVolunteers(state.data);
+    const activeProfile = activePortalProfile();
+    const sessionEmail = safeText(
+      state.user && state.user.email
+        ? state.user.email
+        : (state.demoSession && state.demoSession.email ? state.demoSession.email : ""),
+      140
+    );
+    const sessionUid = safeText(state.user && state.user.uid ? state.user.uid : "", 80);
+    const sessionName = safeText(
+      (activeProfile && (activeProfile.displayName || activeProfile.name))
+        || (state.userProfile && state.userProfile.displayName)
+        || (state.user && state.user.displayName)
+        || (state.demoSession && state.demoSession.displayName)
+        || "",
+      140
+    );
+
+    return volunteers.find(function (item) {
+      return sessionUid && item.ownerUid === sessionUid;
+    }) || volunteers.find(function (item) {
+      return sessionEmail && normalizeText(item.ownerEmail) === normalizeText(sessionEmail);
+    }) || volunteers.find(function (item) {
+      return sessionName && normalizeText(item.name) === normalizeText(sessionName);
+    }) || null;
+  }
+
+  function buildVolunteerPersonalView(data) {
+    const volunteer = currentVolunteerRecord();
+    const activeProfile = activePortalProfile();
+    const assignments = volunteer
+      ? getVisibleAssignments(data).filter(function (item) {
+          return item.volunteerId === volunteer.id || normalizeText(item.volunteerName) === normalizeText(volunteer.name);
+        })
+      : [];
+    const completed = assignments.filter(function (item) {
+      const status = normalizeWorkflowStatus(item.status || "assigned");
+      return status === "delivered" || status === "closed";
+    }).length;
+    const active = assignments.filter(function (item) {
+      const status = normalizeWorkflowStatus(item.status || "assigned");
+      return status === "assigned" || status === "in-progress";
+    }).length;
+    const attendanceDays = new Set(assignments.map(function (item) {
+      return shiftDayLabel(item.shiftLabel || "") || String(item.createdAt || "").slice(0, 10);
+    }).filter(Boolean)).size;
+    const points = completed * 20 + active * 10 + attendanceDays * 5 + Math.min((volunteer && volunteer.skills ? volunteer.skills.length : 0) * 2, 10);
+    const displayName = volunteer
+      ? volunteer.name
+      : safeText(
+          (activeProfile && (activeProfile.displayName || activeProfile.name))
+            || (state.userProfile && state.userProfile.displayName)
+            || (state.user && state.user.displayName)
+            || "Volunteer account",
+          140
+        );
+    const email = safeText(
+      state.user && state.user.email
+        ? state.user.email
+        : (state.demoSession && state.demoSession.email ? state.demoSession.email : ""),
+      140
+    );
+    const sortedAssignments = assignments.slice().sort(function (left, right) {
+      return new Date(right.createdAt || 0) - new Date(left.createdAt || 0);
+    });
+    const completedAssignments = sortedAssignments.filter(function (item) {
+      const status = normalizeWorkflowStatus(item.status || "assigned");
+      return status === "delivered" || status === "closed";
+    });
+    const activeAssignments = sortedAssignments.filter(function (item) {
+      const status = normalizeWorkflowStatus(item.status || "assigned");
+      return status === "assigned" || status === "in-progress";
+    });
+    return {
+      volunteer: volunteer,
+      displayName: displayName,
+      email: email,
+      district: volunteer ? volunteer.zone : (activeProfile.district || activeProfile.zone || ""),
+      availability: volunteer ? volunteer.availability : (activeProfile.availability || ""),
+      skills: volunteer ? volunteer.skills : normalizeSkills(activeProfile.skills || []),
+      languages: volunteer ? volunteer.languages : normalizeLanguages(activeProfile.languages || []),
+      points: points,
+      completed: completed,
+      active: active,
+      attendanceDays: attendanceDays,
+      totalAssignments: assignments.length,
+      volunteerId: volunteer ? String(volunteer.id || "").toUpperCase().slice(-8) : "Pending",
+      assignments: sortedAssignments,
+      activeAssignments: activeAssignments,
+      completedAssignments: completedAssignments,
+      history: sortedAssignments.slice(0, 5)
+    };
+  }
+
+  function renderVolunteerTaskCard(assignment) {
+    return [
+      '<div class="stack-card">',
+      '<strong>' + escapeHtml(assignment.requestTitle || "Assigned response") + '</strong>',
+      '<p class="card-meta">' + escapeHtml(districtText(assignment.zone) + " | " + workflowLabel(assignment.status || "assigned")) + '</p>',
+      '<div class="chip-row">',
+      renderChip(assignment.shiftLabel || "Shift pending"),
+      assignment.reason ? renderChip(assignment.reason) : "",
+      renderChip("ETA " + String(assignment.etaMinutes || 0) + " min"),
+      '</div>',
+      '<p class="card-meta">' + escapeHtml(assignment.organization || "Response team") + '</p>',
+      '</div>'
+    ].join("");
+  }
+
+  function renderVolunteerHistoryCard(assignment) {
+    return [
+      '<div class="stack-card">',
+      '<strong>' + escapeHtml(assignment.requestTitle || "Assigned response") + '</strong>',
+      '<p class="card-meta">' + escapeHtml(districtText(assignment.zone) + " | " + workflowLabel(assignment.status || "assigned")) + '</p>',
+      '<div class="chip-row">',
+      renderChip(assignment.shiftLabel || "Shift pending"),
+      assignment.reason ? renderChip(assignment.reason) : "",
+      '</div>',
+      '</div>'
+    ].join("");
+  }
+
+  function buildVolunteerArchiveItems(data) {
+    return getVisibleAssignments(data).filter(function (item) {
+      const status = normalizeWorkflowStatus(item.status || "assigned");
+      return status === "delivered" || status === "closed";
+    }).slice().sort(function (left, right) {
+      return new Date(right.createdAt || 0) - new Date(left.createdAt || 0);
+    }).slice(0, 10);
+  }
+
+  function renderVolunteerArchiveCard(assignment) {
+    return [
+      '<div class="stack-card">',
+      '<strong>' + escapeHtml((assignment.volunteerName || "Volunteer") + " completed " + (assignment.requestTitle || "a response task")) + '</strong>',
+      '<p class="card-meta">' + escapeHtml(districtText(assignment.zone) + " | " + workflowLabel(assignment.status || "closed")) + '</p>',
+      '<div class="chip-row">',
+      renderChip(assignment.organization || "Response team"),
+      renderChip(assignment.shiftLabel || "Shift pending"),
+      renderChip(formatTimestamp(assignment.createdAt || new Date().toISOString())),
+      '</div>',
+      '</div>'
+    ].join("");
   }
 
   function textValue(formData, key) {
@@ -4252,6 +4487,7 @@
         const previous = previousAssignments[request.id + "|" + entry.volunteer.id];
         assignments.push({
           id: previous ? previous.id : uid(),
+          createdAt: previous ? previous.createdAt : new Date().toISOString(),
           requestId: request.id,
           requestTitle: request.title,
           organization: request.organization,
@@ -4532,9 +4768,23 @@
     if (enforcePortalAccess()) {
       return;
     }
+    const accessNotice = consumeAccessRestrictedNotice();
+    if (accessNotice) {
+      updateSyncStatus("Access Restricted", accessNotice);
+    }
     renderAuthUi();
     syncNavigationAccess();
     renderCommon();
+    if (accessNotice) {
+      const announceNode = document.getElementById("announce");
+      if (announceNode) {
+        announceNode.textContent = accessNotice;
+      } else if (window && typeof window.alert === "function") {
+        window.setTimeout(function () {
+          window.alert(accessNotice);
+        }, 60);
+      }
+    }
     renderHome();
     renderOperations();
     renderVolunteer();
@@ -4635,8 +4885,8 @@
         overviewEntryLink.textContent = "Open Volunteer Portal";
         overviewEntryLink.href = "./volunteer.html";
       } else {
-        overviewEntryLink.textContent = "View Public Impact";
-        overviewEntryLink.href = "./impact.html";
+        overviewEntryLink.textContent = "Community Home";
+        overviewEntryLink.href = "./overview.html";
       }
     }
 
@@ -4660,14 +4910,14 @@
     ));
     if (primaryAction) {
       const nextRoute = {
-        user: "./impact.html",
+        user: "./overview.html",
         volunteer: "./volunteer.html",
         government: "./operations.html",
         coordinator: "./operations.html",
         admin: "./admin.html"
       }[activeAccessRole()] || "./overview.html";
       const nextLabel = {
-        user: "View Public Impact",
+        user: "Stay In Community Portal",
         volunteer: "Open Volunteer Portal",
         government: "Open Operations",
         coordinator: "Open Operations",
@@ -4677,8 +4927,17 @@
       primaryAction.textContent = nextLabel;
     }
     if (secondaryAction) {
-      secondaryAction.setAttribute("href", activeAccessRole() === "admin" ? "./judge.html" : "./insights.html");
-      secondaryAction.textContent = activeAccessRole() === "admin" ? "Open Judge Mode" : "See Insights";
+      if (activeAccessRole() === "admin") {
+        secondaryAction.hidden = false;
+        secondaryAction.setAttribute("href", "./judge.html");
+        secondaryAction.textContent = "Open Judge Mode";
+      } else if (roleCanAccessPage(activeAccessRole(), "insights")) {
+        secondaryAction.hidden = false;
+        secondaryAction.setAttribute("href", "./insights.html");
+        secondaryAction.textContent = "See Insights";
+      } else {
+        secondaryAction.hidden = true;
+      }
     }
 
     const activity = buildActivityFeed(state.data);
@@ -5744,15 +6003,29 @@
       return;
     }
     prefillVolunteerFormFromPortalProfile();
-    setText("body[data-page='volunteer'] .page-intro .eyebrow", uiText("Volunteer Experience", "Volunteer Experience", "Volunteer Experience"));
-    setText("body[data-page='volunteer'] .page-intro h1", uiText(
-      "Register responders with the right skills, availability, and location fit.",
-      "Sahi skills, availability aur location fit ke saath responders register karo.",
-      "Sahi kaushal, availability aur sthaan-anukoolta ke saath responders register kijiye."
-    ));
+    const volunteerOnlyView = activeAccessRole() === "volunteer";
+    const volunteerAdvancedTools = document.getElementById("volunteerAdvancedTools");
+    const volunteerArchiveList = document.getElementById("volunteerArchiveList");
+    setText("body[data-page='volunteer'] .page-intro .eyebrow", volunteerOnlyView
+      ? uiText("My Volunteer Workspace", "Mera Volunteer Workspace", "Mera Volunteer Workspace")
+      : uiText("Volunteer Experience", "Volunteer Experience", "Volunteer Experience"));
+    setText("body[data-page='volunteer'] .page-intro h1", volunteerOnlyView
+      ? uiText(
+          "Track your assignments, completed work, attendance, and volunteer profile.",
+          "Apne assignments, completed work, attendance aur volunteer profile ko track karo.",
+          "Apne assignments, completed work, attendance aur volunteer profile ko track kijiye."
+        )
+      : uiText(
+          "Register responders with the right skills, availability, and location fit.",
+          "Sahi skills, availability aur location fit ke saath responders register karo.",
+          "Sahi kaushal, availability aur sthaan-anukoolta ke saath responders register kijiye."
+        ));
 
     const filters = getVolunteerFilterState();
-    const filteredVolunteers = filterVolunteers(state.data.volunteers, filters);
+    const personalView = buildVolunteerPersonalView(state.data);
+    const filteredVolunteers = volunteerOnlyView
+      ? (personalView.volunteer ? [personalView.volunteer] : [])
+      : filterVolunteers(state.data.volunteers, filters);
     const accessibilityChecklist = document.getElementById("accessibilityChecklist");
     const trainingList = document.getElementById("volunteerTrainingList");
     const communityMessage = document.getElementById("volunteerCommunityMessage");
@@ -5762,21 +6035,41 @@
     const profileSignalsNode = document.getElementById("volunteerProfileSignals");
     const draftCenterNode = document.getElementById("volunteerDraftCenter");
     const accessibilityControlPanel = document.getElementById("accessibilityControlPanel");
+    const volunteerProfileSummary = document.getElementById("volunteerProfileSummary");
+    const volunteerProgressList = document.getElementById("volunteerProgressList");
     const topGap = buildSkillGapPressure(state.data)[0];
     const topRequest = clone(state.data.requests).sort(function (left, right) {
       return Number(right.urgency || 0) - Number(left.urgency || 0);
     })[0];
+    const personalActiveAssignments = personalView.activeAssignments || [];
+    const archiveItems = buildVolunteerArchiveItems(state.data);
+
+    if (volunteerAdvancedTools) {
+      volunteerAdvancedTools.hidden = volunteerOnlyView;
+    }
 
     roster.innerHTML = filteredVolunteers.length
       ? filteredVolunteers.map(renderVolunteerCard).join("")
-      : '<div class="empty-box">No volunteers registered yet.</div>';
+      : '<div class="empty-box">' + (volunteerOnlyView
+        ? "Complete your volunteer profile to link this login with your own responder record."
+        : "No volunteers registered yet.") + '</div>';
 
-    const opportunities = topOpportunities(state.data);
-    setText("#volunteerOpportunityHeadline", opportunities.headline);
-    setText("#volunteerOpportunityText", opportunities.summary);
-    list.innerHTML = opportunities.items.length
-      ? opportunities.items.map(renderOpportunityCard).join("")
-      : '<div class="empty-box">The app will recommend the best open opportunities here.</div>';
+    if (volunteerOnlyView) {
+      setText("#volunteerOpportunityHeadline", personalActiveAssignments.length ? "Your current assignments" : "No live assignment yet");
+      setText("#volunteerOpportunityText", personalActiveAssignments.length
+        ? "These are the tasks currently assigned to your volunteer account."
+        : "Once a coordinator matches your profile, your live assignments will appear here.");
+      list.innerHTML = personalActiveAssignments.length
+        ? personalActiveAssignments.map(renderVolunteerTaskCard).join("")
+        : '<div class="empty-box">No active assignments are linked to this volunteer account yet.</div>';
+    } else {
+      const opportunities = topOpportunities(state.data);
+      setText("#volunteerOpportunityHeadline", opportunities.headline);
+      setText("#volunteerOpportunityText", opportunities.summary);
+      list.innerHTML = opportunities.items.length
+        ? opportunities.items.map(renderOpportunityCard).join("")
+        : '<div class="empty-box">The app will recommend the best open opportunities here.</div>';
+    }
 
     if (accessibilityChecklist) {
       accessibilityChecklist.innerHTML = buildVolunteerAccessibilityItems().map(function (item) {
@@ -5812,9 +6105,30 @@
       const ranking = buildVolunteerRankingItems(state.data);
       rankingNode.innerHTML = ranking.length
         ? ranking.map(function (item) {
-            return '<div class="stack-card"><strong>' + escapeHtml(item.volunteerName + " -> " + item.requestTitle) + '</strong><p class="card-meta">' + escapeHtml(item.text) + '</p><div class="chip-row">' + renderChip(item.zone + " zone") + renderChip("score " + item.score) + '</div></div>';
+            return '<div class="stack-card"><strong>' + escapeHtml(item.volunteerName + " -> " + item.requestTitle) + '</strong><p class="card-meta">' + escapeHtml(item.text) + '</p><div class="chip-row">' + renderChip(districtText(item.zone)) + renderChip("score " + item.score) + '</div></div>';
           }).join("")
         : '<div class="empty-box">Volunteer ranking insights will appear here.</div>';
+    }
+
+    if (volunteerProfileSummary) {
+      volunteerProfileSummary.innerHTML = [
+        '<div class="stack-card"><strong>' + escapeHtml(personalView.displayName) + '</strong><p class="card-meta">' + escapeHtml(personalView.email || "Volunteer session active") + '</p></div>',
+        '<div class="stack-card"><strong>Profile coverage</strong><p class="card-meta">' + escapeHtml(personalView.district ? districtText(personalView.district) + " | " + (personalView.availability || "Availability pending") : "Finish your volunteer registration to link this login to a live responder record.") + '</p></div>',
+        '<div class="stack-card"><strong>Skills on record</strong><p class="card-meta">' + escapeHtml((personalView.skills || []).length ? personalView.skills.join(", ") : "No skills saved yet on this volunteer profile.") + '</p></div>',
+        '<div class="stack-card"><strong>Languages</strong><p class="card-meta">' + escapeHtml((personalView.languages || []).length ? personalView.languages.join(", ") : "Language preferences will appear here once saved.") + '</p></div>'
+      ].join("");
+    }
+
+    if (volunteerProgressList) {
+      volunteerProgressList.innerHTML = personalView.history.length
+        ? personalView.history.map(renderVolunteerHistoryCard).join("")
+        : '<div class="empty-box">Your completed and assigned work will appear here after your volunteer profile is matched to live requests.</div>';
+    }
+
+    if (volunteerArchiveList) {
+      volunteerArchiveList.innerHTML = archiveItems.length
+        ? archiveItems.map(renderVolunteerArchiveCard).join("")
+        : '<div class="empty-box">Completed work from the volunteer network will appear here once tasks are delivered or closed.</div>';
     }
 
     if (profileSignalsNode) {
@@ -5844,22 +6158,51 @@
       bindAccessibilityControls();
     }
 
-    setText("#volunteerStatCount", String(filteredVolunteers.length));
-    setText("#volunteerStatCountText", filteredVolunteers.length === state.data.volunteers.length
-      ? "Responders visible in the current workspace."
-      : String(filteredVolunteers.length) + " responders match the active filters.");
-    setText("#volunteerStatFocus", topGap ? titleCase(topGap.skill) : "Balanced");
-    setText("#volunteerStatFocusText", topGap
-      ? "Highest current skill gap signal in the response network."
-      : "No major volunteer skill gaps are visible right now.");
-    setText("#volunteerStatZone", topRequest ? (topRequest.zone + " Zone") : "No Zone Yet");
-    setText("#volunteerStatZoneText", topRequest
-      ? "Highest-urgency request is currently concentrated here."
-      : "Load demo data or add requests to reveal zone demand.");
+    setText("#volunteerPersonalId", personalView.volunteerId);
+    setText("#volunteerPersonalIdText", personalView.volunteer ? "Linked responder profile in the shared workspace." : "Create or save your volunteer profile to generate a permanent ID.");
+    setText("#volunteerPersonalPoints", String(personalView.points));
+    setText("#volunteerPersonalPointsText", personalView.totalAssignments ? "Points rise with completed work, active tasks, and attendance days." : "Points start once your volunteer profile is assigned to real work.");
+    setText("#volunteerPersonalWork", String(personalView.completed));
+    setText("#volunteerPersonalWorkText", personalView.totalAssignments ? "Completed assignments visible for this volunteer login." : "No completed work is linked to this volunteer login yet.");
+    setText("#volunteerPersonalAttendance", String(personalView.attendanceDays));
+    setText("#volunteerPersonalAttendanceText", personalView.totalAssignments ? "Unique response days recorded from assignments and shift plans." : "Attendance is counted once shifts or assignments are linked.");
+
+    setText("#volunteerStatCountLabel", volunteerOnlyView ? "My Assignments" : "Visible Responders");
+    setText("#volunteerStatFocusLabel", volunteerOnlyView ? "Completed Work" : "Top Skill Focus");
+    setText("#volunteerStatZoneLabel", volunteerOnlyView ? "My District" : "Priority District");
+    setText("#volunteerStatReadinessLabel", volunteerOnlyView ? "Portal Access" : "Portal Status");
+    setText("#volunteerStatCount", volunteerOnlyView ? String(personalView.totalAssignments) : String(filteredVolunteers.length));
+    setText("#volunteerStatCountText", volunteerOnlyView
+      ? (personalView.totalAssignments
+        ? String(personalView.active) + " active tasks and " + String(personalView.completed) + " completed tasks linked to your account."
+        : "Assignments will appear here once your volunteer record is matched to live work.")
+      : (filteredVolunteers.length === state.data.volunteers.length
+        ? "Responders visible in the current workspace."
+        : String(filteredVolunteers.length) + " responders match the active filters."));
+    setText("#volunteerStatFocus", volunteerOnlyView ? String(personalView.completed) : (topGap ? titleCase(topGap.skill) : "Balanced"));
+    setText("#volunteerStatFocusText", volunteerOnlyView
+      ? (personalView.completed
+        ? "Completed tasks already recorded for your volunteer account."
+        : "Finish tasks to build a visible completed-work trail.")
+      : (topGap
+        ? "Highest current skill gap signal in the response network."
+        : "No major volunteer skill gaps are visible right now."));
+    setText("#volunteerStatZone", volunteerOnlyView
+      ? (personalView.district ? districtText(personalView.district) : "District pending")
+      : (topRequest ? districtText(topRequest.zone) : "No District Yet"));
+    setText("#volunteerStatZoneText", volunteerOnlyView
+      ? (personalView.district
+        ? "This volunteer account is currently linked to this district."
+        : "Complete your volunteer profile to connect this login to a district.")
+      : (topRequest
+        ? "Highest-urgency request is currently concentrated here."
+        : "Load demo data or add requests to reveal district demand."));
     setText("#volunteerStatReadiness", hasActiveSession() ? titleCase(activeAccessRole()) : "Guest");
-    setText("#volunteerStatReadinessText", hasActiveSession()
-      ? activePortalSummary("You are signed in and can use the volunteer workflow.")
-      : "Sign in to save volunteers into the shared workspace.");
+    setText("#volunteerStatReadinessText", volunteerOnlyView
+      ? "Volunteer access includes only your tasks, profile, and the shared completion archive."
+      : (hasActiveSession()
+        ? activePortalSummary("You are signed in and can use the volunteer workflow.")
+        : "Sign in to save volunteers into the shared workspace."));
 
     updateVolunteerEditorUi();
   }
@@ -7396,7 +7739,7 @@
     return [
       '<div class="stack-card">',
       "<strong>" + escapeHtml(volunteer.name) + "</strong>",
-      '<p class="card-meta">' + escapeHtml(volunteer.zone + " zone | " + volunteer.experience) + "</p>",
+      '<p class="card-meta">' + escapeHtml(districtText(volunteer.zone) + " | " + volunteer.experience) + "</p>",
       '<div class="chip-row">',
       renderChip(volunteer.availability),
       renderChip(volunteer.shiftPreference || "Shift flexible"),
@@ -8197,7 +8540,8 @@
       responseDay: safeText(next.responseDay || normalizeShiftLabel(next.shiftLabel || inferShiftLabel(next.createdAt || new Date().toISOString(), next.urgency)).split(" - ")[0], 30),
       routeCluster: normalizeRouteCluster(next.routeCluster || routeClusterForZone(next.zone)),
       etaMinutes: safeInteger(next.etaMinutes, 5, 240, estimateEtaMinutes(next.zone, next.zone)),
-      deliveryReceiptId: safeText(next.deliveryReceiptId || ("RCPT-" + safeText(next.requestId, 8).toUpperCase()), 40)
+      deliveryReceiptId: safeText(next.deliveryReceiptId || ("RCPT-" + safeText(next.requestId, 8).toUpperCase()), 40),
+      createdAt: safeIso(next.createdAt || new Date().toISOString())
     };
   }
 

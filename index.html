@@ -6,7 +6,7 @@
   <meta name="description" content="Secure sign in for ResourceFlow.">
   <meta name="theme-color" content="#0c1220">
   <title>ResourceFlow | Sign In</title>
-  <link rel="stylesheet" href="./auth-entry.css?v=20260402-entry3">
+  <link rel="stylesheet" href="./auth-entry.css?v=20260402-entry4">
 </head>
 <body class="entry-body">
   <main class="entry-shell">
@@ -120,33 +120,33 @@
 
         <p id="portalStatus" class="entry-status" role="status" aria-live="polite">Choose a portal to continue.</p>
 
-        <div class="portal-grid">
+        <div id="portalGrid" class="portal-grid">
           <article class="portal-card portal-card-user">
             <span class="portal-chip">Community User</span>
-            <h3>Community Overview</h3>
+            <h3>Community Portal</h3>
             <p>View trusted updates, impact summary, and the public-facing overview of the platform.</p>
-            <button class="entry-submit portal-enter-button" type="button" data-portal="user">Open Community Portal</button>
+            <button class="entry-submit portal-enter-button" type="button" data-portal="user">Continue As Community User</button>
           </article>
 
           <article class="portal-card portal-card-volunteer">
             <span class="portal-chip">Volunteer</span>
             <h3>Volunteer Portal</h3>
             <p>Register skills, availability, and respond to the highest-priority opportunities.</p>
-            <button class="entry-submit portal-enter-button" type="button" data-portal="volunteer">Open Volunteer Portal</button>
+            <button class="entry-submit portal-enter-button" type="button" data-portal="volunteer">Continue As Volunteer</button>
           </article>
 
           <article class="portal-card portal-card-government">
             <span class="portal-chip">Government</span>
             <h3>Government Operations</h3>
             <p>Coordinate requests, review staffing, and monitor live response operations.</p>
-            <button class="entry-submit portal-enter-button" type="button" data-portal="government">Open Government Portal</button>
+            <button class="entry-submit portal-enter-button" type="button" data-portal="government">Continue As Government</button>
           </article>
 
           <article class="portal-card portal-card-admin">
             <span class="portal-chip">Admin</span>
             <h3>Admin Console</h3>
             <p>Manage governance, audit signals, and platform access. Reserved for approved admins.</p>
-            <button class="entry-submit portal-enter-button" type="button" data-portal="admin">Open Admin Portal</button>
+            <button class="entry-submit portal-enter-button" type="button" data-portal="admin">Continue As Admin</button>
           </article>
         </div>
 
@@ -172,6 +172,6 @@
   </main>
 
   <script src="./firebase-config.js"></script>
-  <script src="./auth-entry.js?v=20260402-entry3"></script>
+  <script src="./auth-entry.js?v=20260403-entryperf2"></script>
 </body>
 </html>
