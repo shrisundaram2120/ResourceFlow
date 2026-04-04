@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Secure ResourceFlow sign in and portal selection.">
+  <meta name="theme-color" content="#f1ede3">
+  <title>ResourceFlow | Sign In</title>
+  <style>
+    html, body { min-height: 100%; margin: 0; }
+    body {
+      font-family: "Segoe UI", Arial, sans-serif;
+      background: #e9edf5;
+      color: #1f2534;
+    }
+    .entry-boot {
+      display: none;
+      max-width: 1100px;
+      margin: 24px auto;
+      padding: 24px;
+      border-radius: 24px;
+      background: rgba(255,252,247,0.96);
+      box-shadow: 0 24px 80px rgba(31, 40, 59, 0.12);
+    }
+    .entry-boot strong { display: block; font-size: 1.2rem; margin-bottom: 8px; }
+    .entry-boot p { margin: 0; line-height: 1.6; color: #4c5770; }
+  </style>
+  <link rel="stylesheet" href="./auth-entry.css?v=20260404-portaljump4">
+  <script>
+    (function () {
+      try {
+        var resetKey = "resourceflow-entry-cache-reset-v1";
+        if (sessionStorage.getItem(resetKey) === "done") {
+          return;
+        }
+        if ("serviceWorker" in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function (registrations) {
+            return Promise.all(registrations.map(function (registration) {
+              return registration.unregister();
+            }));
+          }).catch(function () {});
+        }
+        if (window.caches && typeof window.caches.keys === "function") {
+          window.caches.keys().then(function (keys) {
+            return Promise.all(keys.map(function (key) { return window.caches.delete(key); }));
+          }).catch(function () {});
+        }
+        sessionStorage.setItem(resetKey, "done");
+      } catch (error) {}
+    })();
+  </script>
+</head>
+<body class="entry-body">
+  <div class="entry-boot" id="entryBootFallback">
+    <strong>Loading ResourceFlow sign in...</strong>
+    <p>If the styled sign-in screen takes a moment, this page is still starting your secure entry workspace.</p>
+  </div>
+  <main class="entry-shell">
+    <section class="entry-card">
+      <section class="entry-panel entry-form-panel" id="authStage">
+        <div class="entry-brand-row">
+          <div class="entry-brand" aria-label="ResourceFlow">
+            <span class="entry-brand-mark">RF</span>
+            <span>
+              <strong>ResourceFlow</strong>
+              <small>Google Solution Challenge App</small>
+            </span>
+          </div>
+        </div>
+
+        <p class="entry-eyebrow">Secure Access</p>
+        <h1>Enter your workspace</h1>
+        <p class="entry-lead">Sign in with email/password or Google before entering the live coordination interface.</p>
+
+        <div class="entry-mode-tabs" role="tablist" aria-label="Authentication mode">
+          <button type="button" class="entry-mode-button is-active" data-auth-mode="signin">Sign In</button>
+          <button type="button" class="entry-mode-button" data-auth-mode="signup">Create Account</button>
+          <button type="button" class="entry-mode-button" data-auth-mode="reset">Reset</button>
+        </div>
+
+        <p id="entryStatus" class="entry-status">Secure access screen is ready. Sign in can start in a moment.</p>
+        <p id="entryHelpText" class="entry-help-text">Use your existing ResourceFlow account to continue, or switch to Create Account if you are new.</p>
+
+        <form id="entryAuthForm" class="entry-form" novalidate>
+          <div id="signupFields" class="entry-optional-fields" hidden>
+            <label class="entry-field">
+              <span>Full name</span>
+              <input id="entryNameInput" name="displayName" type="text" autocomplete="name" placeholder="Shri Sundaram">
+            </label>
+            <label class="entry-field">
+              <span>Location</span>
+              <input id="entryLocationInput" name="location" type="text" autocomplete="address-level2" placeholder="Kolkata, West Bengal">
+            </label>
+          </div>
+
+          <label class="entry-field">
+            <span>Email</span>
+            <input id="entryEmailInput" name="email" type="email" autocomplete="email" placeholder="you@example.com" required>
+          </label>
+
+          <div id="passwordField" class="entry-field">
+            <label class="entry-field">
+              <span>Password</span>
+              <input id="entryPasswordInput" name="password" type="password" autocomplete="current-password" placeholder="Enter your password" required>
+            </label>
+          </div>
+
+          <button id="entrySubmitButton" class="entry-submit" type="submit">Sign In</button>
+        </form>
+
+        <div class="entry-secondary-actions">
+          <button id="entryGoogleButton" type="button" class="entry-secondary-button">Continue with Google</button>
+          <button id="entryDemoButton" type="button" class="entry-secondary-button">Preview Demo Access</button>
+        </div>
+      </section>
+
+      <aside class="entry-panel entry-visual-panel" aria-label="ResourceFlow preview">
+        <div class="entry-hero-frame">
+          <p class="entry-eyebrow dark">Live Coordination</p>
+          <div class="entry-visual-copy">
+            <h2>Move from scattered requests to calm, visible response operations.</h2>
+            <p>ResourceFlow brings approvals, assignments, volunteer readiness, and impact proof into one clean system for communities, volunteers, agencies, and admins.</p>
+          </div>
+          <div class="entry-calendar-card" aria-hidden="true">
+            <span>Sun</span>
+            <span>Mon</span>
+            <span>Tue</span>
+            <span>Wed</span>
+            <span>Thu</span>
+            <span>Fri</span>
+            <span>Sat</span>
+            <strong>22</strong>
+            <strong>23</strong>
+            <strong>24</strong>
+            <strong>25</strong>
+            <strong>26</strong>
+            <strong>27</strong>
+            <strong>28</strong>
+          </div>
+          <div class="entry-floating-card" aria-hidden="true">
+            <strong>Daily briefing</strong>
+            <span>Three priority zones, two mobile units, one delayed supply route.</span>
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <section id="portalStage" class="portal-stage-card" hidden>
+      <div class="portal-stage-header">
+        <div>
+          <p class="entry-eyebrow">Portal Selection</p>
+          <h2>Choose how you want to enter ResourceFlow</h2>
+          <p id="portalLead" class="portal-stage-copy">Choose the portal that matches your role and enter the workspace.</p>
+        </div>
+        <button id="entrySignOutButton" type="button" class="entry-secondary-button">Sign Out</button>
+      </div>
+
+      <div class="portal-user-summary">
+        <strong id="portalUserLabel">Signed in user</strong>
+        <span id="portalUserMeta">profile@example.com</span>
+      </div>
+
+      <p id="portalStatus" class="entry-status">Choose a portal to continue.</p>
+
+      <div id="portalGrid" class="portal-grid">
+        <article class="portal-card portal-card-user">
+          <span class="portal-chip">Community User</span>
+          <h3>Community Portal</h3>
+          <p>View trusted updates, impact summary, and the public-facing overview of the platform.</p>
+          <button type="button" class="entry-submit portal-enter-button" data-portal="user">Continue As Community User</button>
+        </article>
+
+        <article class="portal-card portal-card-volunteer">
+          <span class="portal-chip">Volunteer</span>
+          <h3>Volunteer Portal</h3>
+          <p>Register skills, availability, and respond to the highest-priority opportunities.</p>
+          <button type="button" class="entry-submit portal-enter-button" data-portal="volunteer">Continue As Volunteer</button>
+        </article>
+
+        <article class="portal-card portal-card-government">
+          <span class="portal-chip">Government</span>
+          <h3>Government Operations</h3>
+          <p>Coordinate requests, review staffing, and monitor live response operations.</p>
+          <button type="button" class="entry-submit portal-enter-button" data-portal="government">Continue As Government</button>
+        </article>
+
+        <article class="portal-card portal-card-admin">
+          <span class="portal-chip">Admin</span>
+          <h3>Admin Console</h3>
+          <p>Manage governance, audit signals, and platform access. Reserved for approved admins.</p>
+          <button type="button" class="entry-submit portal-enter-button" data-portal="admin">Continue As Admin</button>
+        </article>
+      </div>
+
+      <section id="portalSetupPanel" class="portal-setup-panel" hidden>
+        <div class="portal-stage-header">
+          <div>
+            <p class="entry-eyebrow">Portal Setup</p>
+            <h2 id="portalSetupTitle">Complete your portal profile</h2>
+            <p id="portalSetupLead" class="portal-stage-copy">Tell us a little more so the workspace can match the right tools to your role.</p>
+          </div>
+          <button id="portalSetupBack" type="button" class="entry-secondary-button">Back</button>
+        </div>
+
+        <p id="portalSetupStatus" class="entry-status">Complete your profile before entering the workspace.</p>
+
+        <form id="portalSetupForm" class="entry-form" novalidate>
+          <div id="portalSetupFields" class="entry-optional-fields"></div>
+          <button id="portalSetupSubmit" class="entry-submit" type="submit">Save And Open Portal</button>
+        </form>
+      </section>
+    </section>
+  </main>
+
+  <script src="./firebase-config.js?v=20260404-portaljump4"></script>
+  <script src="./auth-entry.js?v=20260404-portaljump4"></script>
+  <script>
+    window.setTimeout(function () {
+      var shell = document.querySelector(".entry-shell");
+      var boot = document.getElementById("entryBootFallback");
+      if (boot && shell && (!shell.offsetHeight || shell.offsetHeight < 40)) {
+        boot.style.display = "block";
+      }
+    }, 1200);
+  </script>
+</body>
+</html>

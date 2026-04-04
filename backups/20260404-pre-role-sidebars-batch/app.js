@@ -5405,12 +5405,8 @@
     const guidedDemoPanel = document.getElementById("guidedDemoPanel");
     const roleDashboardNode = document.getElementById("homeRoleDashboard");
     const roleAccessNode = document.getElementById("homeRoleAccessGrid");
-    const homePortalSidebar = document.getElementById("homePortalSidebar");
-    const demoWalkthroughPanel = document.getElementById("demoWalkthroughPanel");
-    const homeDemandChart = document.getElementById("homeDemandChart");
     const communityRequestFeed = document.getElementById("communityRequestFeed");
     const communityRequestStatus = document.getElementById("communityRequestStatus");
-    const communityRequestTracker = document.getElementById("communityRequestTracker");
     const demoStoryPanel = document.getElementById("demoStoryPanel");
     const primaryAction = document.querySelector("body[data-page='home'] .button-row .primary-link");
     const secondaryAction = document.querySelector("body[data-page='home'] .button-row .ghost-link");
@@ -5528,35 +5524,10 @@
       }).join("");
     }
 
-    if (homePortalSidebar) {
-      homePortalSidebar.innerHTML = buildRoleSidebarCards(role, state.data, "home").map(function (item) {
-        return '<div class="stack-card"><strong>' + escapeHtml(item.title) + '</strong><p class="card-meta">' + escapeHtml(item.text) + '</p><div class="chip-row">' + (item.chips || []).map(renderChip).join("") + '</div></div>';
-      }).join("");
-    }
-
-    if (demoWalkthroughPanel) {
-      demoWalkthroughPanel.innerHTML = buildDemoWalkthroughItems(state.data, role).map(function (item) {
-        return '<div class="stack-card"><strong>' + escapeHtml(item.title) + '</strong><p class="card-meta">' + escapeHtml(item.text) + '</p><div class="chip-row">' + (item.chips || []).map(renderChip).join("") + '</div></div>';
-      }).join("");
-    }
-
-    if (homeDemandChart) {
-      const demandItems = buildDistrictDemandItems(state.data);
-      homeDemandChart.innerHTML = demandItems.length
-        ? renderBarChart("District demand", demandItems)
-        : '<div class="empty-box">District demand chart will appear here after requests are loaded.</div>';
-    }
-
     if (communityRequestStatus) {
       communityRequestStatus.textContent = role === "user"
         ? "Community users can submit requests here. Government and admin teams will see them in the approval queue."
         : "Managers can use this form to simulate public intake and show how requests move into review.";
-    }
-
-    if (communityRequestTracker) {
-      communityRequestTracker.innerHTML = buildCommunityRequestTracker(state.data, role).map(function (item) {
-        return '<div class="stack-card"><strong>' + escapeHtml(item.title) + '</strong><p class="card-meta">' + escapeHtml(item.text) + '</p><div class="chip-row">' + (item.chips || []).map(renderChip).join("") + '</div></div>';
-      }).join("");
     }
 
     if (communityRequestFeed) {
@@ -6284,9 +6255,6 @@
     const governmentDispatchStatus = document.getElementById("governmentDispatchStatus");
     const governmentAiStory = document.getElementById("governmentAiStory");
     const governmentOutcomeBoard = document.getElementById("governmentOutcomeBoard");
-    const operationsPortalSidebar = document.getElementById("operationsPortalSidebar");
-    const operationsDemandPressureChart = document.getElementById("operationsDemandPressureChart");
-    const operationsDispatchProgressChart = document.getElementById("operationsDispatchProgressChart");
 
     if (!requestsBoard || !assignmentsBoard || !operationsAlert || !operationsSummary) {
       return;
@@ -6355,26 +6323,6 @@
       governmentOutcomeBoard.innerHTML = buildGovernmentOutcomeBoard(state.data).map(function (item) {
         return '<div class="stack-card"><strong>' + escapeHtml(item.title) + '</strong><p class="card-meta">' + escapeHtml(item.text) + '</p></div>';
       }).join("");
-    }
-
-    if (operationsPortalSidebar) {
-      operationsPortalSidebar.innerHTML = buildRoleSidebarCards(activeAccessRole(), state.data, "operations").map(function (item) {
-        return '<div class="stack-card"><strong>' + escapeHtml(item.title) + '</strong><p class="card-meta">' + escapeHtml(item.text) + '</p><div class="chip-row">' + (item.chips || []).map(renderChip).join("") + '</div></div>';
-      }).join("");
-    }
-
-    if (operationsDemandPressureChart) {
-      const demandItems = buildDistrictDemandItems(state.data);
-      operationsDemandPressureChart.innerHTML = demandItems.length
-        ? renderBarChart("District pressure", demandItems)
-        : '<div class="empty-box">District demand pressure chart will appear here.</div>';
-    }
-
-    if (operationsDispatchProgressChart) {
-      const progressItems = buildAssignmentOutcomeItems(state.data);
-      operationsDispatchProgressChart.innerHTML = progressItems.length
-        ? renderBarChart("Assignment completion", progressItems)
-        : '<div class="empty-box">Assignment completion chart will appear here.</div>';
     }
 
     if (opsCategoryChart) {
@@ -6734,9 +6682,6 @@
     const volunteerAchievementPanel = document.getElementById("volunteerAchievementPanel");
     const volunteerCompletionTimeline = document.getElementById("volunteerCompletionTimeline");
     const volunteerNextActionPanel = document.getElementById("volunteerNextActionPanel");
-    const volunteerPortalSidebar = document.getElementById("volunteerPortalSidebar");
-    const volunteerLeaderboardChart = document.getElementById("volunteerLeaderboardChart");
-    const volunteerLeaderboardList = document.getElementById("volunteerLeaderboardList");
     const topGap = buildSkillGapPressure(state.data)[0];
     const topRequest = clone(state.data.requests).sort(function (left, right) {
       return Number(right.urgency || 0) - Number(left.urgency || 0);
@@ -6841,30 +6786,6 @@
       volunteerNextActionPanel.innerHTML = buildVolunteerNextActionItems(personalView, state.data).map(function (item) {
         return '<div class="stack-card"><strong>' + escapeHtml(item.title) + '</strong><p class="card-meta">' + escapeHtml(item.text) + '</p><div class="chip-row">' + item.chips.map(renderChip).join("") + '</div></div>';
       }).join("");
-    }
-
-    if (volunteerPortalSidebar) {
-      volunteerPortalSidebar.innerHTML = buildRoleSidebarCards(activeAccessRole(), state.data, "volunteer").map(function (item) {
-        return '<div class="stack-card"><strong>' + escapeHtml(item.title) + '</strong><p class="card-meta">' + escapeHtml(item.text) + '</p><div class="chip-row">' + (item.chips || []).map(renderChip).join("") + '</div></div>';
-      }).join("");
-    }
-
-    if (volunteerLeaderboardChart) {
-      const leaderboardItems = buildVolunteerLeaderboardItems(state.data);
-      volunteerLeaderboardChart.innerHTML = leaderboardItems.length
-        ? renderBarChart("Volunteer leaderboard", leaderboardItems.map(function (item) {
-            return { label: item.shortName, value: item.points, suffix: " pts" };
-          }))
-        : '<div class="empty-box">Volunteer leaderboard chart will appear here.</div>';
-    }
-
-    if (volunteerLeaderboardList) {
-      const leaderboardCards = buildVolunteerLeaderboardItems(state.data);
-      volunteerLeaderboardList.innerHTML = leaderboardCards.length
-        ? leaderboardCards.map(function (item) {
-            return '<div class="stack-card"><strong>' + escapeHtml(item.name) + '</strong><p class="card-meta">' + escapeHtml(item.text) + '</p><div class="chip-row">' + item.chips.map(renderChip).join("") + '</div></div>';
-          }).join("")
-        : '<div class="empty-box">Volunteer leaderboard cards will appear here.</div>';
     }
 
     if (volunteerArchiveList) {
@@ -7008,8 +6929,6 @@
     const auditDashboardNode = document.getElementById("adminAuditDashboard");
     const userReviewSnapshotNode = document.getElementById("adminUserReviewSnapshot");
     const restrictedActionsNode = document.getElementById("adminRestrictedActionsPanel");
-    const adminPortalSidebar = document.getElementById("adminPortalSidebar");
-    const adminAuditTrendChart = document.getElementById("adminAuditTrendChart");
     const snapshot = state.adminSnapshot;
     const reviewItems = buildAdminReviewQueue(state.data);
     const snapshotUsers = snapshot && snapshot.users ? snapshot.users : [];
@@ -7054,19 +6973,6 @@
       restrictedActionsNode.innerHTML = buildAdminRestrictedActions(state.data).map(function (item) {
         return '<div class="stack-card soft-warning"><strong>' + escapeHtml(item.title) + '</strong><p class="card-meta">' + escapeHtml(item.text) + '</p></div>';
       }).join("");
-    }
-
-    if (adminPortalSidebar) {
-      adminPortalSidebar.innerHTML = buildRoleSidebarCards(activeAccessRole(), state.data, "admin").map(function (item) {
-        return '<div class="stack-card"><strong>' + escapeHtml(item.title) + '</strong><p class="card-meta">' + escapeHtml(item.text) + '</p><div class="chip-row">' + (item.chips || []).map(renderChip).join("") + '</div></div>';
-      }).join("");
-    }
-
-    if (adminAuditTrendChart) {
-      const governanceItems = buildGovernancePulseItems(state.data, snapshot);
-      adminAuditTrendChart.innerHTML = governanceItems.length
-        ? renderBarChart("Governance pulse", governanceItems)
-        : '<div class="empty-box">Governance pulse chart will appear here.</div>';
     }
 
     if (!canManageWorkspace()) {
@@ -7168,8 +7074,6 @@
     const impactCommunityStory = document.getElementById("impactCommunityStory");
     const impactNgoPanel = document.getElementById("impactNgoPanel");
     const impactJudgeProof = document.getElementById("impactJudgeProof");
-    const impactJourneyTimeline = document.getElementById("impactJourneyTimeline");
-    const impactDistrictDemandChart = document.getElementById("impactDistrictDemandChart");
     setText("body[data-page='impact'] .page-intro .eyebrow", uiText("Read-only NGO View", "Read-only NGO View", "Read-only NGO View"));
     setText("body[data-page='impact'] .page-intro h1", uiText(
       "Share impact, coverage, and response readiness with judges and partners.",
@@ -7198,19 +7102,6 @@
       impactJudgeProof.innerHTML = buildImpactJudgeProof(state.data).map(function (item) {
         return '<div class="stack-card"><strong>' + escapeHtml(item.title) + '</strong><p class="card-meta">' + escapeHtml(item.text) + '</p></div>';
       }).join("");
-    }
-
-    if (impactJourneyTimeline) {
-      impactJourneyTimeline.innerHTML = buildImpactJourneyItems(state.data).map(function (item) {
-        return '<div class="stack-card"><strong>' + escapeHtml(item.title) + '</strong><p class="card-meta">' + escapeHtml(item.text) + '</p><div class="chip-row">' + (item.chips || []).map(renderChip).join("") + '</div></div>';
-      }).join("");
-    }
-
-    if (impactDistrictDemandChart) {
-      const districtItems = buildDistrictDemandItems(state.data);
-      impactDistrictDemandChart.innerHTML = districtItems.length
-        ? renderBarChart("District demand", districtItems)
-        : '<div class="empty-box">District demand chart will appear here.</div>';
     }
 
     if (zoneNode) {
@@ -8497,150 +8388,9 @@
             ? "Show achievements, task history, and AI-guided task recommendations."
             : role === "government" || role === "coordinator"
               ? "Show approvals, dispatch, and AI-backed matching."
-        : "Show audit, governance, and judge-proof evidence."
+              : "Show audit, governance, and judge-proof evidence."
       }
     ];
-  }
-
-  function buildRoleSidebarCards(role, data, page) {
-    const normalizedRole = normalizeRole(role);
-    const metrics = computeMetrics(data);
-    const allowed = allowedPageLabels(normalizedRole);
-    const primaryPortal = portalLabelForRole(normalizedRole);
-    const pageLabel = pageLabelForAccess(page);
-    const scenario = scenarioTitle(loadDemoScenario());
-    return [
-      {
-        title: "Portal lane",
-        text: currentRoleMeta(normalizedRole).label + " is currently inside " + pageLabel + ". This role is optimized for " + primaryPortal + ".",
-        chips: [primaryPortal, scenario]
-      },
-      {
-        title: "Visible spaces",
-        text: allowed.length ? allowed.join(", ") + "." : "No portal spaces are available until access is granted.",
-        chips: [allowed.length + " visible areas", metrics.coverage + "% coverage"]
-      },
-      {
-        title: "Live snapshot",
-        text: metrics.requests
-          ? metrics.requests + " requests, " + metrics.assignments + " assignments, and " + metrics.beneficiaries + " projected beneficiaries are visible right now."
-          : "Load a demo scenario to reveal the response board, matching flow, and impact numbers for this role.",
-        chips: [metrics.volunteers + " volunteers", "Readiness " + metrics.readinessScore + "/100"]
-      }
-    ];
-  }
-
-  function buildDemoWalkthroughItems(data, role) {
-    const metrics = computeMetrics(data);
-    const scenario = scenarioTitle(loadDemoScenario());
-    const topRequest = clone(getVisibleRequests(data)).sort(function (left, right) {
-      return Number(right.urgency || 0) - Number(left.urgency || 0);
-    })[0];
-    const topRanking = buildVolunteerRankingItems(data)[0];
-    const delivered = getVisibleAssignments(data).filter(function (item) {
-      const status = normalizeWorkflowStatus(item.status || "assigned");
-      return status === "delivered" || status === "closed";
-    }).length;
-    return [
-      {
-        title: "1. Trigger the scenario",
-        text: "Load the " + scenario + " demo to seed fake requests, volunteers, assignments, and public impact numbers instantly.",
-        chips: [scenario, metrics.requests + " requests"]
-      },
-      {
-        title: "2. Show the community intake",
-        text: topRequest
-          ? "Start with " + topRequest.title + " in " + districtText(topRequest.zone) + " so the problem statement feels real."
-          : "Use the community request form to show how support needs enter the workspace.",
-        chips: topRequest ? [topRequest.category, urgencyLabel(topRequest.urgency)] : ["Community intake"]
-      },
-      {
-        title: "3. Explain the AI match",
-        text: topRanking
-          ? topRanking.volunteerName + " ranks highly for " + topRanking.requestTitle + " because of skills, district fit, transport, and availability."
-          : "Once volunteers are loaded, the AI matching panel will show why the highest-fit responder was chosen.",
-        chips: topRanking ? ["score " + topRanking.score, districtText(topRanking.zone)] : ["Skills", "District fit"]
-      },
-      {
-        title: "4. Finish with impact",
-        text: delivered
-          ? delivered + " assignment(s) are already marked delivered, helping you show a complete before-to-after response story."
-          : "Use the Operations and Public Impact pages to show the full staffing and beneficiary story.",
-        chips: [metrics.assignments + " assignments", metrics.beneficiaries + " people"]
-      }
-    ];
-  }
-
-  function buildCommunityRequestTracker(data, role) {
-    const requests = clone(getVisibleRequests(data)).sort(function (left, right) {
-      return new Date(right.createdAt || 0) - new Date(left.createdAt || 0);
-    });
-    const actor = normalizeText(currentActor());
-    const communityRequests = normalizeRole(role) === "user"
-      ? requests.filter(function (item) {
-          return normalizeText(item.requestedBy) === actor;
-        })
-      : requests.filter(function (item) {
-          return Boolean(String(item.requestedBy || "").trim());
-        });
-    if (!communityRequests.length) {
-      return [
-        {
-          title: "No tracked requests yet",
-          text: normalizeRole(role) === "user"
-            ? "Once you submit a community request, its approval and workflow status will appear here."
-            : "Community-origin requests will appear here once users or demo scenarios submit them.",
-          chips: ["Waiting for intake"]
-        }
-      ];
-    }
-    const approvedCount = communityRequests.filter(function (item) {
-      return normalizeApprovalStatus(item.approvalStatus) === "approved";
-    }).length;
-    const activeCount = communityRequests.filter(function (item) {
-      const status = normalizeWorkflowStatus(item.workflowStatus || "pending");
-      return status === "assigned" || status === "in-progress";
-    }).length;
-    return [
-      {
-        title: normalizeRole(role) === "user" ? "My request tracker" : "Community intake tracker",
-        text: communityRequests.length + " submitted request(s) are visible with " + approvedCount + " approved and " + activeCount + " already active in the field.",
-        chips: [approvedCount + " approved", activeCount + " active"]
-      }
-    ].concat(communityRequests.slice(0, 3).map(function (request) {
-      return {
-        title: request.title,
-        text: titleCase(request.approvalStatus || "pending") + " | " + workflowLabel(request.workflowStatus || "pending") + " | " + districtText(request.zone),
-        chips: [request.category, urgencyLabel(request.urgency), String(request.beneficiaries || 0) + " people"]
-      };
-    }));
-  }
-
-  function buildDistrictDemandItems(data) {
-    const counts = {};
-    getVisibleRequests(data).forEach(function (request) {
-      const district = request.zone || "Unassigned";
-      const pressure = Number(request.urgency || 0) + Math.max(1, Math.round(Number(request.beneficiaries || 0) / 60));
-      counts[district] = (counts[district] || 0) + pressure;
-    });
-    return Object.keys(counts).map(function (label) {
-      return { label: label, value: counts[label] };
-    }).sort(function (left, right) {
-      return right.value - left.value;
-    });
-  }
-
-  function buildAssignmentOutcomeItems(data) {
-    const counts = {};
-    getVisibleAssignments(data).forEach(function (assignment) {
-      const label = workflowLabel(assignment.status || "assigned");
-      counts[label] = (counts[label] || 0) + 1;
-    });
-    return Object.keys(counts).map(function (label) {
-      return { label: label, value: counts[label] };
-    }).sort(function (left, right) {
-      return right.value - left.value;
-    });
   }
 
   function buildDemoStoryCards(data) {
@@ -8765,73 +8515,6 @@
         chips: [(personalView.languages || []).join(", ") || "Language tags pending"]
       }
     ];
-  }
-
-  function buildVolunteerContributionStats(volunteer, data) {
-    const assignments = getVisibleAssignments(data).filter(function (item) {
-      return item.volunteerId === volunteer.id || normalizeText(item.volunteerName) === normalizeText(volunteer.name);
-    });
-    const completed = assignments.filter(function (item) {
-      const status = normalizeWorkflowStatus(item.status || "assigned");
-      return status === "delivered" || status === "closed";
-    }).length;
-    const active = assignments.filter(function (item) {
-      const status = normalizeWorkflowStatus(item.status || "assigned");
-      return status === "assigned" || status === "in-progress";
-    }).length;
-    const attendanceDays = new Set(assignments.map(function (item) {
-      return shiftDayLabel(item.shiftLabel || "") || String(item.createdAt || "").slice(0, 10);
-    }).filter(Boolean)).size;
-    const languages = normalizeLanguages(volunteer.languages || []);
-    const points = completed * 25 + active * 12 + attendanceDays * 6 + (volunteer.transport === "Yes" ? 4 : 0) + Math.min((languages.length || 0) * 2, 6);
-    const badges = [];
-    if (completed >= 2) {
-      badges.push("Closer");
-    }
-    if (attendanceDays >= 2) {
-      badges.push("Streak");
-    }
-    if (volunteer.transport === "Yes") {
-      badges.push("Transport ready");
-    }
-    if (languages.length >= 2) {
-      badges.push("Multilingual");
-    }
-    if ((volunteer.skills || []).length >= 3) {
-      badges.push("Multi-skill");
-    }
-    return {
-      volunteer: volunteer,
-      points: points,
-      completed: completed,
-      active: active,
-      attendanceDays: attendanceDays,
-      badges: badges
-    };
-  }
-
-  function buildVolunteerLeaderboardItems(data) {
-    return getVisibleVolunteers(data).map(function (volunteer) {
-      const stats = buildVolunteerContributionStats(volunteer, data);
-      const names = String(volunteer.name || "Volunteer").trim().split(/\s+/);
-      return {
-        name: volunteer.name,
-        shortName: names[0] || "Volunteer",
-        points: stats.points,
-        text: districtText(volunteer.zone) + " | " + stats.completed + " completed | " + stats.active + " active | " + stats.attendanceDays + " attendance day(s)",
-        chips: (stats.badges.length ? stats.badges : ["New responder"]).slice(0, 3),
-        completed: stats.completed,
-        active: stats.active
-      };
-    }).sort(function (left, right) {
-      if (right.points !== left.points) {
-        return right.points - left.points;
-      }
-      if (right.completed !== left.completed) {
-        return right.completed - left.completed;
-      }
-      return right.active - left.active;
-    }).slice(0, 5);
   }
 
   function buildGovernmentDistrictSummary(data) {
@@ -9044,19 +8727,6 @@
     ];
   }
 
-  function buildGovernancePulseItems(data, snapshot) {
-    const metrics = computeMetrics(data);
-    const audits = snapshot && snapshot.audits ? snapshot.audits.length : (data.activityLog || []).length;
-    const drafts = snapshot && snapshot.notifications ? snapshot.notifications.length : state.localNotifications.length;
-    const reviewQueue = buildAdminReviewQueue(data).length;
-    return [
-      { label: "Audit events", value: audits },
-      { label: "Review queue", value: reviewQueue || metrics.pendingApprovals },
-      { label: "Outreach drafts", value: drafts },
-      { label: "Archived records", value: metrics.archivedCount }
-    ];
-  }
-
   function buildImpactCommunityStory(data) {
     const metrics = computeMetrics(data);
     const topRequest = clone(getVisibleRequests(data)).sort(function (left, right) {
@@ -9115,45 +8785,6 @@
       {
         title: "Scalability",
         text: "The current workspace tracks " + metrics.requests + " requests, " + metrics.volunteers + " volunteers, and " + metrics.assignments + " assignments in a structure that can scale to larger districts."
-      }
-    ];
-  }
-
-  function buildImpactJourneyItems(data) {
-    const metrics = computeMetrics(data);
-    const scenario = scenarioTitle(loadDemoScenario());
-    const topRequest = clone(getVisibleRequests(data)).sort(function (left, right) {
-      return Number(right.urgency || 0) - Number(left.urgency || 0);
-    })[0];
-    const topAssignment = getVisibleAssignments(data)[0];
-    return [
-      {
-        title: "1. Public request appears",
-        text: topRequest
-          ? topRequest.title + " enters the workspace from the community side with urgency and beneficiary context."
-          : "Community submissions appear here as soon as requests are added or demo data is loaded.",
-        chips: [scenario]
-      },
-      {
-        title: "2. Government reviews it",
-        text: metrics.pendingApprovals
-          ? metrics.pendingApprovals + " request(s) are waiting for approval or routing in the operations board."
-          : "Approved requests move quickly into matching and dispatch planning.",
-        chips: [metrics.pendingApprovals + " pending"]
-      },
-      {
-        title: "3. Volunteer assignment happens",
-        text: topAssignment
-          ? topAssignment.volunteerName + " is already linked to " + topAssignment.requestTitle + "."
-          : "Assignments appear once the AI matching flow selects the best-fit responders.",
-        chips: [metrics.assignments + " assignments"]
-      },
-      {
-        title: "4. Impact becomes visible",
-        text: metrics.beneficiaries
-          ? "The current scenario now projects support for about " + metrics.beneficiaries + " people."
-          : "Load demo data to reveal the beneficiary and coverage story.",
-        chips: [metrics.coverage + "% coverage", "Readiness " + metrics.readinessScore + "/100"]
       }
     ];
   }
