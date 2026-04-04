@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#061521">
   <link rel="manifest" href="./manifest.webmanifest">
   <title>ResourceFlow | Community Portal</title>
-  <link rel="stylesheet" href="./styles.css?v=20260402-rolelock2">
+  <link rel="stylesheet" href="./styles.css?v=20260403-rolefix1">
 </head>
 <body data-page="home">
   <a class="skip-link" href="#mainContent">Skip to content</a>
@@ -33,7 +33,7 @@
 
       <div class="header-actions">
         <button class="ghost-button" data-action="seed-demo">Load Demo</button>
-        <a class="primary-link" id="overviewEntryLink" href="./operations.html">Open App</a>
+        <a class="primary-link" id="overviewEntryLink" data-access-page="home" href="./overview.html">Open App</a>
       </div>
     </header>
 
@@ -46,8 +46,8 @@
             ResourceFlow centralizes requests, volunteers, approvals, assignment tracking, and impact proof so community organizations can respond faster and more clearly.
           </p>
           <div class="button-row">
-            <a class="primary-link" id="overviewPrimaryAction" href="./operations.html">Go To Command Center</a>
-            <a class="ghost-link" id="overviewSecondaryAction" href="./judge.html">Open Judge Mode</a>
+            <a class="primary-link" id="overviewPrimaryAction" data-access-page="operations" href="./operations.html">Go To Command Center</a>
+            <a class="ghost-link" id="overviewSecondaryAction" data-access-page="judge" href="./judge.html">Open Judge Mode</a>
           </div>
           <ul class="hero-points">
             <li>Capture and approve requests in one place</li>
@@ -209,8 +209,8 @@
     </main>
   </div>
 
-  <script src="./firebase-config.js"></script>
-  <script src="./app.js?v=20260403-rolelock3"></script>
+  <script src="./firebase-config.js?v=20260404-authrestore1"></script>
+  <script src="./app.js?v=20260404-communityfix2"></script>
   <script src="./criteria.js?v=20260402-rolelock2"></script>
 </body>
 </html>

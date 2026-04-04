@@ -1,8 +1,10 @@
 ﻿(function () {
-  const STORAGE_KEY = "resourceflow-state-v4";
+  const STORAGE_KEY = "resourceflow-state-v5";
   const DEMO_AUTH_KEY = "resourceflow-demo-auth-v1";
-  const PORTAL_SELECTION_KEY = "resourceflow-portal-selection-v1";
-  const PORTAL_PROFILE_KEY = "resourceflow-portal-profile-v1";
+  const PORTAL_SELECTION_KEY = "resourceflow-portal-selection-v2";
+  const PORTAL_PROFILE_KEY = "resourceflow-portal-profile-v2";
+  const ENTRY_PROFILE_KEY = "resourceflow-entry-profile-v1";
+  const PORTAL_HANDOFF_KEY = "resourceflow-portal-handoff-v1";
   const REQUEST_DRAFT_KEY = "resourceflow-request-draft-v1";
   const VOLUNTEER_DRAFT_KEY = "resourceflow-volunteer-draft-v1";
   const ONBOARDING_KEY = "resourceflow-onboarding-v1";
@@ -236,6 +238,32 @@
     coordinator: "./operations.html",
     admin: "./admin.html"
   };
+  const ROLE_NAV_ITEMS = {
+    user: [
+      { page: "home", href: "./overview.html", label: "Community Portal" }
+    ],
+    volunteer: [
+      { page: "home", href: "./overview.html", label: "Community Portal" },
+      { page: "volunteer", href: "./volunteer.html", label: "Volunteer Portal" }
+    ],
+    government: [
+      { page: "home", href: "./overview.html", label: "Community Portal" },
+      { page: "operations", href: "./operations.html", label: "Operations" }
+    ],
+    coordinator: [
+      { page: "home", href: "./overview.html", label: "Community Portal" },
+      { page: "operations", href: "./operations.html", label: "Operations" }
+    ],
+    admin: [
+      { page: "home", href: "./overview.html", label: "Community Portal" },
+      { page: "operations", href: "./operations.html", label: "Operations" },
+      { page: "volunteer", href: "./volunteer.html", label: "Volunteer Portal" },
+      { page: "insights", href: "./insights.html", label: "AI Insights" },
+      { page: "admin", href: "./admin.html", label: "Admin" },
+      { page: "judge", href: "./judge.html", label: "Judge Mode" }
+    ],
+    guest: []
+  };
 
   const ROLE_PAGE_ACCESS = {
     guest: [],
@@ -340,52 +368,78 @@
   });
 
   async function bootstrap() {
-    highlightActiveNav();
-    ensureAuthShell();
-    ensureDemoAuthModal();
-    ensureEmailAuthModal();
-    ensureTourDialog();
-    loadDemoSession();
-    loadSelectedPortal();
-    loadPortalProfiles();
-    loadOnboardingState();
-    loadUiLanguage();
-    loadUiPreferences();
-    loadOpsNotes();
-    applyUiPreferences();
-    renderAuthUi();
-    bindGlobalActions();
-    bindEntityActions();
-    bindCrossTabSync();
-    bindGlobalErrorMonitoring();
-    updateSyncStatus("Connecting", "Checking storage adapter and workspace access.");
-    state.adapter = await createAdapter();
-    state.storageMode = state.adapter.mode;
-    await initializeFirebaseRuntime();
-
     try {
-      const loaded = await state.adapter.load();
-      state.data = sanitizeState(loaded || createEmptyState());
-      updateSyncStatus(
-        state.storageMode === "firebase" ? "Cloud Connected" : "Offline Ready",
-        state.storageMode === "firebase"
-          ? "Cloud workspace connected. Realtime updates are active."
-          : "Local mode active. Data is kept in your browser for offline use."
-      );
+      highlightActiveNav();
+      ensureAuthShell();
+      ensureDemoAuthModal();
+      ensureEmailAuthModal();
+      ensureTourDialog();
+      loadDemoSession();
+      loadSelectedPortal();
+      loadPortalProfiles();
+      if (!state.demoSession && state.selectedPortalRole) {
+        const entryProfile = loadEntryProfile();
+        state.userProfile = Object.assign({}, entryProfile, {
+          role: normalizeRole(entryProfile.role || state.selectedPortalRole || "user"),
+          requestedRole: normalizeRole(entryProfile.requestedRole || state.selectedPortalRole || "user")
+        });
+        state.role = normalizeRole(state.selectedPortalRole || state.userProfile.role || "user");
+        state.authResolved = true;
+      }
+      loadOnboardingState();
+      loadUiLanguage();
+      loadUiPreferences();
+      loadOpsNotes();
+      applyUiPreferences();
+      renderAuthUi();
+      bindGlobalActions();
+      bindEntityActions();
+      bindCrossTabSync();
+      bindGlobalErrorMonitoring();
+      updateSyncStatus("Connecting", "Checking storage adapter and workspace access.");
+      state.adapter = await createAdapter();
+      state.storageMode = state.adapter.mode;
+
+      try {
+        const loaded = await state.adapter.load();
+        state.data = sanitizeState(loaded || createEmptyState());
+        updateSyncStatus(
+          state.storageMode === "firebase" ? "Cloud Connected" : "Offline Ready",
+          state.storageMode === "firebase"
+            ? "Cloud workspace connected. Realtime updates are active."
+            : "Local mode active. Data is kept in your browser for offline use."
+        );
+      } catch (error) {
+        console.warn("Primary storage unavailable, switching to local mode.", error);
+        state.adapter = createLocalAdapter();
+        state.storageMode = state.adapter.mode;
+        const fallbackData = await state.adapter.load();
+        state.data = sanitizeState(fallbackData || createEmptyState());
+        updateSyncStatus("Offline Fallback", "Cloud access failed. Running safely in local mode.");
+      }
+
+      startRealtimeSync();
+      enforcePortalAccess();
+      renderAll();
+      bindPageHandlers();
+      maybeLaunchOnboarding();
+
+      initializeFirebaseRuntime().then(function () {
+        renderAll();
+      }).catch(function (error) {
+        console.warn("Deferred Firebase initialization failed.", error);
+        renderAll();
+      });
     } catch (error) {
-      console.warn("Primary storage unavailable, switching to local mode.", error);
+      console.warn("Workspace bootstrap failed, falling back to local demo mode.", error);
+      state.authResolved = true;
       state.adapter = createLocalAdapter();
       state.storageMode = state.adapter.mode;
-      const fallbackData = await state.adapter.load();
-      state.data = sanitizeState(fallbackData || createEmptyState());
-      updateSyncStatus("Offline Fallback", "Cloud access failed. Running safely in local mode.");
+      state.data = sanitizeState(createDemoState());
+      updateSyncStatus("Offline Ready", "Local demo workspace loaded immediately.");
+      renderAll();
+      bindPageHandlers();
     }
-
-    startRealtimeSync();
-    enforcePortalAccess();
-    renderAll();
-    bindPageHandlers();
-    maybeLaunchOnboarding();
   }
 
   function createEmptyState() {
@@ -788,6 +842,9 @@
 
   async function createAdapter() {
     const config = window.RESOURCEFLOW_FIREBASE_CONFIG || {};
+    if (config.forceLocalWorkspace !== false) {
+      return createLocalAdapter();
+    }
     const canUseFirebase = Boolean(config.enabled && config.apiKey && !String(config.apiKey).startsWith("YOUR_"));
 
     if (!canUseFirebase) {
@@ -921,6 +978,24 @@
 
   async function initializeFirebaseRuntime() {
     const config = getFirebaseConfig();
+    if (config.forceLocalWorkspace !== false) {
+      state.authResolved = true;
+      if (state.demoSession) {
+        applyDemoSessionState();
+      } else if (state.selectedPortalRole) {
+        const entryProfile = loadEntryProfile();
+        state.userProfile = Object.assign({}, entryProfile, {
+          role: normalizeRole(entryProfile.role || state.selectedPortalRole || "user"),
+          requestedRole: normalizeRole(entryProfile.requestedRole || state.selectedPortalRole || "user")
+        });
+        state.role = normalizeRole(state.selectedPortalRole || state.userProfile.role || "user");
+      } else {
+        state.role = "guest";
+        state.userProfile = null;
+      }
+      renderAuthUi();
+      return;
+    }
     if (!config.enabled) {
       if (state.demoSession) {
         applyDemoSessionState();
@@ -986,13 +1061,58 @@
 
   function loadSelectedPortal() {
     try {
-      const stored = localStorage.getItem(PORTAL_SELECTION_KEY);
+      var urlRole = "";
+      var handoffRole = "";
+      if (window.location && window.location.search && typeof URLSearchParams === "function") {
+        urlRole = normalizeRole(new URLSearchParams(window.location.search).get("portal"));
+      }
+      const handoff = loadPortalHandoff();
+      handoffRole = handoff && handoff.role ? normalizeRole(handoff.role) : "";
+      const stored = urlRole && urlRole !== "guest"
+        ? urlRole
+        : (localStorage.getItem(PORTAL_SELECTION_KEY) || handoffRole);
       state.selectedPortalRole = normalizeRole(stored);
       if (state.selectedPortalRole === "guest") {
         state.selectedPortalRole = "";
       }
+      if (urlRole && urlRole !== "guest" && state.selectedPortalRole) {
+        localStorage.setItem(PORTAL_SELECTION_KEY, state.selectedPortalRole);
+      }
     } catch (error) {
       state.selectedPortalRole = "";
+    }
+  }
+
+  function loadPortalHandoff() {
+    try {
+      const raw = localStorage.getItem(PORTAL_HANDOFF_KEY);
+      const parsed = raw ? JSON.parse(raw) : null;
+      if (!parsed || typeof parsed !== "object") {
+        return null;
+      }
+      const createdAt = Number(parsed.createdAt || 0);
+      if (!createdAt || (Date.now() - createdAt) > 10 * 60 * 1000) {
+        localStorage.removeItem(PORTAL_HANDOFF_KEY);
+        return null;
+      }
+      const role = normalizeRole(parsed.role || "");
+      if (!role || role === "guest") {
+        return null;
+      }
+      return {
+        role: role,
+        createdAt: createdAt
+      };
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function clearPortalHandoff() {
+    try {
+      localStorage.removeItem(PORTAL_HANDOFF_KEY);
+    } catch (error) {
+      console.warn("Could not clear portal handoff.", error);
     }
   }
 
@@ -1006,8 +1126,27 @@
     }
   }
 
+  function loadEntryProfile() {
+    try {
+      const raw = localStorage.getItem(ENTRY_PROFILE_KEY);
+      const parsed = raw ? JSON.parse(raw) : {};
+      return parsed && typeof parsed === "object" ? parsed : {};
+    } catch (error) {
+      return {};
+    }
+  }
+
   function activeAccessRole() {
-    return normalizeRole(state.selectedPortalRole || (state.userProfile && state.userProfile.requestedRole) || state.role || "guest");
+    if (state.selectedPortalRole) {
+      return normalizeRole(state.selectedPortalRole);
+    }
+    if (state.demoSession) {
+      return normalizeRole(state.role || "guest");
+    }
+    if (state.user) {
+      return "user";
+    }
+    return normalizeRole(state.role || "guest");
   }
 
   function activePortalProfile() {
@@ -1121,6 +1260,7 @@
       const previousUid = state.user && state.user.uid ? state.user.uid : "";
       state.user = user || null;
       if (user) {
+        clearPortalHandoff();
         if (previousUid && previousUid !== user.uid) {
           state.selectedPortalRole = "";
           persistSelectedPortal();
@@ -1145,6 +1285,13 @@
       } else {
         if (state.demoSession) {
           applyDemoSessionState();
+        } else if (state.selectedPortalRole) {
+          const entryProfile = loadEntryProfile();
+          state.userProfile = Object.assign({}, entryProfile, {
+            role: normalizeRole(entryProfile.role || state.selectedPortalRole || "user"),
+            requestedRole: normalizeRole(entryProfile.requestedRole || state.selectedPortalRole || "user")
+          });
+          state.role = normalizeRole(state.selectedPortalRole || state.userProfile.role || "user");
         } else {
           state.role = "guest";
           state.userProfile = null;
@@ -1194,11 +1341,6 @@
       state.role = currentRole;
       state.pendingRequestedRole = "";
       state.pendingSignupLocation = "";
-      if (state.storageMode === "local" && getFirebaseConfig().enabled) {
-        state.adapter = await createAdapter();
-        state.storageMode = state.adapter.mode;
-        startRealtimeSync();
-      }
     } catch (error) {
       console.warn("User profile sync failed.", error);
     }
@@ -1976,6 +2118,13 @@
       renderRoleBadges(roleBadges, state.role, "");
       switchRoleButton.hidden = false;
       signOutButton.hidden = false;
+    } else if (state.selectedPortalRole) {
+      const localName = safeText((state.userProfile && state.userProfile.displayName) || titleCase(accessRole) + " session", 60);
+      userLabel.textContent = localName;
+      roleLabel.textContent = roleMeta.label + " access - " + roleMeta.summary;
+      renderRoleBadges(roleBadges, accessRole, normalizeRole(state.userProfile && state.userProfile.requestedRole));
+      switchRoleButton.hidden = false;
+      signOutButton.hidden = false;
     } else {
       if (!state.authResolved) {
         userLabel.textContent = "Checking workspace access";
@@ -2068,12 +2217,15 @@
   async function signOutSession() {
     if (!getFirebaseConfig().enableAuth) {
       state.pendingDemoRole = "";
+      state.pendingPortalRole = "";
+      state.pendingRequestedRole = "";
       state.demoSession = null;
       state.user = null;
       state.role = "guest";
       state.userProfile = null;
       state.selectedPortalRole = "";
       persistSelectedPortal();
+      clearPortalHandoff();
       persistDemoSession();
       renderAuthUi();
       renderAll();
@@ -2082,11 +2234,14 @@
     }
     if (!state.user && state.demoSession) {
       state.pendingDemoRole = "";
+      state.pendingPortalRole = "";
+      state.pendingRequestedRole = "";
       state.demoSession = null;
       state.role = "guest";
       state.userProfile = null;
       state.selectedPortalRole = "";
       persistSelectedPortal();
+      clearPortalHandoff();
       persistDemoSession();
       renderAuthUi();
       renderAll();
@@ -2097,8 +2252,21 @@
     if (!window.firebase || !window.firebase.auth) {
       return;
     }
+    state.pendingDemoRole = "";
+    state.pendingPortalRole = "";
+    state.pendingRequestedRole = "";
+    state.demoSession = null;
+    state.userProfile = null;
+    state.selectedPortalRole = "";
+    state.role = "guest";
+    persistSelectedPortal();
+    clearPortalHandoff();
+    persistDemoSession();
     await window.firebase.auth().signOut();
     trackEvent("resourceflow_sign_out");
+    if (window.location && typeof window.location.assign === "function") {
+      window.location.assign("./index.html");
+    }
   }
 
   function openDemoRoleDialog() {
@@ -2165,13 +2333,14 @@
   }
 
   function redirectToPortal(role) {
-    const nextPath = DEMO_PORTAL_ROUTES[normalizeRole(role)] || "./overview.html";
+    const nextRole = normalizeRole(role);
+    const nextPath = DEMO_PORTAL_ROUTES[nextRole] || "./overview.html";
     const currentPage = currentPageName();
     if (currentPage === portalPageForRole(role)) {
       return;
     }
     if (window.location && typeof window.location.assign === "function") {
-      window.location.assign(nextPath);
+      window.location.assign(nextPath + (nextPath.indexOf("?") >= 0 ? "&" : "?") + "portal=" + encodeURIComponent(nextRole));
     }
   }
 
@@ -2187,12 +2356,14 @@
 
   function pageRoleForPortal(page) {
     return {
+      home: "user",
+      impact: "user",
       volunteer: "volunteer",
       insights: "volunteer",
       operations: "coordinator",
       judge: "coordinator",
       admin: "admin"
-    }[String(page || "").toLowerCase()] || "volunteer";
+    }[String(page || "").toLowerCase()] || "user";
   }
 
   function portalLabelForRole(role) {
@@ -2265,6 +2436,17 @@
     return allowed.indexOf(page) >= 0;
   }
 
+  function renderRoleNavigation(role) {
+    const nav = document.querySelector(".site-nav");
+    if (!nav) {
+      return;
+    }
+    const items = ROLE_NAV_ITEMS[normalizeRole(role)] || ROLE_NAV_ITEMS.guest;
+    nav.innerHTML = items.map(function (item) {
+      return '<a class="nav-link' + (item.page === currentPageName() ? ' active' : '') + '" data-nav="' + escapeHtml(item.page) + '" href="' + escapeHtml(item.href) + '">' + escapeHtml(item.label) + '</a>';
+    }).join("");
+  }
+
   function enforcePortalAccess() {
     const page = currentPageName();
     if (page === "tests") {
@@ -2276,6 +2458,11 @@
     if (!state.authResolved) {
       return false;
     }
+    const handoff = loadPortalHandoff();
+    if (!state.selectedPortalRole && handoff && handoff.role) {
+      state.selectedPortalRole = normalizeRole(handoff.role);
+      persistSelectedPortal();
+    }
     if (!hasActiveSession()) {
       if (window.location && typeof window.location.assign === "function") {
         window.location.assign("./index.html");
@@ -2283,7 +2470,7 @@
       return true;
     }
     if (!state.selectedPortalRole) {
-      state.selectedPortalRole = normalizeRole((state.userProfile && state.userProfile.requestedRole) || state.pendingPortalRole || state.pendingRequestedRole || "user");
+      state.selectedPortalRole = normalizeRole(state.pendingPortalRole || state.pendingRequestedRole || "user");
       persistSelectedPortal();
     }
     if (!roleCanAccessPage(activeAccessRole(), page)) {
@@ -2304,7 +2491,7 @@
       state.pendingPortalRole = "";
       return;
     }
-    const preferredRole = normalizeRole(state.pendingPortalRole || state.selectedPortalRole || state.pendingRequestedRole || "");
+    const preferredRole = normalizeRole(state.selectedPortalRole || state.pendingPortalRole || state.pendingRequestedRole || "");
     state.pendingRequestedRole = "";
     if (!preferredRole || preferredRole === "guest" || !state.selectedPortalRole) {
       state.pendingPortalRole = "";
@@ -2815,9 +3002,9 @@
       return "admin";
     }
     if (target && coordinators.indexOf(target) >= 0) {
-      return "government";
+      return "coordinator";
     }
-    return target ? "user" : "guest";
+    return target ? "volunteer" : "guest";
   }
 
   function normalizeRole(value) {
@@ -2901,9 +3088,9 @@
 
   function loadDemoScenario() {
     try {
-      return normalizeScenario(localStorage.getItem(DEMO_SCENARIO_KEY) || "mixed");
+      return normalizeScenario(localStorage.getItem(DEMO_SCENARIO_KEY) || "flood");
     } catch (error) {
-      return "mixed";
+      return "flood";
     }
   }
 
@@ -2932,7 +3119,7 @@
   }
 
   function hasActiveSession() {
-    return Boolean(state.user || state.demoSession);
+    return Boolean(state.selectedPortalRole || state.user || state.demoSession || loadPortalHandoff());
   }
 
   function currentActor() {
@@ -3327,6 +3514,19 @@
     });
   }
   function bindGlobalActions() {
+    if (window.__resourceFlowAccessLinksBound !== true) {
+      window.__resourceFlowAccessLinksBound = true;
+      document.addEventListener("click", function (event) {
+        const trigger = event.target.closest("[data-nav],[data-access-page]");
+        if (!trigger || trigger.dataset.accessLocked !== "true") {
+          return;
+        }
+        event.preventDefault();
+        event.stopPropagation();
+        const targetPage = trigger.dataset.nav || trigger.dataset.accessPage || "";
+        announceNotice("Access restricted. " + currentRoleMeta(activeAccessRole()).label + " accounts cannot open " + pageLabelForAccess(targetPage) + ".");
+      });
+    }
     document.querySelectorAll('[data-action="seed-demo"]').forEach(function (button) {
       button.addEventListener("click", function () { seedDemo(); });
     });
@@ -3676,7 +3876,14 @@
     sendBrowserNotification("ResourceFlow demo ready", scenarioTitle(scenario) + " mode is loaded and ready for walkthrough.");
     trackEvent("resourceflow_seed_demo", { scenario: scenario });
     state.data = registerActivity(state.data, "system", "Loaded demo workspace data for walkthrough in " + scenarioTitle(scenario) + " mode.", currentActor());
-    await persist();
+    if (typeof state.unsubscribeRemote === "function") {
+      state.unsubscribeRemote();
+      state.unsubscribeRemote = null;
+    }
+    state.adapter = createLocalAdapter();
+    state.storageMode = state.adapter.mode;
+    await state.adapter.save(state.data);
+    updateSyncStatus("Demo Loaded", scenarioTitle(scenario) + " sample records are loaded locally for this walkthrough.");
     renderAll();
   }
 
@@ -4817,15 +5024,23 @@
       ? activeAccessRole()
       : (state.demoSession ? normalizeRole(state.role) : "guest");
     document.body.dataset.accessRole = role;
+    renderRoleNavigation(role);
     document.querySelectorAll("[data-nav]").forEach(function (node) {
       const allowed = roleCanAccessPage(role, node.dataset.nav || "home");
       node.hidden = !allowed;
-      node.classList.toggle("is-hidden-access", !allowed);
+      node.style.display = allowed ? "" : "none";
+      node.dataset.accessLocked = allowed ? "false" : "true";
+      node.setAttribute("aria-disabled", allowed ? "false" : "true");
+      node.classList.toggle("is-locked-access", !allowed);
       node.classList.toggle("active", !allowed ? false : (node.dataset.nav || "home") === currentPageName());
     });
     document.querySelectorAll("[data-access-page]").forEach(function (node) {
       const allowed = roleCanAccessPage(role, node.dataset.accessPage || "home");
       node.hidden = !allowed;
+      node.style.display = allowed ? "" : "none";
+      node.dataset.accessLocked = allowed ? "false" : "true";
+      node.setAttribute("aria-disabled", allowed ? "false" : "true");
+      node.classList.toggle("is-locked-access", !allowed);
     });
     document.querySelectorAll("[data-manager-action]").forEach(function (node) {
       node.hidden = !canManageWorkspace();
@@ -4857,21 +5072,25 @@
         primaryAction.textContent = "Open Volunteer Portal";
         primaryAction.href = "./volunteer.html";
       } else {
-        primaryAction.textContent = "View Public Impact";
-        primaryAction.href = "./impact.html";
+        primaryAction.textContent = "Stay In Community Portal";
+        primaryAction.href = "./overview.html";
       }
+      primaryAction.dataset.accessPage = role === "admin"
+        ? "admin"
+        : (role === "government" || role === "coordinator"
+          ? "operations"
+          : (role === "volunteer" ? "volunteer" : "home"));
     }
     if (secondaryAction) {
-      secondaryAction.hidden = false;
+      secondaryAction.hidden = role === "user";
       if (role === "admin") {
         secondaryAction.textContent = "Open Judge Mode";
         secondaryAction.href = "./judge.html";
-      } else if (role === "user") {
-        secondaryAction.textContent = "Impact Story";
-        secondaryAction.href = "./impact.html";
+        secondaryAction.dataset.accessPage = "judge";
       } else {
         secondaryAction.textContent = "See Insights";
         secondaryAction.href = "./insights.html";
+        secondaryAction.dataset.accessPage = "insights";
       }
     }
     if (overviewEntryLink) {
@@ -4888,6 +5107,11 @@
         overviewEntryLink.textContent = "Community Home";
         overviewEntryLink.href = "./overview.html";
       }
+      overviewEntryLink.dataset.accessPage = role === "admin"
+        ? "admin"
+        : (role === "government" || role === "coordinator"
+          ? "operations"
+          : (role === "volunteer" ? "volunteer" : "home"));
     }
 
     if (!activityNode) {
@@ -5239,7 +5463,10 @@
   }
 
   function buildShiftPlan(data) {
-    const assignments = getVisibleAssignments(data);
+    const requestIds = new Set(getVisibleRequests(data).map(function (item) { return item.id; }));
+    const assignments = clone((data && data.assignments) || []).filter(function (item) {
+      return requestIds.has(item.requestId);
+    });
     const groups = {};
     getVisibleRequests(data).forEach(function (request) {
       const key = request.shiftLabel || "Today - Afternoon";

@@ -11,6 +11,7 @@ window.RESOURCEFLOW_FIREBASE_CONFIG = {
   workspaceId: "resourceflow-demo",
   functionsRegion: "us-central1",
   secureBackendEnabled: false,
+  forceLocalWorkspace: true,
   googleMapsApiKey: "",
   geminiApiKey: "",
   geminiModel: "gemini-2.5-flash",

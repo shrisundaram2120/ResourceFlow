@@ -1,8 +1,9 @@
 (function () {
-  const PORTAL_SELECTION_KEY = "resourceflow-portal-selection-v1";
-  const PORTAL_PROFILE_KEY = "resourceflow-portal-profile-v1";
+  const PORTAL_SELECTION_KEY = "resourceflow-portal-selection-v2";
+  const PORTAL_PROFILE_KEY = "resourceflow-portal-profile-v2";
   const DEMO_AUTH_KEY = "resourceflow-demo-auth-v1";
   const ENTRY_PROFILE_KEY = "resourceflow-entry-profile-v1";
+  const PORTAL_HANDOFF_KEY = "resourceflow-portal-handoff-v1";
   const FIREBASE_SDK_VERSION = "10.12.5";
   const FIREBASE_AUTH_SCRIPTS = [
     "https://www.gstatic.com/firebasejs/" + FIREBASE_SDK_VERSION + "/firebase-app-compat.js",
@@ -33,7 +34,7 @@
       title: "Volunteer setup",
       text: "Tell us where you can help and when you are available.",
       fields: [
-        { name: "zone", label: "Primary district", type: "select", required: true, options: ZONE_OPTIONS },
+        { name: "district", label: "Primary district", type: "select", required: true, options: ZONE_OPTIONS },
         { name: "location", label: "Location", type: "text", placeholder: "Tollygunge, Kolkata", required: true },
         { name: "availability", label: "Availability", type: "select", required: true, options: ["Full Day", "Half Day", "Evening", "Weekend"] },
         { name: "skills", label: "Skills", type: "text", placeholder: "first aid, coordination, driving", required: true },
@@ -47,7 +48,7 @@
       fields: [
         { name: "department", label: "Department", type: "text", placeholder: "Disaster Management Cell", required: true },
         { name: "designation", label: "Designation", type: "text", placeholder: "Field Operations Officer", required: true },
-        { name: "zone", label: "Primary district", type: "select", required: true, options: ZONE_OPTIONS },
+        { name: "district", label: "Primary district", type: "select", required: true, options: ZONE_OPTIONS },
         { name: "officeLocation", label: "Office location", type: "text", placeholder: "District coordination office", required: true },
         { name: "shift", label: "Shift", type: "select", required: true, options: ["Morning", "Afternoon", "Evening", "24/7 Rotation"] },
         { name: "teamSize", label: "Team size", type: "select", required: true, options: ["1-5", "6-10", "11-20", "20+"] }
@@ -104,7 +105,8 @@
     db: null,
     user: null,
     demoMode: false,
-    activePortal: ""
+    activePortal: "",
+    portalTransitioning: false
   };
 
   const refs = {};
@@ -242,14 +244,23 @@
           state.user = user || null;
           state.demoMode = false;
           clearDemoSession();
+          if (state.portalTransitioning) {
+            return;
+          }
           if (user) {
             const immediateProfile = buildEntryProfile(user);
             showPortalStage(immediateProfile);
             setLoading(false);
             ensureUserProfile(user).then(function (profile) {
+              if (state.portalTransitioning) {
+                return;
+              }
               showPortalStage(profile || immediateProfile);
             }).catch(function (error) {
               console.warn("Profile bootstrap failed.", error);
+              if (state.portalTransitioning) {
+                return;
+              }
               showPortalStage(immediateProfile);
               setPortalStatus("Sign in worked, but profile sync is still catching up. You can continue and choose a portal.", "error");
             });
@@ -365,6 +376,7 @@
   }
 
   function handleDemoPreview() {
+    state.portalTransitioning = false;
     state.demoMode = true;
     state.user = null;
     showPortalStage({
@@ -467,13 +479,13 @@
     }
     if (portal === "volunteer") {
       return Object.assign(base, values, {
-        primarySummary: values.availability + " volunteer - " + values.zone + " district",
+        primarySummary: values.availability + " volunteer - " + values.district + " district",
         secondarySummary: values.skills
       });
     }
     if (portal === "government") {
       return Object.assign(base, values, {
-        primarySummary: values.department + " - " + values.zone + " district",
+        primarySummary: values.department + " - " + values.district + " district",
         secondarySummary: values.designation + " - " + values.shift + " shift"
       });
     }
@@ -502,14 +514,21 @@
       setPortalSetupStatus("Please complete all required fields before continuing.", "error");
       return;
     }
-    persistPortalProfile(portal, buildPortalProfile(portal, values));
-    setPortalSetupStatus("Profile saved. Opening " + portalLabel(portal) + "...", "success");
-    await handlePortalSelection(portal);
+    try {
+      setLoading(true);
+      persistPortalProfile(portal, buildPortalProfile(portal, values));
+      setPortalSetupStatus("Profile saved. Opening " + portalLabel(portal) + "...", "success");
+      openPortalImmediately(portal, values);
+    } catch (error) {
+      setPortalSetupStatus(formatAuthError(error), "error");
+      setLoading(false);
+    }
   }
 
   async function handleSignOut() {
     try {
       setLoading(true);
+      state.portalTransitioning = false;
       if (state.auth && state.auth.currentUser) {
         await state.auth.signOut();
       }
@@ -535,47 +554,52 @@
 
     try {
       setLoading(true);
-      if (state.demoMode) {
-        localStorage.setItem(PORTAL_SELECTION_KEY, selectedPortal);
-        persistDemoSession(selectedPortal);
-        window.location.assign(PORTAL_ROUTES[selectedPortal] || "./overview.html");
-        return;
-      }
-
-      if (!state.user) {
-        throw new Error("Sign in first, then choose your portal.");
-      }
-
-      const desiredRole = selectedPortal === "admin" && !isAdminEmail(state.user.email || "")
-        ? "user"
-        : selectedPortal;
-      const requestedRole = selectedPortal;
-      localStorage.setItem(PORTAL_SELECTION_KEY, desiredRole);
-      const localProfile = buildEntryProfile(state.user, {
-        role: desiredRole,
-        requestedRole: requestedRole
-      });
-      persistEntryProfile(localProfile);
-      ensureUserProfile(state.user, {
-        role: desiredRole,
-        requestedRole: requestedRole
-      }).catch(function (profileError) {
-        console.warn("Portal profile sync failed.", profileError);
-      });
-
-      if (selectedPortal === "admin" && desiredRole !== "admin") {
-        setPortalStatus("Admin access was requested, but this account is not on the approved admin list. Opening the community portal in limited mode.", "error");
-      } else {
-        setPortalStatus("Opening " + portalLabel(selectedPortal) + "...", "success");
-      }
-
-      window.setTimeout(function () {
-        window.location.assign(PORTAL_ROUTES[desiredRole] || "./overview.html");
-      }, 30);
+      openPortalImmediately(selectedPortal, {});
     } catch (error) {
       setPortalStatus(formatAuthError(error), "error");
       setLoading(false);
     }
+  }
+
+  function openPortalImmediately(selectedPortal, extraProfile) {
+    const portal = normalizePortal(selectedPortal);
+    const extras = extraProfile && typeof extraProfile === "object" ? extraProfile : {};
+    if (!portal) {
+      throw new Error("Choose a valid portal to continue.");
+    }
+
+    state.portalTransitioning = true;
+    document.body.classList.add("portal-transitioning");
+
+    if (state.demoMode) {
+      localStorage.setItem(PORTAL_SELECTION_KEY, portal);
+      persistPortalHandoff(portal);
+      persistDemoSession(portal);
+      window.location.assign(portalRouteWithSelection(portal));
+      return;
+    }
+
+    if (!state.user) {
+      throw new Error("Sign in first, then choose your portal.");
+    }
+
+    const desiredRole = portal === "admin" && !isAdminEmail(state.user.email || "")
+      ? "user"
+      : portal;
+    const requestedRole = portal;
+    localStorage.setItem(PORTAL_SELECTION_KEY, desiredRole);
+    const localProfile = buildEntryProfile(state.user, {
+      role: desiredRole,
+      requestedRole: requestedRole,
+      location: extras.location || extras.district || extras.officeLocation || ""
+    });
+    persistPortalHandoff(desiredRole);
+    persistEntryProfile(localProfile);
+    window.location.assign(portalRouteWithSelection(desiredRole));
+  }
+
+  async function completePortalAccess(selectedPortal, extraProfile) {
+    openPortalImmediately(selectedPortal, extraProfile);
   }
 
   function activatePortalSelection(user, overrides) {
@@ -583,14 +607,21 @@
     state.user = user || null;
     state.demoMode = false;
     clearDemoSession();
+    state.portalTransitioning = false;
     showPortalStage(immediateProfile);
     setLoading(false);
     setPortalStatus("Choose a portal to continue.", "success");
     ensureUserProfile(user, overrides).then(function (profile) {
+      if (state.portalTransitioning) {
+        return;
+      }
       showPortalStage(profile || immediateProfile);
       setPortalStatus("Choose a portal to continue.", "success");
     }).catch(function (error) {
       console.warn("Profile sync after sign-in failed.", error);
+      if (state.portalTransitioning) {
+        return;
+      }
       showPortalStage(immediateProfile);
       setPortalStatus("Sign in worked. Choose a portal now and the profile sync will continue in the background.", "error");
     });
@@ -616,6 +647,7 @@
       updatedAt: new Date().toISOString(),
       updatedBy: email || "auth-entry"
     };
+    return nextProfile;
   }
 
   async function ensureUserProfile(user, overrides) {
@@ -640,6 +672,7 @@
   }
 
   function showAuthStage() {
+    state.portalTransitioning = false;
     refs.authStage.hidden = false;
     refs.portalStage.hidden = true;
     refs.portalSetupPanel.hidden = true;
@@ -649,6 +682,7 @@
 
   function showPortalStage(profile) {
     const summary = profile || loadEntryProfile();
+    const keepPortalSetupOpen = Boolean(state.activePortal && refs.portalSetupPanel && !refs.portalSetupPanel.hidden);
     refs.authStage.hidden = true;
     refs.portalStage.hidden = false;
     document.body.classList.add("portal-stage-open");
@@ -661,6 +695,13 @@
     refs.portalLead.textContent = state.demoMode
       ? "Preview the product through one of the four demo portals below."
       : "Choose the portal that matches your role and enter the workspace.";
+    if (keepPortalSetupOpen) {
+      if (refs.portalGrid) {
+        refs.portalGrid.hidden = true;
+      }
+      refs.portalSetupPanel.hidden = false;
+      return;
+    }
     if (refs.portalGrid) {
       refs.portalGrid.hidden = false;
     }
@@ -786,6 +827,17 @@
     }
   }
 
+  function persistPortalHandoff(role) {
+    try {
+      localStorage.setItem(PORTAL_HANDOFF_KEY, JSON.stringify({
+        role: normalizePortal(role) || "user",
+        createdAt: Date.now()
+      }));
+    } catch (error) {
+      console.warn("Could not save portal handoff.", error);
+    }
+  }
+
   function loadEntryProfile() {
     try {
       const raw = localStorage.getItem(ENTRY_PROFILE_KEY);
@@ -852,6 +904,12 @@
 
   function resolveDefaultRole(email) {
     return isAdminEmail(email) ? "admin" : "user";
+  }
+
+  function portalRouteWithSelection(role) {
+    const nextRole = normalizePortal(role) || "user";
+    const route = PORTAL_ROUTES[nextRole] || "./overview.html";
+    return route + (route.indexOf("?") >= 0 ? "&" : "?") + "portal=" + encodeURIComponent(nextRole);
   }
 
   function isAdminEmail(email) {
