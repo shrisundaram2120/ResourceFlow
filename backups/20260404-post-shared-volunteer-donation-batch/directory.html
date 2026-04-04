@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#061521">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <title>ResourceFlow | Volunteer Directory</title>
+  <link rel="stylesheet" href="./styles.css?v=20260404-shareddb3">
+</head>
+<body data-page="directory">
+  <a class="skip-link" href="#mainContent">Skip to content</a>
+  <div class="site-shell">
+    <header class="site-header">
+      <a class="brand" href="./overview.html" aria-label="ResourceFlow community portal">
+        <span class="brand-mark">RF</span>
+        <span>
+          <strong>ResourceFlow</strong>
+          <small>Volunteer Directory</small>
+        </span>
+      </a>
+
+      <nav class="site-nav" aria-label="Primary">
+        <a class="nav-link" data-nav="home" href="./overview.html">Community Portal</a>
+        <a class="nav-link" data-nav="operations" href="./operations.html">Operations</a>
+        <a class="nav-link" data-nav="volunteer" href="./volunteer.html">Volunteer Portal</a>
+        <a class="nav-link" data-nav="directory" href="./directory.html">Volunteer Directory</a>
+        <a class="nav-link" data-nav="donations" href="./donations.html">Donations</a>
+        <a class="nav-link" data-nav="admin" href="./admin.html">Admin</a>
+      </nav>
+
+      <div class="header-actions">
+        <a class="ghost-link" href="./volunteer.html">Edit My Profile</a>
+        <a class="primary-link" href="./volunteer.html">Volunteer Portal</a>
+      </div>
+    </header>
+
+    <main id="mainContent" class="page-stack" tabindex="-1">
+      <section class="page-intro">
+        <div>
+          <p class="eyebrow">Shared Directory</p>
+          <h1>Browse every volunteer profile saved in the live NGO network.</h1>
+          <p class="lead">The directory is backed by Firestore, so every signed-in volunteer sees the same profiles, skills, NGO groups, and contact details.</p>
+        </div>
+        <div class="info-card">
+          <strong>Live backend</strong>
+          <p>When one volunteer updates their profile, the rest of the network can see it here automatically.</p>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">Volunteer Directory</p>
+            <h2>Search by skill, NGO group, or location</h2>
+          </div>
+          <a class="ghost-link" href="./volunteer.html">Back To Volunteer Portal</a>
+        </div>
+        <div id="sharedVolunteerStatus" class="notice-box">
+          Sign in to load the shared volunteer directory from Firestore.
+        </div>
+        <div class="two-column">
+          <article class="panel compact">
+            <p class="eyebrow">Directory Filters</p>
+            <div class="form-grid compact-controls shared-directory-filters">
+              <label>
+                Search
+                <input id="sharedVolunteerSearch" type="text" placeholder="Search by name, skill, NGO, or contact">
+              </label>
+              <div class="split-grid">
+                <label>
+                  Skills
+                  <input id="sharedVolunteerSkillFilter" type="text" placeholder="first aid, logistics">
+                </label>
+                <label>
+                  NGO Group
+                  <input id="sharedVolunteerNgoFilter" type="text" placeholder="Seva Relief Collective">
+                </label>
+              </div>
+              <label>
+                Location
+                <input id="sharedVolunteerLocationFilter" type="text" placeholder="Kolkata, Chennai, Salt Lake">
+              </label>
+            </div>
+          </article>
+
+          <article class="panel compact">
+            <p class="eyebrow">Directory Summary</p>
+            <div id="sharedVolunteerDirectoryStats" class="shared-metric-grid" aria-live="polite">
+              <div class="empty-box">Directory metrics will appear here after sign-in.</div>
+            </div>
+          </article>
+        </div>
+        <div id="sharedVolunteerDirectoryList" class="shared-record-grid" aria-live="polite">
+          <div class="empty-box">Volunteer cards will appear here after sign-in.</div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="./firebase-config.js?v=20260404-authrestore1"></script>
+  <script src="./app.js?v=20260404-shareddb3"></script>
+  <script src="./resourceflow-shared.js?v=20260404-shareddb3"></script>
+  <script src="./criteria.js?v=20260402-rolelock2"></script>
+</body>
+</html>

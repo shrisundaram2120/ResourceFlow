@@ -36,6 +36,8 @@
       fields: [
         { name: "district", label: "Primary district", type: "select", required: true, options: ZONE_OPTIONS },
         { name: "location", label: "Location", type: "text", placeholder: "Tollygunge, Kolkata", required: true },
+        { name: "ngoGroup", label: "NGO group", type: "text", placeholder: "Seva Relief Collective", required: true },
+        { name: "phone", label: "Phone", type: "text", placeholder: "+91 98765 43210", required: true },
         { name: "availability", label: "Availability", type: "select", required: true, options: ["Full Day", "Half Day", "Evening", "Weekend"] },
         { name: "skills", label: "Skills", type: "text", placeholder: "first aid, coordination, driving", required: true },
         { name: "languages", label: "Languages", type: "text", placeholder: "English, Hindi, Bengali", required: true },

@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#061521">
   <link rel="manifest" href="./manifest.webmanifest">
   <title>ResourceFlow | Admin</title>
-  <link rel="stylesheet" href="./styles.css?v=20260404-shareddb3">
+  <link rel="stylesheet" href="./styles.css?v=20260404-sharedcloud1">
 </head>
 <body data-page="admin">
   <a class="skip-link" href="#mainContent">Skip to content</a>
@@ -24,8 +24,6 @@
         <a class="nav-link" data-nav="home" href="./overview.html">Community Portal</a>
         <a class="nav-link" data-nav="operations" href="./operations.html">Operations</a>
         <a class="nav-link" data-nav="volunteer" href="./volunteer.html">Volunteer Portal</a>
-        <a class="nav-link" data-nav="directory" href="./directory.html">Volunteer Directory</a>
-        <a class="nav-link" data-nav="donations" href="./donations.html">Donations</a>
         <a class="nav-link" data-nav="insights" href="./insights.html">AI Insights</a>
         <a class="nav-link" data-nav="admin" href="./admin.html">Admin</a>
         <a class="nav-link" data-nav="judge" href="./judge.html">Judge Mode</a>
@@ -82,28 +80,13 @@
             <p class="eyebrow">Shared Backend Dashboard</p>
             <h2>Manage volunteer profiles and donation records from Firestore</h2>
           </div>
-          <a class="ghost-link" href="./donations.html">Open Donation Portal</a>
+          <a class="ghost-link" href="./overview.html#donationPortal">Open Donation Portal</a>
         </div>
         <div id="sharedAdminStatus" class="notice-box">
           Admin or coordinator access is required to manage shared volunteer and donation records.
         </div>
         <div id="adminSharedSummary" class="shared-metric-grid" aria-live="polite">
           <div class="empty-box">Shared backend metrics will appear here after admin sign-in.</div>
-        </div>
-        <div class="two-column">
-          <article class="panel compact">
-            <p class="eyebrow">Volunteer Activity Status</p>
-            <div id="adminVolunteerStatusBoard" class="shared-metric-grid" aria-live="polite">
-              <div class="empty-box">Volunteer activity status counts will appear here.</div>
-            </div>
-          </article>
-
-          <article class="panel compact">
-            <p class="eyebrow">Donation Workflow Status</p>
-            <div id="adminDonationStatusBoard" class="shared-metric-grid" aria-live="polite">
-              <div class="empty-box">Donation workflow status counts will appear here.</div>
-            </div>
-          </article>
         </div>
         <div class="two-column">
           <article class="panel compact">
@@ -278,8 +261,8 @@
   </div>
 
   <script src="./firebase-config.js?v=20260404-authrestore1"></script>
-  <script src="./app.js?v=20260404-shareddb3"></script>
-  <script src="./resourceflow-shared.js?v=20260404-shareddb3"></script>
+  <script src="./app.js?v=20260404-upgrade3"></script>
+  <script src="./resourceflow-shared.js?v=20260404-sharedcloud1"></script>
   <script src="./criteria.js"></script>
 </body>
 </html>

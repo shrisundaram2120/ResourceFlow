@@ -240,33 +240,24 @@
   };
   const ROLE_NAV_ITEMS = {
     user: [
-      { page: "home", href: "./overview.html", label: "Community Portal" },
-      { page: "donations", href: "./donations.html", label: "Donations" }
+      { page: "home", href: "./overview.html", label: "Community Portal" }
     ],
     volunteer: [
       { page: "home", href: "./overview.html", label: "Community Portal" },
-      { page: "volunteer", href: "./volunteer.html", label: "Volunteer Portal" },
-      { page: "directory", href: "./directory.html", label: "Volunteer Directory" },
-      { page: "donations", href: "./donations.html", label: "Donations" }
+      { page: "volunteer", href: "./volunteer.html", label: "Volunteer Portal" }
     ],
     government: [
       { page: "home", href: "./overview.html", label: "Community Portal" },
-      { page: "operations", href: "./operations.html", label: "Operations" },
-      { page: "directory", href: "./directory.html", label: "Volunteer Directory" },
-      { page: "donations", href: "./donations.html", label: "Donations" }
+      { page: "operations", href: "./operations.html", label: "Operations" }
     ],
     coordinator: [
       { page: "home", href: "./overview.html", label: "Community Portal" },
-      { page: "operations", href: "./operations.html", label: "Operations" },
-      { page: "directory", href: "./directory.html", label: "Volunteer Directory" },
-      { page: "donations", href: "./donations.html", label: "Donations" }
+      { page: "operations", href: "./operations.html", label: "Operations" }
     ],
     admin: [
       { page: "home", href: "./overview.html", label: "Community Portal" },
       { page: "operations", href: "./operations.html", label: "Operations" },
       { page: "volunteer", href: "./volunteer.html", label: "Volunteer Portal" },
-      { page: "directory", href: "./directory.html", label: "Volunteer Directory" },
-      { page: "donations", href: "./donations.html", label: "Donations" },
       { page: "insights", href: "./insights.html", label: "AI Insights" },
       { page: "admin", href: "./admin.html", label: "Admin" },
       { page: "judge", href: "./judge.html", label: "Judge Mode" }
@@ -276,28 +267,28 @@
 
   const ROLE_PAGE_ACCESS = {
     guest: [],
-    user: ["home", "donations"],
-    volunteer: ["home", "volunteer", "directory", "donations"],
-    government: ["home", "operations", "directory", "donations"],
-    coordinator: ["home", "operations", "directory", "donations"],
-    admin: ["home", "operations", "volunteer", "directory", "donations", "insights", "admin", "judge", "impact"]
+    user: ["home"],
+    volunteer: ["home", "volunteer"],
+    government: ["home", "operations"],
+    coordinator: ["home", "operations"],
+    admin: ["home", "operations", "volunteer", "insights", "admin", "judge", "impact"]
   };
 
   const ROLE_PORTAL_META = {
     user: {
       label: "Community User",
-      summary: "View trusted community summaries, donate, and track public response progress.",
-      badges: ["Community Portal", "Donation access", "Overview + status"]
+      summary: "View trusted community summaries and read-only response progress.",
+      badges: ["Community Portal", "Read-only access", "Overview only"]
     },
     volunteer: {
       label: "Volunteer",
-      summary: "Track your own assignments, manage your profile, and browse the live volunteer directory.",
-      badges: ["Volunteer Portal", "Volunteer Directory", "No admin tools"]
+      summary: "Track your own assignments, completed work, attendance, and responder profile.",
+      badges: ["Volunteer Portal", "Personal tasks", "No admin tools"]
     },
     government: {
       label: "Government",
-      summary: "Coordinate requests, staffing, district response operations, and shared volunteer visibility.",
-      badges: ["Operations", "Volunteer Directory", "Dispatch access"]
+      summary: "Coordinate requests, staffing, and live response operations for your district team.",
+      badges: ["Operations", "Approvals", "Dispatch access"]
     },
     coordinator: {
       label: "Coordinator",
@@ -306,8 +297,8 @@
     },
     admin: {
       label: "Admin",
-      summary: "Oversee the full platform, shared volunteer records, donations, audits, and judging story.",
-      badges: ["All workspaces", "Shared backend", "Admin Console"]
+      summary: "Oversee the full platform, role management, audit history, and judging story.",
+      badges: ["All workspaces", "Admin Console", "Judge Mode"]
     },
     guest: {
       label: "Guest",
@@ -2649,10 +2640,8 @@
   function pageRoleForPortal(page) {
     return {
       home: "user",
-      donations: "user",
       impact: "user",
       volunteer: "volunteer",
-      directory: "volunteer",
       insights: "volunteer",
       operations: "coordinator",
       judge: "coordinator",
@@ -2673,9 +2662,7 @@
   function pageLabelForAccess(page) {
     return {
       home: "Community Portal",
-      donations: "Donation Portal",
       volunteer: "Volunteer Portal",
-      directory: "Volunteer Directory",
       operations: "Operations",
       insights: "AI Insights",
       admin: "Admin Portal",
