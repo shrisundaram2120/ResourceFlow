@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#061521">
   <link rel="manifest" href="./manifest.webmanifest">
   <title>ResourceFlow | Volunteer Portal</title>
-  <link rel="stylesheet" href="./styles.css?v=20260404-upgrade3">
+  <link rel="stylesheet" href="./styles.css?v=20260404-upgrade2">
 </head>
 <body data-page="volunteer">
   <a class="skip-link" href="#mainContent">Skip to content</a>
@@ -171,16 +171,94 @@
         </article>
       </section>
 
-      <section class="panel">
-        <div class="panel-head">
-          <div>
-            <p class="eyebrow">Volunteer Impact</p>
-            <h2>See the best open opportunities for this volunteer workspace</h2>
+      <section class="two-column">
+        <article class="panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Volunteer Form</p>
+              <h2>Join the response network</h2>
+            </div>
+            <button class="ghost-button" data-action="sample-volunteer">Sample</button>
           </div>
-        </div>
-        <div class="stack-list" id="volunteerOpportunityList" aria-live="polite">
-          <div class="empty-box">The app will recommend the best open opportunities here.</div>
-        </div>
+          <p id="volunteerEditorStatus" class="card-meta">Register a new volunteer</p>
+          <div id="volunteerAccessNote" class="notice-box">
+            Sign in with Google to register volunteers into the shared workspace.
+          </div>
+
+          <form id="volunteerForm" class="form-grid" aria-label="Volunteer registration form">
+            <label>
+              Full Name
+              <input name="name" type="text" placeholder="Aarav Mehta" required>
+            </label>
+            <div class="split-grid">
+              <label>
+                District
+                <select name="zone" required>
+                  <option value="">Choose district</option>
+                  <option>North</option>
+                  <option>South</option>
+                  <option>East</option>
+                  <option>West</option>
+                  <option>Central</option>
+                </select>
+              </label>
+              <label>
+                Location Or Address
+                <input name="location" type="text" placeholder="Salt Lake Sector V, Kolkata" required>
+              </label>
+            </div>
+            <div class="split-grid">
+              <label>
+                Availability
+                <select name="availability" required>
+                  <option>Full Day</option>
+                  <option>Half Day</option>
+                  <option>Evening</option>
+                  <option>Weekend</option>
+                </select>
+              </label>
+              <label>
+                Preferred Shift
+                <select name="shiftPreference">
+                  <option>Today - Morning</option>
+                  <option>Today - Afternoon</option>
+                  <option>Today - Evening</option>
+                  <option>Tomorrow - Morning</option>
+                  <option>Tomorrow - Afternoon</option>
+                  <option>Tomorrow - Evening</option>
+                </select>
+              </label>
+            </div>
+            <label>
+              Skills
+              <input name="skills" type="text" placeholder="first aid, coordination, driving" required>
+            </label>
+            <label>
+              Languages
+              <input name="languages" type="text" placeholder="English, Hindi, Bengali">
+            </label>
+            <div class="split-grid">
+              <label>
+                Transport
+                <select name="transport" required>
+                  <option value="Yes">Has transport</option>
+                  <option value="No">No transport</option>
+                </select>
+              </label>
+            </div>
+            <div class="button-row">
+              <button class="primary-button" id="volunteerSubmitButton" type="submit">Register Volunteer</button>
+              <button class="ghost-button" id="volunteerCancelButton" type="button" data-entity-action="cancel-volunteer-edit" hidden>Cancel Edit</button>
+            </div>
+          </form>
+        </article>
+
+        <article class="panel">
+          <p class="eyebrow">Volunteer Impact</p>
+          <div class="stack-list" id="volunteerOpportunityList" aria-live="polite">
+            <div class="empty-box">The app will recommend the best open opportunities here.</div>
+          </div>
+        </article>
       </section>
 
       <details id="volunteerAdvancedTools" class="advanced-disclosure">
@@ -328,7 +406,7 @@
   </div>
 
   <script src="./firebase-config.js?v=20260404-authrestore1"></script>
-  <script src="./app.js?v=20260404-upgrade4"></script>
+  <script src="./app.js?v=20260404-upgrade2"></script>
   <script src="./criteria.js"></script>
 </body>
 </html>

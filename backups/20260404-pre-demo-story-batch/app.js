@@ -468,7 +468,6 @@
     const scenario = normalizeScenario(mode || "mixed");
     const now = new Date().toISOString();
     const preset = buildScenarioPreset(scenario);
-    const storyMeta = scenarioStoryMeta(scenario);
     const next = {
       requests: clone(preset.requests),
       volunteers: clone(preset.volunteers),
@@ -504,48 +503,34 @@
           : (requestAssignments.length ? "in-progress" : normalizeWorkflowStatus(request.workflowStatus || "pending"))
       }));
     });
-    const leadRequest = next.requests[0] || null;
-    const queuedRequest = next.requests[1] || leadRequest;
-    const leadAssignment = next.assignments[0] || null;
-    const followUpAssignment = next.assignments[1] || leadAssignment;
-    const leadVolunteer = leadAssignment && leadAssignment.volunteerName ? leadAssignment.volunteerName : "Field volunteer";
     next.activityLog = [
       {
         id: uid(),
-        type: "alert",
-        actor: "Community intake",
+        type: "system",
+        actor: state.clientId,
         at: isoMinutesAgo(16),
-        message: storyMeta.incident + (leadRequest ? " Trigger request: " + leadRequest.title + "." : "")
+        message: "Loaded the " + scenarioTitle(scenario) + " walkthrough with live requests, volunteers, and impact proof."
       },
       {
         id: uid(),
         type: "approval",
         actor: "District desk",
         at: isoMinutesAgo(12),
-        message: storyMeta.review + (queuedRequest && queuedRequest !== leadRequest ? " Next queue item: " + queuedRequest.title + "." : "")
+        message: "Government board reviewed urgent requests and approved priority actions for " + scenarioTitle(scenario) + "."
       },
       {
         id: uid(),
         type: "matching",
         actor: "ResourceFlow AI",
         at: isoMinutesAgo(8),
-        message: leadAssignment
-          ? leadVolunteer + " was ranked for " + leadAssignment.requestTitle + " using " + storyMeta.aiFocus + "."
-          : "AI matching recommended the highest-fit volunteers using " + storyMeta.aiFocus + "."
-      },
-      {
-        id: uid(),
-        type: "dispatch",
-        actor: "Operations board",
-        at: isoMinutesAgo(5),
-        message: storyMeta.dispatch + (followUpAssignment ? " Lead route: " + followUpAssignment.requestTitle + "." : "")
+        message: "AI matching recommended the highest-fit volunteers using urgency, skills, district, transport, and shift readiness."
       },
       {
         id: uid(),
         type: "impact",
-        actor: "Public impact board",
+        actor: "Field team",
         at: isoMinutesAgo(3),
-        message: storyMeta.publicImpact + " " + storyMeta.proof
+        message: "First dispatches moved into the field and the public impact counters were updated for the current scenario."
       }
     ];
     next.artifacts = next.assignments.slice(0, 2).map(function (assignment, index) {
@@ -554,8 +539,8 @@
         type: index === 0 ? "field-photo" : "report",
         relatedTo: assignment.requestTitle,
         notes: index === 0
-          ? storyMeta.proof + " Linked request: " + assignment.requestTitle + "."
-          : storyMeta.publicImpact + " Judge-ready update drafted after " + assignment.requestTitle + ".",
+          ? "Dispatch proof uploaded for " + assignment.requestTitle + "."
+          : "Situation update drafted for judges and NGO partners.",
         createdAt: isoMinutesAgo(4 - Math.min(index, 3)),
         uploadedBy: assignment.volunteerName || "Coordinator",
         storageMode: "local"
@@ -3333,74 +3318,6 @@
       shelter: "Shelter Support",
       food: "Food Distribution"
     }[normalizeScenario(value)] || "Mixed Response";
-  }
-
-  function scenarioStoryMeta(value) {
-    const scenario = normalizeScenario(value);
-    return {
-      mixed: {
-        incident: "Multiple community needs are arriving at once, so the workspace must sort urgency before field teams get overloaded.",
-        review: "The response desk groups requests by urgency, beneficiary load, and district pressure before approving the first moves.",
-        aiFocus: "multi-skill fit, district coverage, transport, and shift readiness",
-        dispatch: "Coordinators release the first assignments while keeping the remaining queue visible for the next shift.",
-        publicImpact: "The portal updates live counts so judges and NGO partners can see the response move from intake to action.",
-        proof: "Field proof and a short briefing are captured to make the response trail visible.",
-        communityAngle: "show how different kinds of requests enter one shared system"
-      },
-      flood: {
-        incident: "Rising water is pushing families toward shelter clusters, so meal kits and stock transfer support need to move before evening.",
-        review: "The district desk first approves shelter food dispatches and route support for flooded corridors.",
-        aiFocus: "food handling, driving, district fit, and transport readiness",
-        dispatch: "The first vans and boat-linked handoffs move toward shelter clusters while backup routes stay visible.",
-        publicImpact: "Families in temporary shelters start receiving meal support and the public portal reflects that coverage immediately.",
-        proof: "Dispatch proof is recorded through field notes and a delivery-ready situation update.",
-        communityAngle: "show how a flood alert becomes visible shelter support in one workflow"
-      },
-      cyclone: {
-        incident: "Cyclone damage is blocking relief corridors, so debris clearance, outage support, and shelter intake must be sequenced fast.",
-        review: "The response board approves the most urgent clearance and household support tasks before smaller requests enter the queue.",
-        aiFocus: "route access, logistics experience, first aid support, and shift timing",
-        dispatch: "Teams clear the first corridor, route medical support, and keep shelter intake visible for the next wave.",
-        publicImpact: "The platform shows which post-cyclone tasks are already moving and which districts still need more responders.",
-        proof: "Operations logs and status updates create a clear cyclone-response trail for reviewers.",
-        communityAngle: "show how storm damage turns into visible district action instead of scattered follow-up"
-      },
-      medical: {
-        incident: "A high-volume medical camp needs faster registration, triage support, and family guidance before queues build up.",
-        review: "The government board prioritizes triage and registration tasks first because they unblock the rest of the camp.",
-        aiFocus: "registration, first aid, translation, and calm front-desk availability",
-        dispatch: "The first volunteers are placed at registration and family support desks while medicine logistics stay covered.",
-        publicImpact: "Patients move through the camp faster and the dashboard reflects both support volume and staffing coverage.",
-        proof: "The response story is backed by intake counts, task completion, and a simple public summary.",
-        communityAngle: "show how a crowded health camp becomes a manageable service flow"
-      },
-      shelter: {
-        incident: "Displaced families are arriving at shelters, so bedding, intake, and child-safe support zones must be ready quickly.",
-        review: "Shelter staff approve intake, bedding, and family-support tasks before opening the next arrival window.",
-        aiFocus: "inventory handling, family support, district proximity, and shift readiness",
-        dispatch: "Volunteers move into intake, bedding setup, and family support so the shelter stays calm and organized.",
-        publicImpact: "The public story shows shelter readiness improving as staffing and supplies become visible.",
-        proof: "Shelter setup notes and intake-ready proof give judges a clear before-and-after narrative.",
-        communityAngle: "show how a shelter changes from intake pressure to organized support"
-      },
-      food: {
-        incident: "Community kitchens need safer packing and faster distribution before the next meal window opens.",
-        review: "The board approves the highest-volume meal line first, then sorts the next ration task behind it.",
-        aiFocus: "food handling, inventory flow, district proximity, and delivery support",
-        dispatch: "Volunteers move from packing to queue support and then into live delivery confirmation.",
-        publicImpact: "The impact view shows meal support moving from kitchen prep into real beneficiary coverage.",
-        proof: "Packaging and delivery proof make the food-response story easy to understand in a demo.",
-        communityAngle: "show how a food request becomes a visible distribution chain"
-      }
-    }[scenario] || {
-      incident: "Community requests are entering the workspace and need fast prioritization.",
-      review: "The board reviews the most urgent items first.",
-      aiFocus: "skills, district fit, and readiness",
-      dispatch: "Assignments move into the field.",
-      publicImpact: "The impact counters update as work is completed.",
-      proof: "Proof and reports are captured alongside the response.",
-      communityAngle: "show how the platform turns requests into action"
-    };
   }
 
   function inferShiftLabel(createdAt, urgency) {
@@ -6896,7 +6813,7 @@
     if (volunteerProfileSummary) {
       volunteerProfileSummary.innerHTML = [
         '<div class="stack-card"><strong>' + escapeHtml(personalView.displayName) + '</strong><p class="card-meta">' + escapeHtml(personalView.email || "Volunteer session active") + '</p></div>',
-        '<div class="stack-card"><strong>Profile coverage</strong><p class="card-meta">' + escapeHtml(personalView.district ? districtText(personalView.district) + " | " + (personalView.availability || "Availability pending") : "Complete your portal setup or load demo data to link this login to a live responder record.") + '</p></div>',
+        '<div class="stack-card"><strong>Profile coverage</strong><p class="card-meta">' + escapeHtml(personalView.district ? districtText(personalView.district) + " | " + (personalView.availability || "Availability pending") : "Finish your volunteer registration to link this login to a live responder record.") + '</p></div>',
         '<div class="stack-card"><strong>Skills on record</strong><p class="card-meta">' + escapeHtml((personalView.skills || []).length ? personalView.skills.join(", ") : "No skills saved yet on this volunteer profile.") + '</p></div>',
         '<div class="stack-card"><strong>Languages</strong><p class="card-meta">' + escapeHtml((personalView.languages || []).length ? personalView.languages.join(", ") : "Language preferences will appear here once saved.") + '</p></div>'
       ].join("");
@@ -8503,13 +8420,6 @@
 
   function buildActivityFeed(data) {
     const activity = [];
-    const scenario = loadDemoScenario();
-    const storyMeta = scenarioStoryMeta(scenario);
-    activity.push({
-      title: scenarioTitle(scenario) + " story",
-      meta: storyMeta.incident,
-      chips: [scenarioTitle(scenario), storyMeta.communityAngle]
-    });
     (data.activityLog || []).slice(0, 3).forEach(function (event) {
       activity.push({
         title: titleCase(event.type || "update"),
@@ -8622,9 +8532,7 @@
 
   function buildDemoWalkthroughItems(data, role) {
     const metrics = computeMetrics(data);
-    const scenarioKey = loadDemoScenario();
-    const scenario = scenarioTitle(scenarioKey);
-    const storyMeta = scenarioStoryMeta(scenarioKey);
+    const scenario = scenarioTitle(loadDemoScenario());
     const topRequest = clone(getVisibleRequests(data)).sort(function (left, right) {
       return Number(right.urgency || 0) - Number(left.urgency || 0);
     })[0];
@@ -8635,30 +8543,28 @@
     }).length;
     return [
       {
-        title: "1. Start with the live incident",
-        text: topRequest
-          ? storyMeta.incident + " The first visible request is " + topRequest.title + " in " + districtText(topRequest.zone) + "."
-          : "Load the " + scenario + " demo to seed fake requests, volunteers, assignments, and public impact numbers instantly.",
+        title: "1. Trigger the scenario",
+        text: "Load the " + scenario + " demo to seed fake requests, volunteers, assignments, and public impact numbers instantly.",
         chips: [scenario, metrics.requests + " requests"]
       },
       {
-        title: "2. Show the approval step",
+        title: "2. Show the community intake",
         text: topRequest
-          ? storyMeta.review + " Priority request: " + topRequest.title + "."
+          ? "Start with " + topRequest.title + " in " + districtText(topRequest.zone) + " so the problem statement feels real."
           : "Use the community request form to show how support needs enter the workspace.",
         chips: topRequest ? [topRequest.category, urgencyLabel(topRequest.urgency)] : ["Community intake"]
       },
       {
         title: "3. Explain the AI match",
         text: topRanking
-          ? topRanking.volunteerName + " is ranked for " + topRanking.requestTitle + " because of " + topRanking.text.toLowerCase() + ", plus " + storyMeta.aiFocus + "."
+          ? topRanking.volunteerName + " ranks highly for " + topRanking.requestTitle + " because of skills, district fit, transport, and availability."
           : "Once volunteers are loaded, the AI matching panel will show why the highest-fit responder was chosen.",
         chips: topRanking ? ["score " + topRanking.score, districtText(topRanking.zone)] : ["Skills", "District fit"]
       },
       {
-        title: "4. Finish with public proof",
+        title: "4. Finish with impact",
         text: delivered
-          ? delivered + " assignment(s) are already marked delivered. " + storyMeta.publicImpact
+          ? delivered + " assignment(s) are already marked delivered, helping you show a complete before-to-after response story."
           : "Use the Operations and Public Impact pages to show the full staffing and beneficiary story.",
         chips: [metrics.assignments + " assignments", metrics.beneficiaries + " people"]
       }
@@ -8740,32 +8646,26 @@
   function buildDemoStoryCards(data) {
     const metrics = computeMetrics(data);
     const scenario = loadDemoScenario();
-    const storyMeta = scenarioStoryMeta(scenario);
     const topRequest = clone(getVisibleRequests(data)).sort(function (left, right) {
       return Number(right.urgency || 0) - Number(left.urgency || 0);
     })[0];
-    const topAssignment = getVisibleAssignments(data)[0];
     return [
       {
-        title: "1. Incident becomes visible",
-        text: topRequest
-          ? storyMeta.incident + " Focus request: " + topRequest.title + "."
-          : "Use " + scenarioTitle(scenario) + " to show a real response story instead of blank records.",
+        title: "1. Scenario loaded",
+        text: "Use " + scenarioTitle(scenario) + " to show a real response story instead of blank records.",
         chips: [scenarioTitle(scenario), metrics.requests + " live requests"]
       },
       {
-        title: "2. AI matching in plain language",
+        title: "2. AI matching steps",
         text: topRequest
-          ? "The system scores " + storyMeta.aiFocus + " before suggesting volunteers for " + topRequest.title + "."
+          ? "The system scores urgency, district fit, skills, transport, and shift readiness before suggesting volunteers for " + topRequest.title + "."
           : "Load demo data to show why the AI matching engine chose each volunteer.",
         chips: ["Urgency", "Skills", "District fit", "Shift readiness"]
       },
       {
-        title: "3. Public proof closes the loop",
+        title: "3. Public impact proof",
         text: metrics.assignments
-          ? (topAssignment
-            ? topAssignment.requestTitle + " is already linked to live delivery status. " + storyMeta.publicImpact
-            : metrics.assignments + " assignments now support about " + metrics.beneficiaries + " people with " + metrics.coverage + "% request coverage.")
+          ? metrics.assignments + " assignments now support about " + metrics.beneficiaries + " people with " + metrics.coverage + "% request coverage."
           : "Impact numbers will appear here after the demo scenario is loaded.",
         chips: ["Assignments", "Beneficiaries", "Coverage"]
       }
@@ -9031,25 +8931,24 @@
       return Number(right.urgency || 0) - Number(left.urgency || 0);
     })[0];
     const ranking = buildVolunteerRankingItems(data).slice(0, 3);
-    const storyMeta = scenarioStoryMeta(loadDemoScenario());
     return [
       {
         title: "AI step 1: prioritize",
         text: topRequest
-          ? topRequest.title + " was prioritized first because of urgency, beneficiaries, and current staffing risk. " + storyMeta.review
+          ? topRequest.title + " was prioritized first because of urgency, beneficiaries, and current staffing risk."
           : "Load demo data to show which request the AI prioritizes first.",
         chips: topRequest ? [urgencyLabel(topRequest.urgency), districtText(topRequest.zone)] : ["No request"]
       },
       {
         title: "AI step 2: match",
         text: ranking.length
-          ? ranking[0].volunteerName + " ranks first for " + ranking[0].requestTitle + " with score " + ranking[0].score + " because of " + ranking[0].text.toLowerCase() + " and " + storyMeta.aiFocus + "."
+          ? "The engine then ranked volunteers by district fit, required skills, transport access, and shift availability."
           : "Volunteer ranking appears after responders and requests are both available.",
-        chips: ranking.length ? ranking.map(function (item) { return item.volunteerName; }).slice(0, 2) : ["Waiting for volunteers"]
+        chips: ranking.length ? ranking.map(function (item) { return item.label; }).slice(0, 2) : ["Waiting for volunteers"]
       },
       {
         title: "AI step 3: explain",
-        text: "The board below shows not just the assignment result but the reason why the platform chose each responder, plus how that decision supports the live response story."
+        text: "The board below shows not just the assignment result but the reason why the platform chose each responder."
       }
     ];
   }
@@ -9222,9 +9121,7 @@
 
   function buildImpactJourneyItems(data) {
     const metrics = computeMetrics(data);
-    const scenarioKey = loadDemoScenario();
-    const scenario = scenarioTitle(scenarioKey);
-    const storyMeta = scenarioStoryMeta(scenarioKey);
+    const scenario = scenarioTitle(loadDemoScenario());
     const topRequest = clone(getVisibleRequests(data)).sort(function (left, right) {
       return Number(right.urgency || 0) - Number(left.urgency || 0);
     })[0];
@@ -9233,7 +9130,7 @@
       {
         title: "1. Public request appears",
         text: topRequest
-          ? topRequest.title + " enters the workspace from the community side with urgency and beneficiary context. " + storyMeta.communityAngle + "."
+          ? topRequest.title + " enters the workspace from the community side with urgency and beneficiary context."
           : "Community submissions appear here as soon as requests are added or demo data is loaded.",
         chips: [scenario]
       },
@@ -9241,20 +9138,20 @@
         title: "2. Government reviews it",
         text: metrics.pendingApprovals
           ? metrics.pendingApprovals + " request(s) are waiting for approval or routing in the operations board."
-          : storyMeta.review,
+          : "Approved requests move quickly into matching and dispatch planning.",
         chips: [metrics.pendingApprovals + " pending"]
       },
       {
         title: "3. Volunteer assignment happens",
         text: topAssignment
-          ? topAssignment.volunteerName + " is already linked to " + topAssignment.requestTitle + ". " + storyMeta.dispatch
+          ? topAssignment.volunteerName + " is already linked to " + topAssignment.requestTitle + "."
           : "Assignments appear once the AI matching flow selects the best-fit responders.",
         chips: [metrics.assignments + " assignments"]
       },
       {
         title: "4. Impact becomes visible",
         text: metrics.beneficiaries
-          ? "The current scenario now projects support for about " + metrics.beneficiaries + " people. " + storyMeta.publicImpact
+          ? "The current scenario now projects support for about " + metrics.beneficiaries + " people."
           : "Load demo data to reveal the beneficiary and coverage story.",
         chips: [metrics.coverage + "% coverage", "Readiness " + metrics.readinessScore + "/100"]
       }
