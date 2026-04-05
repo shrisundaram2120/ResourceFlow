@@ -174,8 +174,11 @@
     volunteers: [],
     donations: [],
     audit: [],
-    outreach: []
+    outreach: [],
+    systemNotice: "Choose a scenario to populate the workspace."
   };
+
+  const REQUEST_STAGES = ["Submitted", "Reviewed", "Assigned", "In Progress", "Delivered"];
 
   function init() {
     const root = document.getElementById("portalApp");
@@ -281,6 +284,17 @@
     return [
       '<aside class="rf-rail right-stack">',
       '<section class="surface-card">',
+      '<p class="section-label">Scenario Switcher</p>',
+      '<form id="scenarioControlForm" class="form-grid compact-form" data-testid="scenario-control-form">',
+      '<label><span>Active Scenario</span><select id="scenarioSelect" class="text-select" data-testid="scenario-select">' + renderScenarioOptions(workspace.scenario) + "</select></label>",
+      '<div class="action-stack">',
+      '<button class="primary-button" type="submit" data-testid="load-selected-scenario">Load Scenario</button>',
+      '<button class="ghost-button" type="button" data-action="reset-workspace" data-testid="reset-workspace">Clear Demo</button>',
+      "</div>",
+      "</form>",
+      '<div class="notice-box">' + escapeHtml(workspace.systemNotice || "Choose a scenario to populate the workspace.") + "</div>",
+      "</section>",
+      '<section class="surface-card">',
       '<p class="section-label">Quick Actions</p>',
       '<div class="quick-actions">',
       '<button class="primary-button" type="button" data-action="seed-demo" data-scenario="flood" data-testid="load-demo">Load Demo</button>',
@@ -348,8 +362,9 @@
         ]
       }),
       renderMetrics(workspaceMetrics(workspace)),
+      '<section class="two-col"><article class="surface-card"><p class="section-label">Request Status Tracker</p><h2 class="section-title">Follow each request from intake to delivery</h2>' + renderStatusBoard(workspace.requests) + '</article><article class="surface-card"><p class="section-label">AI Matching Story</p><h2 class="section-title">How this scenario moves from request to response</h2><div class="feed-list">' + renderWorkflowCards(buildMatchingSteps(workspace)) + "</div></article></section>",
       '<section class="surface-card"><p class="section-label">Community Feed</p><h2 class="section-title">Live requests and visible response spaces</h2><div class="feed-list">' + renderRequestCards(workspace.requests) + "</div></section>",
-      '<section class="two-col"><article class="surface-card"><p class="section-label">Community Request Form</p><h2 class="section-title">Raise a support request</h2><form id="communityRequestForm" class="form-grid" data-testid="community-request-form"><label><span>Request title</span><input class="text-input" name="title" type="text" placeholder="Emergency food kits for affected streets" required></label><div class="grid-2"><label><span>Category</span><select class="text-select" name="category" required><option value="">Choose category</option><option>Food</option><option>Medical</option><option>Shelter</option><option>Education</option><option>Logistics</option></select></label><label><span>District</span><input class="text-input" name="district" type="text" placeholder="Chennai" required></label></div><label><span>Location address</span><input class="text-input" name="location" type="text" placeholder="Velachery, Chennai" required></label><label><span>Need summary</span><textarea class="text-area" name="summary" placeholder="Describe the situation and the people affected." required></textarea></label><button class="primary-button" type="submit" data-testid="submit-community-request">Submit Request</button></form><div id="communityRequestStatus" class="notice-box">New community requests will appear in the live feed immediately on this device.</div></article><article class="surface-card"><p class="section-label">Demo Story</p><h2 class="section-title">How the AI assigns support</h2><div class="stack-list">' + renderListCards(workspace.audit.length ? workspace.audit : ["Load demo data to see how requests, volunteer matches, and donations connect end to end.", "The flood demo shows requests flowing into AI matching and field assignments.", "Each request card includes a direct map link for field navigation."]) + "</div></article></section>"
+      '<section class="two-col"><article class="surface-card"><p class="section-label">Community Request Form</p><h2 class="section-title">Raise a support request</h2><form id="communityRequestForm" class="form-grid" data-testid="community-request-form"><label><span>Request title</span><input class="text-input" name="title" type="text" placeholder="Emergency food kits for affected streets" required></label><div class="grid-2"><label><span>Category</span><select class="text-select" name="category" required><option value="">Choose category</option><option>Food</option><option>Medical</option><option>Shelter</option><option>Education</option><option>Logistics</option></select></label><label><span>District</span><input class="text-input" name="district" type="text" placeholder="Chennai" required></label></div><div class="grid-2"><label><span>Location address</span><input class="text-input" name="location" type="text" placeholder="Velachery, Chennai" required></label><label><span>Estimated people affected</span><input class="text-input" name="beneficiaries" type="number" min="1" step="1" placeholder="40" required></label></div><div class="grid-2"><label><span>Urgency</span><select class="text-select" name="priority" required><option value="Submitted">Submitted</option><option value="Reviewed">Reviewed</option><option value="Assigned">Assigned</option><option value="In Progress">In Progress</option></select></label><label><span>Need summary</span><input class="text-input" name="shortSummary" type="text" placeholder="Families need food, blankets, and safe shelter." required></label></div><label><span>Detailed context</span><textarea class="text-area" name="summary" placeholder="Describe the situation, road access, vulnerable groups, and immediate needs." required></textarea></label><button class="primary-button" type="submit" data-testid="submit-community-request">Submit Request</button></form><div id="communityRequestStatus" class="notice-box">Submitted requests are added to the tracker below and become part of the visible feed immediately.</div></article><article class="surface-card"><p class="section-label">Community Request Tracker</p><h2 class="section-title">See what is active right now</h2><div class="feed-list">' + renderCommunityTracker(workspace.requests) + "</div></article></section>"
     ].join("");
   }
 
@@ -427,8 +442,9 @@
         ]
       }),
       renderMetrics(workspaceMetrics(workspace)),
+      '<section class="two-col"><article class="surface-card"><p class="section-label">Request Workflow</p><h2 class="section-title">Status pipeline across the active scenario</h2>' + renderStatusBoard(workspace.requests) + '</article><article class="surface-card"><p class="section-label">District Pressure Board</p><h2 class="section-title">Where teams should move next</h2><div class="feed-list">' + renderDistrictSummaryCards(workspace) + "</div></article></section>",
       '<section class="surface-card"><p class="section-label">Vertical Feed</p><h2 class="section-title">Requests, assignments, and dispatch reasons</h2><div class="feed-list">' + renderRequestCards(workspace.requests) + "</div></section>",
-      '<section class="two-col"><article class="surface-card"><p class="section-label">Active Dispatch</p><div class="feed-list">' + renderAssignmentCards(workspace.assignments) + '</div></article><article class="surface-card"><p class="section-label">Governance Pulse</p><div class="feed-list">' + renderListCards(workspace.audit) + "</div></article></section>"
+      '<section class="two-col"><article class="surface-card"><p class="section-label">Active Dispatch</p><div class="feed-list">' + renderAssignmentCards(workspace.assignments) + '</div></article><article class="surface-card"><p class="section-label">AI Matching Story</p><div class="feed-list">' + renderWorkflowCards(buildMatchingSteps(workspace)) + "</div></article></section>"
     ].join("");
   }
 
@@ -557,6 +573,10 @@
       return '<div class="empty-box">No active requests yet. Use Load Demo to bring in a fake disaster scenario.</div>';
     }
     return items.map(function (item) {
+      const stage = normalizeRequestStatus(item.status);
+      return '<article class="feed-card"><div class="feed-card-head"><div><strong>' + escapeHtml(item.title) + '</strong><p class="feed-meta">' + escapeHtml(item.summary) + '</p></div>' + renderStatus(stage) + '</div><div class="feed-chip-row"><span class="feed-chip">' + escapeHtml(item.category) + '</span><span class="feed-chip">' + escapeHtml(item.district) + '</span><span class="feed-chip">' + escapeHtml(String(item.beneficiaries)) + ' beneficiaries</span><span class="feed-chip">' + escapeHtml(item.priority) + '</span></div>' + renderStepper(stage) + '<p class="card-copy"><strong>AI match:</strong> ' + escapeHtml(item.ai) + '</p><div class="action-stack" style="margin-top:14px;"><button class="ghost-button" type="button" data-map-location="' + escapeHtml(item.location) + '" data-testid="view-map-' + escapeHtml(item.id.toLowerCase()) + '">View on Map</button></div></article>';
+    }).join("");
+    return items.map(function (item) {
       return '<article class="feed-card"><div class="feed-card-head"><div><strong>' + escapeHtml(item.title) + '</strong><p class="feed-meta">' + escapeHtml(item.summary) + '</p></div>' + renderStatus(item.status) + '</div><div class="feed-chip-row"><span class="feed-chip">' + escapeHtml(item.category) + '</span><span class="feed-chip">' + escapeHtml(item.district) + '</span><span class="feed-chip">' + escapeHtml(String(item.beneficiaries)) + ' beneficiaries</span><span class="feed-chip">' + escapeHtml(item.priority) + '</span></div><p class="card-copy"><strong>AI match:</strong> ' + escapeHtml(item.ai) + '</p><div class="action-stack" style="margin-top:14px;"><button class="ghost-button" type="button" data-map-location="' + escapeHtml(item.location) + '" data-testid="view-map-' + escapeHtml(item.id.toLowerCase()) + '">📍 View on Map</button></div></article>';
     }).join("");
   }
@@ -565,6 +585,9 @@
     if (!items.length) {
       return '<div class="empty-box">No assignments are visible yet. Load a demo scenario to populate assignments.</div>';
     }
+    return items.map(function (item) {
+      return '<article class="feed-card"><div class="feed-card-head"><div><strong>' + escapeHtml(item.title) + '</strong><p class="feed-meta">' + escapeHtml(item.volunteer) + ' - ' + escapeHtml(item.date) + '</p></div>' + renderStatus(item.status) + '</div><div class="feed-chip-row"><span class="feed-chip">' + escapeHtml(item.district) + '</span><span class="feed-chip">' + escapeHtml(item.location) + '</span><span class="feed-chip">' + escapeHtml(String(item.points)) + ' pts</span></div><div class="action-stack" style="margin-top:14px;"><button class="ghost-button" type="button" data-map-location="' + escapeHtml(item.location) + '" data-testid="assignment-map-' + escapeHtml(item.id.toLowerCase()) + '">View on Map</button></div></article>';
+    }).join("");
     return items.map(function (item) {
       return '<article class="feed-card"><div class="feed-card-head"><div><strong>' + escapeHtml(item.title) + '</strong><p class="feed-meta">' + escapeHtml(item.volunteer) + ' • ' + escapeHtml(item.date) + '</p></div>' + renderStatus(item.status) + '</div><div class="feed-chip-row"><span class="feed-chip">' + escapeHtml(item.district) + '</span><span class="feed-chip">' + escapeHtml(item.location) + '</span><span class="feed-chip">' + escapeHtml(String(item.points)) + ' pts</span></div><div class="action-stack" style="margin-top:14px;"><button class="ghost-button" type="button" data-map-location="' + escapeHtml(item.location) + '" data-testid="assignment-map-' + escapeHtml(item.id.toLowerCase()) + '">📍 View on Map</button></div></article>';
     }).join("");
@@ -575,6 +598,9 @@
       return '<div class="empty-box">Completed volunteer work will appear here once assignments are finished.</div>';
     }
     return items.map(function (item) {
+      return '<article class="feed-card"><div class="feed-card-head"><div><strong>' + escapeHtml(item.title) + '</strong><p class="feed-meta">' + escapeHtml(item.volunteer) + ' - ' + escapeHtml(item.date) + '</p></div>' + renderStatus(item.status) + '</div><p class="card-copy">' + escapeHtml(item.location) + ' - ' + escapeHtml(item.district) + "</p></article>";
+    }).join("");
+    return items.map(function (item) {
       return '<article class="feed-card"><div class="feed-card-head"><div><strong>' + escapeHtml(item.title) + '</strong><p class="feed-meta">' + escapeHtml(item.volunteer) + ' • ' + escapeHtml(item.date) + '</p></div>' + renderStatus(item.status) + '</div><p class="card-copy">' + escapeHtml(item.location) + ' • ' + escapeHtml(item.district) + "</p></article>";
     }).join("");
   }
@@ -584,8 +610,63 @@
       return '<div class="empty-box">Load demo data to preview the volunteer network.</div>';
     }
     return items.slice(0, 3).map(function (item) {
+      return '<article class="feed-card"><div class="feed-card-head"><div><strong>' + escapeHtml(item.name) + '</strong><p class="feed-meta">' + escapeHtml(item.ngo) + '</p></div>' + renderStatus(item.availability) + '</div><p class="card-copy">' + escapeHtml(item.skills.join(", ")) + ' - ' + escapeHtml(item.location) + "</p></article>";
+    }).join("");
+    return items.slice(0, 3).map(function (item) {
       return '<article class="feed-card"><div class="feed-card-head"><div><strong>' + escapeHtml(item.name) + '</strong><p class="feed-meta">' + escapeHtml(item.ngo) + '</p></div>' + renderStatus(item.availability) + '</div><p class="card-copy">' + escapeHtml(item.skills.join(", ")) + ' • ' + escapeHtml(item.location) + "</p></article>";
     }).join("");
+  }
+
+  function renderStatusBoard(items) {
+    const counts = buildRequestStageCounts(items);
+    return '<div class="status-board">' + REQUEST_STAGES.map(function (stage) {
+      return '<article class="status-card"><span class="status-card-label">' + escapeHtml(stage) + '</span><strong>' + escapeHtml(String(counts[stage] || 0)) + '</strong><span class="status-card-meta">' + escapeHtml(statusMetaCopy(stage)) + "</span></article>";
+    }).join("") + "</div>";
+  }
+
+  function renderCommunityTracker(items) {
+    if (!items.length) {
+      return '<div class="empty-box">Submit a request or load a demo scenario to populate the community tracker.</div>';
+    }
+    return items.slice(0, 5).map(function (item) {
+      const stage = normalizeRequestStatus(item.status);
+      return '<article class="feed-card"><div class="feed-card-head"><div><strong>' + escapeHtml(item.title) + '</strong><p class="feed-meta">' + escapeHtml(item.district) + ' - ' + escapeHtml(item.location) + '</p></div>' + renderStatus(stage) + '</div>' + renderStepper(stage) + '<div class="feed-chip-row"><span class="feed-chip">' + escapeHtml(item.category) + '</span><span class="feed-chip">' + escapeHtml(String(item.beneficiaries)) + ' people</span><span class="feed-chip">' + escapeHtml(item.priority) + '</span></div></article>';
+    }).join("");
+  }
+
+  function renderWorkflowCards(items) {
+    if (!items.length) {
+      return '<div class="empty-box">Load a scenario to see how requests move through AI triage, matching, and field delivery.</div>';
+    }
+    return items.map(function (item) {
+      return '<article class="feed-card"><div class="feed-card-head"><div><strong>' + escapeHtml(item.title) + '</strong><p class="feed-meta">' + escapeHtml(item.meta) + '</p></div></div><p class="card-copy">' + escapeHtml(item.copy) + "</p></article>";
+    }).join("");
+  }
+
+  function renderDistrictSummaryCards(workspace) {
+    const summaries = buildDistrictSummary(workspace);
+    if (!summaries.length) {
+      return '<div class="empty-box">District pressure will appear after you load a scenario.</div>';
+    }
+    return summaries.map(function (item) {
+      return '<article class="feed-card"><div class="feed-card-head"><div><strong>' + escapeHtml(item.district) + '</strong><p class="feed-meta">' + escapeHtml(item.meta) + '</p></div>' + renderStatus(item.status) + '</div><div class="feed-chip-row"><span class="feed-chip">' + escapeHtml(String(item.requests)) + ' requests</span><span class="feed-chip">' + escapeHtml(String(item.assignments)) + ' assignments</span><span class="feed-chip">' + escapeHtml(String(item.beneficiaries)) + ' beneficiaries</span></div><p class="card-copy">' + escapeHtml(item.copy) + "</p></article>";
+    }).join("");
+  }
+
+  function renderStepper(stage) {
+    const currentIndex = REQUEST_STAGES.indexOf(normalizeRequestStatus(stage));
+    return '<div class="status-stepper">' + REQUEST_STAGES.map(function (label, index) {
+      const className = index < currentIndex ? "status-step is-complete" : index === currentIndex ? "status-step is-current" : "status-step";
+      return '<span class="' + className + '">' + escapeHtml(label) + "</span>";
+    }).join("") + "</div>";
+  }
+
+  function renderScenarioOptions(selectedScenario) {
+    const current = safeText(selectedScenario, 30).toLowerCase();
+    return ['<option value="none"' + (current === "none" ? " selected" : "") + '>No demo selected</option>'].concat(Object.keys(SCENARIO_PRESETS).map(function (key) {
+      const preset = SCENARIO_PRESETS[key];
+      return '<option value="' + escapeHtml(key) + '"' + (current === key ? " selected" : "") + '>' + escapeHtml(preset.label) + "</option>";
+    })).join("");
   }
 
   function renderImpactCards(workspace) {
@@ -678,7 +759,103 @@
     if (item.kind === "money") {
       return formatCurrency(item.amount) + " via " + safeText(item.paymentMethod || "money", 40);
     }
+    return safeText(item.itemType || "Item", 40) + " - Qty " + safeText(item.quantity || "1", 20);
     return safeText(item.itemType || "Item", 40) + " • Qty " + safeText(item.quantity || "1", 20);
+  }
+
+  function normalizeRequestStatus(status) {
+    const normalized = safeText(status, 40).toLowerCase();
+    if (!normalized || normalized === "tracked") return "Submitted";
+    if (normalized.indexOf("delivered") !== -1 || normalized.indexOf("completed") !== -1 || normalized.indexOf("closed") !== -1) return "Delivered";
+    if (normalized.indexOf("progress") !== -1 || normalized.indexOf("active") !== -1) return "In Progress";
+    if (normalized.indexOf("assigned") !== -1) return "Assigned";
+    if (normalized.indexOf("review") !== -1 || normalized.indexOf("queue") !== -1 || normalized.indexOf("pending") !== -1) return "Reviewed";
+    return "Submitted";
+  }
+
+  function buildRequestStageCounts(items) {
+    const counts = {};
+    REQUEST_STAGES.forEach(function (stage) {
+      counts[stage] = 0;
+    });
+    items.forEach(function (item) {
+      counts[normalizeRequestStatus(item.status)] += 1;
+    });
+    return counts;
+  }
+
+  function statusMetaCopy(stage) {
+    if (stage === "Submitted") return "Fresh community requests waiting for review.";
+    if (stage === "Reviewed") return "Requests checked and ready for assignment.";
+    if (stage === "Assigned") return "A team or volunteer has been attached.";
+    if (stage === "In Progress") return "Field work is currently active.";
+    return "Support delivered and visible in the archive.";
+  }
+
+  function buildMatchingSteps(workspace) {
+    if (!workspace.requests.length) {
+      return [];
+    }
+    const request = workspace.requests[0];
+    const assignment = workspace.assignments[0];
+    const volunteer = workspace.volunteers[0];
+    const donation = workspace.donations[0];
+    return [
+      {
+        title: "1. Intake and triage",
+        meta: workspace.label || "Scenario",
+        copy: request.title + " entered from " + request.district + " with " + String(request.beneficiaries) + " people affected."
+      },
+      {
+        title: "2. Skill and district match",
+        meta: assignment ? assignment.volunteer : (volunteer ? volunteer.name : "Volunteer fit pending"),
+        copy: request.ai || "The AI looks at skills, district fit, and current availability before recommending a responder."
+      },
+      {
+        title: "3. Dispatch and movement",
+        meta: assignment ? assignment.location : request.location,
+        copy: "The operations team uses the assignment board and View on Map links to move the right team to the right location."
+      },
+      {
+        title: "4. Delivery and proof",
+        meta: donation ? formatDonationLine(donation) : "Donation proof pending",
+        copy: donation ? ("Donation support from " + donation.donor + " backs the request and gives admins clear proof of movement and support.") : "When donations arrive, admins can connect them to the active request and show end-to-end proof."
+      }
+    ];
+  }
+
+  function buildDistrictSummary(workspace) {
+    const bucket = {};
+    workspace.requests.forEach(function (request) {
+      const key = request.district || "Unknown";
+      if (!bucket[key]) {
+        bucket[key] = { district: key, requests: 0, assignments: 0, beneficiaries: 0 };
+      }
+      bucket[key].requests += 1;
+      bucket[key].beneficiaries += Number(request.beneficiaries || 0);
+    });
+    workspace.assignments.forEach(function (assignment) {
+      const key = assignment.district || "Unknown";
+      if (!bucket[key]) {
+        bucket[key] = { district: key, requests: 0, assignments: 0, beneficiaries: 0 };
+      }
+      bucket[key].assignments += 1;
+    });
+    return Object.keys(bucket).map(function (key) {
+      const item = bucket[key];
+      const stage = item.assignments >= item.requests && item.requests > 0 ? "In Progress" : item.requests ? "Reviewed" : "Submitted";
+      return {
+        district: item.district,
+        requests: item.requests,
+        assignments: item.assignments,
+        beneficiaries: item.beneficiaries,
+        status: stage,
+        meta: "District pressure and response coverage",
+        copy: item.requests ? ("This district has " + item.requests + " visible request(s) and " + item.assignments + " assignment(s) linked to them.") : "No active requests yet, but the district remains visible for coordination."
+      };
+    }).sort(function (a, b) {
+      return b.beneficiaries - a.beneficiaries || b.requests - a.requests;
+    }).slice(0, 4);
   }
 
   function renderStatus(status) {
@@ -687,7 +864,7 @@
 
   function statusTone(status) {
     const normalized = safeText(status, 40).toLowerCase();
-    if (normalized.indexOf("complete") !== -1 || normalized.indexOf("available") !== -1 || normalized.indexOf("active") !== -1 || normalized.indexOf("visible") !== -1) return "success";
+    if (normalized.indexOf("complete") !== -1 || normalized.indexOf("delivered") !== -1 || normalized.indexOf("available") !== -1 || normalized.indexOf("active") !== -1 || normalized.indexOf("visible") !== -1) return "success";
     if (normalized.indexOf("submitted") !== -1 || normalized.indexOf("review") !== -1 || normalized.indexOf("queue") !== -1 || normalized.indexOf("pending") !== -1 || normalized.indexOf("scheduled") !== -1 || normalized.indexOf("assigned") !== -1 || normalized.indexOf("progress") !== -1) return "pending";
     return "muted";
   }
@@ -742,6 +919,13 @@
       });
     });
 
+    root.querySelectorAll("[data-action='reset-workspace']").forEach(function (button) {
+      button.addEventListener("click", function () {
+        resetWorkspace();
+        renderApp(document.getElementById("portalApp"));
+      });
+    });
+
     root.querySelectorAll("[data-map-location]").forEach(function (button) {
       button.addEventListener("click", function () {
         const location = button.dataset.mapLocation || "";
@@ -762,6 +946,21 @@
       communityForm.addEventListener("submit", function (event) {
         event.preventDefault();
         submitCommunityRequest(communityForm);
+      });
+    }
+
+    const scenarioForm = document.getElementById("scenarioControlForm");
+    if (scenarioForm) {
+      scenarioForm.addEventListener("submit", function (event) {
+        event.preventDefault();
+        const select = document.getElementById("scenarioSelect");
+        const selectedScenario = select ? safeText(select.value || "none", 40).toLowerCase() : "none";
+        if (selectedScenario === "none") {
+          resetWorkspace();
+        } else {
+          seedWorkspace(selectedScenario);
+        }
+        renderApp(document.getElementById("portalApp"));
       });
     }
 
@@ -793,12 +992,14 @@
       category: safeText(data.get("category"), 80),
       district: safeText(data.get("district"), 80),
       location: safeText(data.get("location"), 140),
-      beneficiaries: 40,
-      priority: "Submitted",
-      status: "Submitted",
-      summary: safeText(data.get("summary"), 280),
+      beneficiaries: Number(data.get("beneficiaries") || 40),
+      priority: safeText(data.get("priority"), 40) || "Submitted",
+      status: safeText(data.get("priority"), 40) || "Submitted",
+      summary: safeText(data.get("shortSummary"), 180) || safeText(data.get("summary"), 280),
       ai: "The AI will attach skills, district fit, and donation needs after an operator reviews this request."
     });
+    workspace.systemNotice = "New community request added to the live tracker.";
+    workspace.audit.unshift("A community request was submitted for " + safeText(data.get("district"), 80) + " and routed into the visible tracker.");
     saveWorkspace(workspace);
     renderApp(document.getElementById("portalApp"));
   }
@@ -926,8 +1127,13 @@
       volunteers: preset.volunteers.slice(),
       donations: preset.donations.slice(),
       audit: preset.audit.slice(),
-      outreach: preset.outreach.slice()
+      outreach: preset.outreach.slice(),
+      systemNotice: preset.label + " loaded. Review the tracker, AI story, and map links."
     });
+  }
+
+  function resetWorkspace() {
+    saveWorkspace(Object.assign({}, EMPTY_WORKSPACE));
   }
 
   function saveWorkspace(workspace) {
