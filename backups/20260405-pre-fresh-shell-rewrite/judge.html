@@ -1,0 +1,147 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1A362D">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <title>ResourceFlow | Judge Mode</title>
+  <link rel="stylesheet" href="./styles.css?v=20260405-design6">
+</head>
+<body data-page="judge">
+  <a class="skip-link" href="#mainContent">Skip to content</a>
+  <div class="site-shell">
+    <header class="site-header">
+      <a class="brand" href="./overview.html" aria-label="ResourceFlow community portal">
+        <span class="brand-mark">RF</span>
+        <span>
+          <strong>ResourceFlow</strong>
+          <small>Judge Mode</small>
+        </span>
+      </a>
+
+      <nav class="site-nav" aria-label="Primary">
+        <a class="nav-link" data-nav="home" href="./overview.html">Community Portal</a>
+        <a class="nav-link" data-nav="operations" href="./operations.html">Operations</a>
+        <a class="nav-link" data-nav="volunteer" href="./volunteer.html">Volunteer Portal</a>
+        <a class="nav-link" data-nav="insights" href="./insights.html">AI Insights</a>
+        <a class="nav-link" data-nav="admin" href="./admin.html">Admin</a>
+        <a class="nav-link" data-nav="judge" href="./judge.html">Judge Mode</a>
+      </nav>
+
+      <div class="header-actions">
+        <button class="ghost-button" data-action="seed-demo">Load Demo</button>
+        <button class="ghost-button" data-action="judge-demo-mode">Judge Demo Mode</button>
+        <a class="primary-link" href="./submission/solution-challenge-submission.md">Open Submission Draft</a>
+      </div>
+    </header>
+
+    <main id="mainContent" class="page-stack" tabindex="-1">
+      <section class="judge-hero panel">
+        <p class="eyebrow">Evaluation Criteria</p>
+        <h1>Live evidence for technical merit, UX, cause alignment, innovation, and predictive disaster response.</h1>
+        <p class="lead judge-lead" id="judgeSummary">Load demo data or add real records to generate a judge-ready evidence summary.</p>
+      </section>
+
+      <section class="judge-grid">
+        <article class="panel">
+          <p class="eyebrow">Technical Merit 40%</p>
+          <h2>Google tech utilization, coding expertise, scalability</h2>
+          <div id="judgeTechnical" class="stack-list">
+            <div class="empty-box">Technical evidence will appear here.</div>
+          </div>
+        </article>
+        <article class="panel">
+          <p class="eyebrow">User Experience 10%</p>
+          <h2>Design, usability, accessibility</h2>
+          <div id="judgeUx" class="stack-list">
+            <div class="empty-box">UX evidence will appear here.</div>
+          </div>
+        </article>
+        <article class="panel">
+          <p class="eyebrow">Alignment With Cause 25%</p>
+          <h2>Problem alignment and real-world impact</h2>
+          <div id="judgeCause" class="stack-list">
+            <div class="empty-box">Cause alignment evidence will appear here.</div>
+          </div>
+        </article>
+        <article class="panel">
+          <p class="eyebrow">Innovation and Creativity 25%</p>
+          <h2>Novelty and creative AI use</h2>
+          <div id="judgeInnovation" class="stack-list">
+            <div class="empty-box">Innovation evidence will appear here.</div>
+          </div>
+        </article>
+      </section>
+
+      <section class="two-column">
+        <article class="panel">
+          <p class="eyebrow">Judge Tips</p>
+          <ul class="clean-list">
+            <li>Click `Load Demo` to instantly populate a realistic coordination scenario.</li>
+            <li>Go to `Operations` to run matching and inspect explainable assignments.</li>
+            <li>Open `AI Insights` to test the simulation, shortage forecast, and outreach generation features.</li>
+            <li>Use the AidFlow forecast and delivery verification panels to explain proactive disaster readiness.</li>
+            <li>Use the submission documents for your written application and demo pitch.</li>
+          </ul>
+        </article>
+        <article class="panel">
+          <p class="eyebrow">Deployment Readiness</p>
+          <div id="judgeDeployment" class="stack-list">
+            <div class="empty-box">Deployment readiness evidence will appear here.</div>
+          </div>
+        </article>
+      </section>
+
+      <section class="stats-grid">
+        <article class="stat-card">
+          <span>Live Requests</span>
+          <strong id="judgeMetricRequests">0</strong>
+          <small>Community needs modeled in the workspace</small>
+        </article>
+        <article class="stat-card">
+          <span>Volunteers</span>
+          <strong id="judgeMetricVolunteers">0</strong>
+          <small>Responder profiles available for matching</small>
+        </article>
+        <article class="stat-card">
+          <span>Coverage</span>
+          <strong id="judgeMetricCoverage">0%</strong>
+          <small>Requests currently supported</small>
+        </article>
+        <article class="stat-card">
+          <span>Readiness</span>
+          <strong id="judgeMetricReadiness">0/100</strong>
+          <small>Operational readiness score</small>
+        </article>
+      </section>
+
+      <section class="three-column">
+        <article class="panel">
+          <p class="eyebrow">Before / After Story</p>
+          <div id="judgeBeforeAfter" class="stack-list">
+            <div class="empty-box">Before-and-after proof cards will appear here.</div>
+          </div>
+        </article>
+        <article class="panel">
+          <p class="eyebrow">SDG Mapping</p>
+          <div id="judgeSdgMap" class="stack-list">
+            <div class="empty-box">SDG alignment proof cards will appear here.</div>
+          </div>
+        </article>
+        <article class="panel">
+          <p class="eyebrow">Demo Proof Pack</p>
+          <div id="judgeProofPack" class="stack-list">
+            <div class="empty-box">Judge-proof feature snapshots will appear here.</div>
+          </div>
+        </article>
+      </section>
+    </main>
+  </div>
+
+  <script src="./firebase-config.js?v=20260405-design6"></script>
+  <script src="./app.js?v=20260405-design6"></script>
+  <script src="./criteria.js"></script>
+</body>
+</html>
+

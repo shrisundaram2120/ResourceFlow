@@ -1,0 +1,714 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1A362D">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <title>ResourceFlow | Operations</title>
+  <link rel="stylesheet" href="./styles.css?v=20260405-design6">
+</head>
+<body data-page="operations">
+  <a class="skip-link" href="#mainContent">Skip to content</a>
+  <div class="site-shell">
+    <header class="site-header">
+      <a class="brand" href="./overview.html" aria-label="ResourceFlow overview">
+        <span class="brand-mark">RF</span>
+        <span>
+          <strong>ResourceFlow</strong>
+          <small>Operations Dashboard</small>
+        </span>
+      </a>
+
+      <nav class="site-nav" aria-label="Primary">
+        <a class="nav-link" data-nav="home" href="./overview.html">Community Portal</a>
+        <a class="nav-link" data-nav="operations" href="./operations.html">Operations</a>
+        <a class="nav-link" data-nav="volunteer" href="./volunteer.html">Volunteer Portal</a>
+        <a class="nav-link" data-nav="insights" href="./insights.html">AI Insights</a>
+        <a class="nav-link" data-nav="admin" href="./admin.html">Admin</a>
+        <a class="nav-link" data-nav="judge" href="./judge.html">Judge Mode</a>
+      </nav>
+
+      <div class="header-actions">
+        <label class="inline-select">
+          <span>Scenario</span>
+          <select id="demoScenarioSelect">
+            <option value="mixed">Mixed</option>
+            <option value="flood">Flood</option>
+            <option value="cyclone">Cyclone</option>
+            <option value="medical">Medical Camp</option>
+            <option value="shelter">Shelter</option>
+            <option value="food">Food Distribution</option>
+          </select>
+        </label>
+        <button class="ghost-button" data-action="seed-demo">Load Demo</button>
+        <button class="ghost-button" data-action="export-json">Export JSON</button>
+        <button class="ghost-button" data-action="export-csv">Export CSV</button>
+        <button class="ghost-button" data-action="print-field-sheet">Field Sheet</button>
+        <button class="ghost-button" data-action="print-judge-report">Judge Report</button>
+        <a class="ghost-link" data-access-page="impact" href="./impact.html">Public Impact</a>
+      </div>
+    </header>
+
+    <main id="mainContent" class="page-stack" tabindex="-1">
+      <div id="announce" class="sr-only" aria-live="polite"></div>
+
+      <section class="page-intro">
+        <div>
+          <p class="eyebrow">Coordinator Command Center</p>
+          <h1>Capture needs, run matching, forecast shortages, and manage field response.</h1>
+        </div>
+        <div class="button-row">
+          <button class="primary-button" data-action="run-matching">Run Matching</button>
+          <button class="danger-button" data-action="reset-all">Reset Workspace</button>
+        </div>
+      </section>
+
+      <section class="stats-grid" aria-label="Operations metrics">
+        <article class="stat-card">
+          <span>Requests</span>
+          <strong id="metricRequests">0</strong>
+          <small>Open and tracked</small>
+        </article>
+        <article class="stat-card">
+          <span>Assignments</span>
+          <strong id="metricAssignments">0</strong>
+          <small>Generated matches</small>
+        </article>
+        <article class="stat-card">
+          <span>Coverage</span>
+          <strong id="metricCoverage">0%</strong>
+          <small>Requests with volunteers</small>
+        </article>
+        <article class="stat-card">
+          <span>Critical Fill Rate</span>
+          <strong id="metricCriticalFill">0%</strong>
+          <small>High urgency needs staffed</small>
+        </article>
+      </section>
+
+      <section class="two-column portal-split">
+        <article class="panel compact portal-sidebar-panel">
+          <p class="eyebrow">Government Sidebar</p>
+          <h2>Know this portal's control lane</h2>
+          <div id="operationsPortalSidebar" class="stack-list">
+            <div class="empty-box">Government portal guidance will appear here.</div>
+          </div>
+        </article>
+
+        <article class="panel compact">
+          <p class="eyebrow">Response Charts</p>
+          <h2>District pressure and assignment completion at a glance</h2>
+          <div id="operationsDemandPressureChart" class="stack-list">
+            <div class="empty-box">District demand pressure chart will appear here.</div>
+          </div>
+          <div id="operationsDispatchProgressChart" class="stack-list">
+            <div class="empty-box">Dispatch completion chart will appear here.</div>
+          </div>
+        </article>
+      </section>
+
+      <section class="three-column">
+        <article class="panel compact">
+          <p class="eyebrow">District Summary</p>
+          <h2>What government teams need to know first</h2>
+          <div id="governmentDistrictSummary" class="stack-list">
+            <div class="empty-box">District coverage and pressure summaries will appear here.</div>
+          </div>
+        </article>
+        <article class="panel compact">
+          <p class="eyebrow">Pending Approvals</p>
+          <h2>Requests waiting for action</h2>
+          <div id="governmentApprovalSnapshot" class="stack-list">
+            <div class="empty-box">Pending approvals and urgent items will appear here.</div>
+          </div>
+        </article>
+        <article class="panel compact">
+          <p class="eyebrow">Dispatch Status</p>
+          <h2>Live movement across the response network</h2>
+          <div id="governmentDispatchStatus" class="stack-list">
+            <div class="empty-box">Dispatch readiness and active field tasks will appear here.</div>
+          </div>
+        </article>
+      </section>
+
+      <section class="two-column">
+        <article class="panel compact">
+          <p class="eyebrow">AI Matching Story</p>
+          <h2>Why the system made these decisions</h2>
+          <div id="governmentAiStory" class="stack-list">
+            <div class="empty-box">Visible AI matching steps will appear here.</div>
+          </div>
+        </article>
+
+        <article class="panel compact">
+          <p class="eyebrow">Outcome Board</p>
+          <h2>Response status across the current scenario</h2>
+          <div id="governmentOutcomeBoard" class="stack-list">
+            <div class="empty-box">Operational outcome cards will appear here.</div>
+          </div>
+        </article>
+      </section>
+
+      <section class="two-column">
+        <article class="panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Smart Filters</p>
+              <h2>Search and narrow the live workspace</h2>
+            </div>
+          </div>
+          <div class="form-grid compact-controls">
+            <label>
+              Search Requests Or Organizations
+              <input id="operationsSearch" type="text" placeholder="Search by title, organization, location, or skill">
+            </label>
+            <div class="split-grid">
+              <label>
+                  District
+                  <select id="operationsZoneFilter">
+                    <option value="">All districts</option>
+                  <option>North</option>
+                  <option>South</option>
+                  <option>East</option>
+                  <option>West</option>
+                  <option>Central</option>
+                </select>
+              </label>
+              <label>
+                Category
+                <select id="operationsCategoryFilter">
+                  <option value="">All categories</option>
+                  <option>Food Distribution</option>
+                  <option>Medical Support</option>
+                  <option>Shelter Support</option>
+                  <option>Logistics</option>
+                  <option>Education Outreach</option>
+                  <option>Elder Care</option>
+                </select>
+              </label>
+            </div>
+            <div class="split-grid">
+              <label>
+                Minimum Urgency
+                <select id="operationsUrgencyFilter">
+                  <option value="0">All urgency levels</option>
+                  <option value="5">Critical only</option>
+                  <option value="4">High and above</option>
+                  <option value="3">Moderate and above</option>
+                  <option value="2">Low and above</option>
+                </select>
+              </label>
+              <label>
+                Sort By
+                <select id="operationsSort">
+                  <option value="urgency">Urgency</option>
+                  <option value="beneficiaries">Beneficiaries</option>
+                  <option value="zone">District</option>
+                  <option value="recent">Most recent</option>
+                </select>
+              </label>
+            </div>
+            <div class="split-grid">
+              <label>
+                Approval
+                <select id="operationsApprovalFilter">
+                  <option value="">All approvals</option>
+                  <option value="pending">Pending</option>
+                  <option value="approved">Approved</option>
+                  <option value="rejected">Rejected</option>
+                </select>
+              </label>
+              <label>
+                Workflow
+                <select id="operationsStatusFilter">
+                  <option value="">All workflow stages</option>
+                  <option value="pending">Pending</option>
+                  <option value="assigned">Assigned</option>
+                  <option value="in-progress">In Progress</option>
+                  <option value="delivered">Delivered</option>
+                  <option value="closed">Closed</option>
+                </select>
+              </label>
+            </div>
+          </div>
+        </article>
+
+        <article class="panel">
+          <p class="eyebrow">Operational Analytics</p>
+          <div id="opsCategoryChart" class="stack-list">
+            <div class="empty-box">Category demand chart will appear here.</div>
+          </div>
+          <div id="opsUrgencyChart" class="stack-list">
+            <div class="empty-box">Urgency pressure chart will appear here.</div>
+          </div>
+        </article>
+      </section>
+
+      <section class="dashboard-grid">
+        <article class="panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Add Request</p>
+              <h2>Community need intake</h2>
+            </div>
+            <button class="ghost-button" data-action="sample-request">Sample</button>
+          </div>
+          <p id="requestEditorStatus" class="card-meta">Create a new request</p>
+          <div id="operationsAccessNote" class="notice-box">
+            Coordinator or admin access is required for shared workspace management.
+          </div>
+
+          <form id="requestForm" class="form-grid" aria-label="Community request form">
+            <label>
+              Organization
+              <input name="organization" type="text" placeholder="Seva Relief Collective" required>
+            </label>
+            <label>
+              Request Title
+              <input name="title" type="text" placeholder="Food delivery support in East District" required>
+            </label>
+            <label>
+              Category
+              <select name="category" required>
+                <option value="">Choose category</option>
+                <option>Food Distribution</option>
+                <option>Medical Support</option>
+                <option>Shelter Support</option>
+                <option>Logistics</option>
+                <option>Education Outreach</option>
+                <option>Elder Care</option>
+              </select>
+            </label>
+            <div class="split-grid">
+              <label>
+                Urgency
+                <select name="urgency" required>
+                  <option value="5">Critical</option>
+                  <option value="4">High</option>
+                  <option value="3">Moderate</option>
+                  <option value="2">Low</option>
+                  <option value="1">Routine</option>
+                </select>
+              </label>
+              <label>
+                Volunteers Needed
+                <input name="peopleNeeded" type="number" min="1" max="20" value="3" required>
+              </label>
+            </div>
+            <div class="split-grid">
+              <label>
+                District
+                <select name="zone" required>
+                  <option value="">Choose district</option>
+                  <option>North</option>
+                  <option>South</option>
+                  <option>East</option>
+                  <option>West</option>
+                  <option>Central</option>
+                </select>
+              </label>
+              <label>
+                Location Or Address
+                <input name="location" type="text" placeholder="Kolkata Medical College area" required>
+              </label>
+            </div>
+            <div class="split-grid">
+              <label>
+                Beneficiaries
+                <input name="beneficiaries" type="number" min="1" value="50" required>
+              </label>
+              <label>
+                Shift Slot
+                <select name="shiftLabel">
+                  <option>Today - Morning</option>
+                  <option>Today - Afternoon</option>
+                  <option>Today - Evening</option>
+                  <option>Tomorrow - Morning</option>
+                  <option>Tomorrow - Afternoon</option>
+                  <option>Tomorrow - Evening</option>
+                </select>
+              </label>
+            </div>
+            <label>
+              Scenario Mode
+              <select name="scenario">
+                <option value="mixed">Mixed Response</option>
+                <option value="flood">Flood</option>
+                <option value="medical">Medical Camp</option>
+                <option value="shelter">Shelter</option>
+                <option value="food">Food Distribution</option>
+              </select>
+            </label>
+            <label>
+              Required Skills
+              <input name="skills" type="text" placeholder="first aid, logistics, driving" required>
+            </label>
+            <label>
+              Notes
+              <textarea name="notes" rows="4" placeholder="Describe the task, timing, and constraints."></textarea>
+            </label>
+            <div class="button-row">
+              <button class="primary-button" id="requestSubmitButton" type="submit">Save Request</button>
+              <button class="ghost-button" id="requestCancelButton" type="button" data-entity-action="cancel-request-edit" hidden>Cancel Edit</button>
+            </div>
+          </form>
+        </article>
+
+        <article class="panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Operations Alert</p>
+              <h2>Coordinator guidance</h2>
+            </div>
+            <span class="storage-pill" data-storage-mode>Local Mode</span>
+          </div>
+          <div id="operationsAlert" class="highlight-box">No guidance yet. Add data or load the demo to begin.</div>
+          <div id="operationsSummary" class="stack-list" aria-live="polite">
+            <div class="empty-box">Assignments will appear here after matching runs.</div>
+          </div>
+        </article>
+      </section>
+
+      <section class="impact-grid" aria-label="Real-world impact evidence">
+        <article class="impact-card">
+          <span class="mini-label">Volunteer Hours</span>
+          <strong id="impactHours">0 hrs</strong>
+          <p>Estimated hours mobilized for current assignments.</p>
+        </article>
+        <article class="impact-card">
+          <span class="mini-label">Response Time Saved</span>
+          <strong id="impactResponseTime">0 min</strong>
+          <p>Estimated minutes saved by faster matching and prioritization.</p>
+        </article>
+        <article class="impact-card">
+          <span class="mini-label">Fairness Watch</span>
+          <strong id="impactFairness">Balanced</strong>
+          <p>Checks whether zone coverage is becoming uneven.</p>
+        </article>
+        <article class="impact-card">
+          <span class="mini-label">Cause Alignment</span>
+          <strong id="impactCauseFit">Loading</strong>
+          <p>Summarizes live impact against the selected social problem.</p>
+        </article>
+      </section>
+
+      <section class="two-column">
+        <article class="panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Approval Queue</p>
+              <h2>Approve or reject incoming requests</h2>
+            </div>
+            <button class="ghost-button" data-action="undo-archive">Undo Last Archive</button>
+          </div>
+          <div id="approvalQueue" class="stack-list">
+            <div class="empty-box">Pending requests will appear here for coordinator approval.</div>
+          </div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Shift Planning</p>
+              <h2>Day-wise response calendar</h2>
+            </div>
+          </div>
+          <div id="shiftPlanner" class="stack-list">
+            <div class="empty-box">Shift slots will appear here after requests and assignments are loaded.</div>
+          </div>
+        </article>
+      </section>
+
+      <section class="two-column">
+        <article class="panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Requests Board</p>
+              <h2>Current needs</h2>
+            </div>
+          </div>
+          <div id="requestsBoard" class="stack-list">
+            <div class="empty-box">No requests in the workspace yet.</div>
+          </div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Assignments Board</p>
+              <h2>Volunteer matches</h2>
+            </div>
+          </div>
+          <div id="assignmentsBoard" class="stack-list">
+            <div class="empty-box">Assignments will appear after matching.</div>
+          </div>
+        </article>
+      </section>
+
+      <details class="advanced-disclosure">
+        <summary>Advanced response tools</summary>
+
+        <section class="two-column">
+          <article class="panel">
+            <p class="eyebrow">Response Calendar</p>
+            <h2>Weekly shift and workload view</h2>
+            <div id="responseCalendar" class="stack-list">
+              <div class="empty-box">Calendar view will appear here after requests and assignments are loaded.</div>
+            </div>
+          </article>
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Operator Notes</p>
+                <h2>Pinned notes and handoff memory</h2>
+              </div>
+            </div>
+            <form id="opsNotesForm" class="form-grid" aria-label="Operator notes form">
+              <label>
+                Daily Briefing Note
+                <textarea name="briefing" rows="3" placeholder="Key update for the next operator shift"></textarea>
+              </label>
+              <label>
+                Handoff Note
+                <textarea name="handoff" rows="3" placeholder="What the next coordinator must know"></textarea>
+              </label>
+              <label>
+                Incident Note
+                <textarea name="incident" rows="3" placeholder="Route issue, shortage alert, or beneficiary concern"></textarea>
+              </label>
+              <div class="button-row">
+                <button class="primary-button" type="submit">Save Notes</button>
+              </div>
+            </form>
+          </article>
+        </section>
+
+        <section class="three-column">
+          <article class="panel">
+            <p class="eyebrow">Workflow Board</p>
+            <h2>Kanban-style request pipeline</h2>
+            <div id="workflowChart" class="stack-list">
+              <div class="empty-box">Workflow distribution will appear here.</div>
+            </div>
+          </article>
+          <article class="panel">
+            <p class="eyebrow">Scenario Mix</p>
+            <h2>Demand by response mode</h2>
+            <div id="scenarioChart" class="stack-list">
+              <div class="empty-box">Scenario mix will appear here.</div>
+            </div>
+          </article>
+          <article class="panel">
+            <p class="eyebrow">Volunteer Utilization</p>
+            <h2>Shift load and staffing pressure</h2>
+            <div id="volunteerUtilizationChart" class="stack-list">
+              <div class="empty-box">Volunteer utilization analytics will appear here.</div>
+            </div>
+          </article>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Kanban Workflow</p>
+              <h2>See every request by stage at a glance</h2>
+            </div>
+          </div>
+          <div id="workflowKanban" class="kanban-board">
+            <div class="empty-box">Workflow board will appear here.</div>
+          </div>
+        </section>
+
+        <section class="two-column">
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">AidFlow Forecast</p>
+                <h2>Predictive resource allocation</h2>
+              </div>
+            </div>
+            <div id="forecastBoard" class="stack-list">
+              <div class="empty-box">Forecasted shortages and pre-positioning suggestions will appear here.</div>
+            </div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Delivery Verification</p>
+                <h2>QR-ready field trail</h2>
+              </div>
+            </div>
+            <div id="verificationBoard" class="stack-list">
+              <div class="empty-box">Delivery tokens and verification trail will appear here.</div>
+            </div>
+            <div id="qrPreviewPanel" class="stack-list">
+              <div class="empty-box">Select a token to preview its QR code.</div>
+            </div>
+          </article>
+        </section>
+
+        <section class="two-column">
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">QR Verification Scanner</p>
+                <h2>Scan a delivery token</h2>
+              </div>
+            </div>
+            <form id="qrVerifyForm" class="form-grid" aria-label="QR verification form">
+              <label>
+                Upload QR Image
+                <input id="qrScanFile" name="qrScanFile" type="file" accept="image/*">
+              </label>
+              <label>
+                Or Enter Token Manually
+                <input id="qrManualToken" name="qrManualToken" type="text" placeholder="RF-EAS-AB12">
+              </label>
+              <button class="primary-button" type="submit">Verify Token</button>
+            </form>
+            <div id="qrScanResult" class="highlight-box">Scan result will appear here.</div>
+          </article>
+
+          <article class="panel">
+            <p class="eyebrow">Printable Situation Report</p>
+            <div id="printReportSummary" class="stack-list">
+              <div class="empty-box">The report summary will update as requests, assignments, and forecasts change.</div>
+            </div>
+          </article>
+        </section>
+
+        <section class="two-column">
+          <article class="panel">
+            <p class="eyebrow">Notification Center</p>
+            <h2>Free browser-safe reminders and alerts</h2>
+            <div id="notificationCenter" class="stack-list">
+              <div class="empty-box">Assignments, reminders, and alerts will appear here.</div>
+            </div>
+          </article>
+
+          <article class="panel">
+            <p class="eyebrow">Field Collaboration</p>
+            <h2>Daily briefing, handoff, and incident notes</h2>
+            <div id="dailyBriefingPanel" class="stack-list">
+              <div class="empty-box">Daily briefing notes will appear here.</div>
+            </div>
+            <div id="handoffNotesPanel" class="stack-list">
+              <div class="empty-box">Operator handoff notes will appear here.</div>
+            </div>
+            <div id="incidentLogPanel" class="stack-list">
+              <div class="empty-box">Incident log entries will appear here.</div>
+            </div>
+          </article>
+        </section>
+
+        <section class="two-column">
+          <article class="panel">
+            <p class="eyebrow">Zone Coverage</p>
+            <div id="zoneCoverageList" class="stack-list">
+              <div class="empty-box">Zone coverage evidence will appear here.</div>
+            </div>
+          </article>
+          <article class="panel">
+            <p class="eyebrow">Maps-Ready Dispatch</p>
+            <div id="mapsDispatchList" class="stack-list">
+              <div class="empty-box">Google Maps dispatch links will appear here.</div>
+            </div>
+            <div id="routeClusterList" class="stack-list">
+              <div class="empty-box">Route clusters will appear here.</div>
+            </div>
+          </article>
+        </section>
+
+        <section class="two-column">
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Cloud Evidence Uploads</p>
+                <h2>Upload proofs, photos, and field documents</h2>
+              </div>
+            </div>
+            <form id="artifactForm" class="form-grid" aria-label="Artifact upload form">
+              <div class="split-grid">
+                <label>
+                  Artifact Type
+                  <select name="artifactType" required>
+                    <option value="field-photo">Field Photo</option>
+                    <option value="request-proof">Request Proof</option>
+                    <option value="volunteer-proof">Volunteer Proof</option>
+                    <option value="report">Report / PDF</option>
+                  </select>
+                </label>
+                <label>
+                  Related Record
+                  <input name="relatedTo" type="text" placeholder="East meal distribution" required>
+                </label>
+              </div>
+              <label>
+                Notes
+                <input name="artifactNotes" type="text" placeholder="Proof of meal kit dispatch">
+              </label>
+              <label>
+                File
+                <input name="artifactFile" type="file" accept=".png,.jpg,.jpeg,.pdf,.txt" required>
+              </label>
+              <button class="primary-button" type="submit">Upload To Cloud Storage</button>
+            </form>
+            <div id="artifactUploadStatus" class="subtle-banner">Sign in to upload evidence into Cloud Storage.</div>
+            <div id="artifactList" class="stack-list">
+              <div class="empty-box">Uploaded artifacts will appear here.</div>
+            </div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Live Route Planner</p>
+                <h2>Google Maps routing for top dispatch</h2>
+              </div>
+              <button class="ghost-button" data-action="refresh-route">Refresh Route</button>
+            </div>
+            <div id="routeSummary" class="highlight-box">Route summary will appear here when assignments and map access are available.</div>
+            <div id="routeMap" class="route-map" aria-label="Route map view"></div>
+          </article>
+        </section>
+
+        <section class="two-column">
+          <article class="panel">
+            <p class="eyebrow">Collaboration Timeline</p>
+            <h2>Live team activity log</h2>
+            <div id="collabTimeline" class="stack-list">
+              <div class="empty-box">Collaboration events appear here after actions are performed.</div>
+            </div>
+          </article>
+          <article class="panel">
+            <p class="eyebrow">Sync Health</p>
+            <h2>Submission-safe reliability checks</h2>
+            <div id="syncHealth" class="sys-grid">
+              <div class="empty-box">Sync health indicators will appear here.</div>
+            </div>
+          </article>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Archive Safety</p>
+              <h2>Archived requests and volunteers</h2>
+            </div>
+          </div>
+          <div id="archivedOverview" class="stack-list">
+            <div class="empty-box">Archived records will appear here instead of being permanently deleted.</div>
+          </div>
+        </section>
+      </details>
+    </main>
+  </div>
+
+  <script src="./firebase-config.js?v=20260405-design6"></script>
+  <script src="./app.js?v=20260405-design6"></script>
+  <script src="./criteria.js"></script>
+</body>
+</html>
+

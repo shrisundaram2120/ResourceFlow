@@ -1,0 +1,160 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1A362D">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <title>ResourceFlow | Donation Portal</title>
+  <link rel="stylesheet" href="./styles.css?v=20260405-design6">
+</head>
+<body data-page="donations">
+  <a class="skip-link" href="#mainContent">Skip to content</a>
+  <div class="site-shell">
+    <header class="site-header">
+      <a class="brand" href="./overview.html" aria-label="ResourceFlow community portal">
+        <span class="brand-mark">RF</span>
+        <span>
+          <strong>ResourceFlow</strong>
+          <small>Donation Portal</small>
+        </span>
+      </a>
+
+      <nav class="site-nav" aria-label="Primary">
+        <a class="nav-link" data-nav="home" href="./overview.html">Community Portal</a>
+        <a class="nav-link" data-nav="operations" href="./operations.html">Operations</a>
+        <a class="nav-link" data-nav="volunteer" href="./volunteer.html">Volunteer Portal</a>
+        <a class="nav-link" data-nav="directory" href="./directory.html">Volunteer Directory</a>
+        <a class="nav-link" data-nav="donations" href="./donations.html">Donations</a>
+        <a class="nav-link" data-nav="admin" href="./admin.html">Admin</a>
+      </nav>
+
+      <div class="header-actions">
+        <a class="ghost-link" href="./admin.html">Admin Dashboard</a>
+        <a class="primary-link" href="./overview.html">Community Portal</a>
+      </div>
+    </header>
+
+    <main id="mainContent" class="page-stack" tabindex="-1">
+      <section class="page-intro">
+        <div>
+          <p class="eyebrow">Donation Portal</p>
+          <h1>Donate money or useful items into the shared NGO workflow.</h1>
+          <p class="lead">All donation records are stored in Firestore so admins can review them, update their status, and coordinate real handling.</p>
+        </div>
+        <div class="info-card">
+          <strong>Shared backend</strong>
+          <p>Money, clothes, food, books, and other useful items are stored permanently and shown in the admin dashboard.</p>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">Donation Forms</p>
+            <h2>Support the response with money or useful items</h2>
+          </div>
+          <a class="ghost-link" href="./admin.html">View Admin Dashboard</a>
+        </div>
+        <div class="donation-mode-switch" data-donation-mode-group aria-label="Donation mode switch">
+          <button class="mode-toggle-button is-active" type="button" data-donation-mode="money">Money Donation</button>
+          <button class="mode-toggle-button" type="button" data-donation-mode="item">Item Donation</button>
+        </div>
+        <div id="donationPortalStatus" class="notice-box">
+          Sign in to store donation records in Firestore and track their status.
+        </div>
+        <div class="two-column donation-forms-grid">
+          <article class="panel compact donation-mode-panel" data-donation-panel="money">
+            <p class="eyebrow">Money Donation</p>
+            <form id="moneyDonationForm" class="form-grid" aria-label="Money donation form">
+              <label>
+                Donor Name
+                <input name="donorName" type="text" placeholder="Aarav Mehta" required>
+              </label>
+              <div class="split-grid">
+                <label>
+                  Amount
+                  <input name="amount" type="number" min="1" step="1" placeholder="2500" required>
+                </label>
+                <label>
+                  Payment Method
+                  <select name="paymentMethod" required>
+                    <option value="">Choose method</option>
+                    <option>UPI</option>
+                    <option>Bank Transfer</option>
+                    <option>Card</option>
+                    <option>Cash</option>
+                    <option>Cheque</option>
+                  </select>
+                </label>
+              </div>
+              <label>
+                Message / Note
+                <textarea name="message" rows="4" placeholder="Add a note for the NGO or admin team."></textarea>
+              </label>
+              <button class="primary-button" type="submit">Save Money Donation</button>
+            </form>
+          </article>
+
+          <article class="panel compact donation-mode-panel" data-donation-panel="item" hidden>
+            <p class="eyebrow">Item Donation</p>
+            <form id="itemDonationForm" class="form-grid" aria-label="Item donation form">
+              <label>
+                Donor Name
+                <input name="donorName" type="text" placeholder="Diya Raman" required>
+              </label>
+              <div class="split-grid">
+                <label>
+                  Item Type
+                  <select name="itemType" required>
+                    <option value="">Choose item type</option>
+                    <option>Clothes</option>
+                    <option>Food</option>
+                    <option>Books</option>
+                    <option>Other Useful Items</option>
+                  </select>
+                </label>
+                <label>
+                  Quantity
+                  <input name="quantity" type="number" min="1" step="1" placeholder="12" required>
+                </label>
+              </div>
+              <label>
+                Description
+                <textarea name="description" rows="4" placeholder="Winter jackets, dry ration kits, school books, or other useful items." required></textarea>
+              </label>
+              <label>
+                Contact Details
+                <input name="contactDetails" type="text" placeholder="+91 98765 43210 | donor@example.com" required>
+              </label>
+              <button class="primary-button" type="submit">Save Item Donation</button>
+            </form>
+          </article>
+        </div>
+      </section>
+
+      <section class="two-column">
+        <article class="panel compact">
+          <p class="eyebrow">Donation Summary</p>
+          <div id="donationSummaryGrid" class="shared-metric-grid" aria-live="polite">
+            <div class="empty-box">Your shared donation summary will appear here after sign-in.</div>
+          </div>
+        </article>
+
+        <article class="panel compact">
+          <p class="eyebrow">Recent Donation Records</p>
+          <div id="donationHistoryList" class="stack-list" aria-live="polite">
+            <div class="empty-box">Recent donation records from your account will appear here.</div>
+          </div>
+        </article>
+      </section>
+    </main>
+  </div>
+
+  <script src="./firebase-config.js?v=20260405-design6"></script>
+  <script src="./app.js?v=20260405-design6"></script>
+  <script src="./resourceflow-shared.js?v=20260405-design6"></script>
+  <script src="./criteria.js?v=20260402-rolelock2"></script>
+</body>
+</html>
+

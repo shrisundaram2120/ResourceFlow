@@ -1,0 +1,373 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="ResourceFlow overview workspace.">
+  <meta name="theme-color" content="#1A362D">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <title>ResourceFlow | Community Portal</title>
+  <link rel="stylesheet" href="./styles.css?v=20260405-design6">
+</head>
+<body data-page="home">
+  <a class="skip-link" href="#mainContent">Skip to content</a>
+
+  <div class="site-shell">
+    <header class="site-header">
+      <a class="brand" href="./overview.html" aria-label="ResourceFlow community portal">
+        <span class="brand-mark">RF</span>
+        <span>
+          <strong>ResourceFlow</strong>
+          <small>Google Solution Challenge App</small>
+        </span>
+      </a>
+
+      <nav class="site-nav" aria-label="Primary">
+        <a class="nav-link" data-nav="home" href="./overview.html">Community Portal</a>
+        <a class="nav-link" data-nav="operations" href="./operations.html">Operations</a>
+        <a class="nav-link" data-nav="volunteer" href="./volunteer.html">Volunteer Portal</a>
+        <a class="nav-link" data-nav="directory" href="./directory.html">Volunteer Directory</a>
+        <a class="nav-link" data-nav="donations" href="./donations.html">Donations</a>
+        <a class="nav-link" data-nav="insights" href="./insights.html">AI Insights</a>
+        <a class="nav-link" data-nav="admin" href="./admin.html">Admin</a>
+        <a class="nav-link" data-nav="judge" href="./judge.html">Judge Mode</a>
+      </nav>
+
+      <div class="header-actions">
+        <button class="ghost-button" data-action="seed-demo">Load Demo</button>
+        <a class="ghost-link" href="./directory.html">Volunteer Directory</a>
+        <a class="ghost-link" href="./donations.html">Donation Portal</a>
+        <a class="primary-link" id="overviewEntryLink" data-access-page="home" href="./overview.html">Open App</a>
+      </div>
+    </header>
+
+    <main id="mainContent" class="page-stack" tabindex="-1">
+      <section class="hero-card">
+        <div class="hero-copy">
+          <p class="eyebrow">Smart Resource Allocation</p>
+          <h1>Move from chaotic coordination to visible, data-driven response.</h1>
+          <p class="lead">
+            ResourceFlow centralizes requests, volunteers, approvals, assignment tracking, and impact proof so community organizations can respond faster and more clearly.
+          </p>
+          <div class="button-row">
+            <a class="primary-link" id="overviewPrimaryAction" data-access-page="operations" href="./operations.html">Go To Command Center</a>
+            <a class="ghost-link" id="overviewSecondaryAction" data-access-page="judge" href="./judge.html">Open Judge Mode</a>
+          </div>
+          <ul class="hero-points">
+            <li>Capture and approve requests in one place</li>
+            <li>Match volunteers by skills, district, and availability</li>
+            <li>Track delivery, operations, and measurable public impact</li>
+          </ul>
+        </div>
+
+        <div class="hero-side">
+          <article class="signal-card">
+            <span class="mini-label">Storage Mode</span>
+            <strong data-storage-mode>Checking...</strong>
+            <p data-sync-note>Preparing workspace data.</p>
+          </article>
+          <article class="signal-card warm">
+            <span class="mini-label">AI Copilot</span>
+            <strong id="homeInsightTitle">Waiting for live data</strong>
+            <p id="homeInsightText">Load demo data or add real requests to generate coordinator guidance.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="stats-grid" aria-label="Impact summary">
+        <article class="stat-card">
+          <span>Total Requests</span>
+          <strong id="metricRequests">0</strong>
+          <small>Community tasks captured</small>
+        </article>
+        <article class="stat-card">
+          <span>Volunteers Ready</span>
+          <strong id="metricVolunteers">0</strong>
+          <small>Available responders</small>
+        </article>
+        <article class="stat-card">
+          <span>Assignments</span>
+          <strong id="metricAssignments">0</strong>
+          <small>Auto-generated matches</small>
+        </article>
+        <article class="stat-card">
+          <span>Beneficiaries</span>
+          <strong id="metricBeneficiaries">0</strong>
+          <small>Projected people supported</small>
+        </article>
+      </section>
+
+      <section id="donationPortal" class="panel">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">Donation Portal</p>
+            <h2>Record money and item donations in the shared backend</h2>
+          </div>
+          <a class="ghost-link" href="./admin.html">Open Admin Dashboard</a>
+        </div>
+        <div id="donationPortalStatus" class="notice-box">
+          Sign in to store donation records in Firestore and track their status across the platform.
+        </div>
+        <div class="two-column donation-forms-grid">
+          <article class="panel compact">
+            <p class="eyebrow">Money Donation</p>
+            <form id="moneyDonationForm" class="form-grid" aria-label="Money donation form">
+              <label>
+                Donor Name
+                <input name="donorName" type="text" placeholder="Aarav Mehta" required>
+              </label>
+              <div class="split-grid">
+                <label>
+                  Amount
+                  <input name="amount" type="number" min="1" step="1" placeholder="2500" required>
+                </label>
+                <label>
+                  Payment Method
+                  <select name="paymentMethod" required>
+                    <option value="">Choose method</option>
+                    <option>UPI</option>
+                    <option>Bank Transfer</option>
+                    <option>Card</option>
+                    <option>Cash</option>
+                    <option>Cheque</option>
+                  </select>
+                </label>
+              </div>
+              <label>
+                Message / Note
+                <textarea name="message" rows="4" placeholder="Add a note for the receiving NGO or admin team."></textarea>
+              </label>
+              <button class="primary-button" type="submit">Save Money Donation</button>
+            </form>
+          </article>
+
+          <article class="panel compact">
+            <p class="eyebrow">Item Donation</p>
+            <form id="itemDonationForm" class="form-grid" aria-label="Item donation form">
+              <label>
+                Donor Name
+                <input name="donorName" type="text" placeholder="Diya Raman" required>
+              </label>
+              <div class="split-grid">
+                <label>
+                  Item Type
+                  <select name="itemType" required>
+                    <option value="">Choose item type</option>
+                    <option>Clothes</option>
+                    <option>Food</option>
+                    <option>Books</option>
+                    <option>Other Useful Items</option>
+                  </select>
+                </label>
+                <label>
+                  Quantity
+                  <input name="quantity" type="number" min="1" step="1" placeholder="12" required>
+                </label>
+              </div>
+              <label>
+                Description
+                <textarea name="description" rows="4" placeholder="Winter jackets for children, dry ration kits, school books, or other useful items." required></textarea>
+              </label>
+              <label>
+                Contact Details
+                <input name="contactDetails" type="text" placeholder="+91 98765 43210 | donor@example.com" required>
+              </label>
+              <button class="primary-button" type="submit">Save Item Donation</button>
+            </form>
+          </article>
+        </div>
+        <div id="donationSummaryGrid" class="shared-metric-grid" aria-live="polite">
+          <div class="empty-box">Your shared donation summary will appear here after sign-in.</div>
+        </div>
+        <div id="donationHistoryList" class="stack-list" aria-live="polite">
+          <div class="empty-box">Recent donation records from your account will appear here.</div>
+        </div>
+      </section>
+
+      <section class="two-column portal-split">
+        <article class="panel compact portal-sidebar-panel">
+          <p class="eyebrow">Portal Sidebar</p>
+          <h2>See this role's lane before you demo</h2>
+          <div id="homePortalSidebar" class="stack-list">
+            <div class="empty-box">Role guidance for this portal will appear here.</div>
+          </div>
+        </article>
+
+        <article class="panel compact demo-walkthrough-panel">
+          <p class="eyebrow">Live Demo Walkthrough</p>
+          <h2>Show the disaster story step by step</h2>
+          <div id="demoWalkthroughPanel" class="stack-list">
+            <div class="empty-box">The live walkthrough will appear here after the demo is loaded.</div>
+          </div>
+          <div id="homeDemandChart" class="stack-list">
+            <div class="empty-box">District demand chart will appear here.</div>
+          </div>
+        </article>
+      </section>
+
+      <section class="two-column">
+        <article class="panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Role Dashboard</p>
+              <h2>Each portal now feels different on purpose</h2>
+            </div>
+            <a class="ghost-link" href="./index.html">Back To Sign In</a>
+          </div>
+          <div id="homeRoleDashboard" class="stack-list">
+            <div class="empty-box">Role-specific dashboard summaries will appear here.</div>
+          </div>
+        </article>
+
+        <article class="panel compact">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Access Map</p>
+              <h2>What each portal can open</h2>
+            </div>
+          </div>
+          <div id="homeRoleAccessGrid" class="stack-list">
+            <div class="empty-box">Portal access rules will appear here.</div>
+          </div>
+        </article>
+      </section>
+
+      <section class="two-column">
+        <article class="panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Community Request Form</p>
+              <h2>Let citizens or NGOs raise a support request</h2>
+            </div>
+          </div>
+          <div id="communityRequestStatus" class="notice-box">
+            Community users can submit a support request here. Operators will see it in the review queue.
+          </div>
+          <form id="communityRequestForm" class="form-grid" aria-label="Community request form">
+            <div class="split-grid">
+              <label>
+                Request Title
+                <input name="title" type="text" placeholder="Emergency food kits for flooded streets" required>
+              </label>
+              <label>
+                Category
+                <select name="category" required>
+                  <option value="">Choose category</option>
+                  <option>Food Distribution</option>
+                  <option>Medical Support</option>
+                  <option>Shelter Support</option>
+                  <option>Logistics</option>
+                  <option>Education Outreach</option>
+                  <option>Elder Care</option>
+                </select>
+              </label>
+            </div>
+            <div class="split-grid">
+              <label>
+                District
+                <select name="zone" required>
+                  <option value="">Choose district</option>
+                  <option>North</option>
+                  <option>South</option>
+                  <option>East</option>
+                  <option>West</option>
+                  <option>Central</option>
+                </select>
+              </label>
+              <label>
+                Locality / Address
+                <input name="location" type="text" placeholder="Velachery, Chennai" required>
+              </label>
+            </div>
+            <div class="split-grid">
+              <label>
+                Urgency
+                <select name="urgency" required>
+                  <option value="5">Critical</option>
+                  <option value="4">High</option>
+                  <option value="3">Moderate</option>
+                  <option value="2">Low</option>
+                  <option value="1">Routine</option>
+                </select>
+              </label>
+              <label>
+                Beneficiaries
+                <input name="beneficiaries" type="number" min="1" value="40" required>
+              </label>
+            </div>
+            <label>
+              Help Needed
+              <input name="skills" type="text" placeholder="meal delivery, first aid, transport">
+            </label>
+            <label>
+              Notes
+              <textarea name="notes" rows="4" placeholder="Briefly explain what support is needed and what has already been affected." required></textarea>
+            </label>
+            <button class="primary-button" type="submit">Submit Community Request</button>
+          </form>
+          <div id="communityRequestTracker" class="stack-list">
+            <div class="empty-box">Submitted community requests and status updates will appear here.</div>
+          </div>
+          <div id="communityRequestFeed" class="stack-list">
+            <div class="empty-box">Latest community requests will appear here.</div>
+          </div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Demo Story</p>
+              <h2>Show the disaster scenario, the AI steps, and the live activity</h2>
+            </div>
+          </div>
+          <div id="demoStoryPanel" class="stack-list">
+            <div class="empty-box">The guided demo story will appear here after you load a scenario.</div>
+          </div>
+          <div id="homeActivity" class="stack-list">
+            <div class="empty-box">Live activity and demo timeline will appear here.</div>
+          </div>
+        </article>
+      </section>
+
+      <section class="three-column">
+        <article class="panel compact">
+          <p class="eyebrow">Search Workspace</p>
+          <h2>Find requests, volunteers, and alerts quickly</h2>
+          <label class="full-width-field">
+            <span class="sr-only">Search workspace</span>
+            <input id="homeGlobalSearch" type="text" placeholder="Search by district, volunteer, request, or alert">
+          </label>
+          <div id="globalSearchResults" class="stack-list">
+            <div class="empty-box">Search results will appear here.</div>
+          </div>
+        </article>
+
+        <article class="panel compact">
+          <p class="eyebrow">Accessibility + Install</p>
+          <h2>Explain why the product is practical</h2>
+          <div id="homeAccessibilityPanel" class="stack-list">
+            <div class="empty-box">Accessibility and trust cards will appear here.</div>
+          </div>
+          <div id="homePwaPanel" class="stack-list">
+            <div class="empty-box">Install and offline-readiness details will appear here.</div>
+          </div>
+        </article>
+
+        <article class="panel compact">
+          <p class="eyebrow">Judge + NGO Story</p>
+          <h2>Why this solution deserves attention</h2>
+          <div id="guidedDemoPanel" class="stack-list">
+            <div class="empty-box">Judge walkthrough cards will appear here.</div>
+          </div>
+        </article>
+      </section>
+    </main>
+  </div>
+
+  <script src="./firebase-config.js?v=20260405-design6"></script>
+  <script src="./app.js?v=20260405-design6"></script>
+  <script src="./resourceflow-shared.js?v=20260405-design6"></script>
+  <script src="./criteria.js?v=20260402-rolelock2"></script>
+</body>
+</html>
+

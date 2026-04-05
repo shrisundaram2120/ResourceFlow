@@ -1,0 +1,216 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdminEmail() {
+      return signedIn() && request.auth.token.email == "acshrisundaram@gmail.com";
+    }
+
+    function currentProfileRole() {
+      return signedIn() && exists(/databases/$(database)/documents/resourceflowUsers/$(request.auth.uid))
+        ? get(/databases/$(database)/documents/resourceflowUsers/$(request.auth.uid)).data.role
+        : "volunteer";
+    }
+
+    function canManageWorkspace() {
+      return isAdminEmail()
+        || (signedIn() && (
+          currentProfileRole() == "admin" || currentProfileRole() == "coordinator"
+        ));
+    }
+
+    function validVolunteerProfile() {
+      return request.resource.data.keys().hasOnly([
+          "id",
+          "ownerUid",
+          "fullName",
+          "ngoGroup",
+          "skills",
+          "phone",
+          "email",
+          "availability",
+          "location",
+          "activityStatus",
+          "createdAt",
+          "updatedAt",
+          "updatedBy"
+        ])
+        && request.resource.data.id is string
+        && request.resource.data.ownerUid is string
+        && request.resource.data.fullName is string
+        && request.resource.data.ngoGroup is string
+        && request.resource.data.skills is list
+        && request.resource.data.phone is string
+        && request.resource.data.email is string
+        && request.resource.data.availability is string
+        && request.resource.data.location is string
+        && request.resource.data.activityStatus is string
+        && request.resource.data.createdAt is string
+        && request.resource.data.updatedAt is string
+        && request.resource.data.updatedBy is string
+        && request.resource.data.activityStatus in ["available", "on call", "active", "inactive"];
+    }
+
+    function validDonationRecord() {
+      return request.resource.data.keys().hasOnly([
+          "ownerUid",
+          "ownerEmail",
+          "donorName",
+          "kind",
+          "amount",
+          "paymentMethod",
+          "message",
+          "itemType",
+          "quantity",
+          "description",
+          "contactDetails",
+          "status",
+          "createdAt",
+          "updatedAt",
+          "updatedBy"
+        ])
+        && request.resource.data.ownerUid is string
+        && request.resource.data.ownerEmail is string
+        && request.resource.data.donorName is string
+        && request.resource.data.kind is string
+        && request.resource.data.amount is int
+        && request.resource.data.paymentMethod is string
+        && request.resource.data.message is string
+        && request.resource.data.itemType is string
+        && request.resource.data.quantity is int
+        && request.resource.data.description is string
+        && request.resource.data.contactDetails is string
+        && request.resource.data.status is string
+        && request.resource.data.createdAt is string
+        && request.resource.data.updatedAt is string
+        && request.resource.data.updatedBy is string
+        && request.resource.data.kind in ["money", "item"]
+        && request.resource.data.status in ["submitted", "reviewing", "scheduled", "received", "completed"];
+    }
+
+    function validWorkspacePayload() {
+      return request.resource.data.keys().hasOnly(["state", "updatedAt"])
+        && request.resource.data.state is map
+        && request.resource.data.state.keys().hasOnly([
+          "requests",
+          "volunteers",
+          "assignments",
+          "artifacts",
+          "activityLog",
+          "history",
+          "meta",
+          "lastUpdated"
+        ])
+        && request.resource.data.state.requests is list
+        && request.resource.data.state.volunteers is list
+        && request.resource.data.state.assignments is list
+        && request.resource.data.state.artifacts is list
+        && request.resource.data.state.activityLog is list
+        && request.resource.data.state.history is list
+        && request.resource.data.state.meta is map
+        && request.resource.data.state.meta.keys().hasOnly(["revision", "updatedBy", "updatedAt"])
+        && request.resource.data.state.meta.revision is int
+        && request.resource.data.state.meta.updatedBy is string
+        && request.resource.data.state.meta.updatedAt is string
+        && request.resource.data.state.lastUpdated is string
+        && request.resource.data.updatedAt is string;
+    }
+
+    function validProfileShape(userId) {
+      return request.resource.data.keys().hasOnly([
+        "uid",
+        "email",
+        "displayName",
+        "photoURL",
+        "location",
+        "role",
+        "requestedRole",
+        "updatedAt",
+        "updatedBy"
+      ])
+        && request.resource.data.uid == userId
+        && request.resource.data.email is string
+        && request.resource.data.displayName is string
+        && request.resource.data.photoURL is string
+        && request.resource.data.location is string
+        && request.resource.data.role is string
+        && request.resource.data.requestedRole is string
+        && request.resource.data.updatedAt is string
+        && request.resource.data.updatedBy is string
+        && request.resource.data.role in ["user", "volunteer", "government", "coordinator", "admin"]
+        && request.resource.data.requestedRole in ["user", "volunteer", "government", "coordinator", "admin"];
+    }
+
+    match /resourceflow/{workspaceId} {
+      allow read: if true;
+      allow create, update: if signedIn() && validWorkspacePayload();
+      allow delete: if canManageWorkspace();
+    }
+
+    match /resourceflowUsers/{userId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.auth.uid == userId
+        && validProfileShape(userId)
+        && (
+          request.resource.data.role in ["user", "volunteer", "government", "coordinator"]
+          || (request.resource.data.role == "admin" && isAdminEmail())
+        );
+      allow update: if validProfileShape(userId) && (
+        (signedIn()
+          && request.auth.uid == userId
+          && (
+            request.resource.data.role == resource.data.role
+            || request.resource.data.role in ["user", "volunteer", "government", "coordinator"]
+          ))
+        || isAdminEmail()
+      );
+      allow delete: if isAdminEmail();
+    }
+
+    match /resourceflowVolunteerProfiles/{volunteerId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.auth.uid == volunteerId
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.id == volunteerId
+        && validVolunteerProfile();
+      allow update: if validVolunteerProfile()
+        && (
+          (signedIn()
+            && request.auth.uid == volunteerId
+            && request.resource.data.ownerUid == request.auth.uid)
+          || canManageWorkspace()
+        );
+      allow delete: if canManageWorkspace();
+    }
+
+    match /resourceflowDonations/{donationId} {
+      allow create: if signedIn()
+        && request.resource.data.ownerUid == request.auth.uid
+        && validDonationRecord();
+      allow read: if signedIn()
+        && (
+          request.auth.uid == resource.data.ownerUid
+          || canManageWorkspace()
+        );
+      allow update: if canManageWorkspace() && validDonationRecord();
+      allow delete: if canManageWorkspace();
+    }
+
+    match /resourceflowNotifications/{notificationId} {
+      allow read, write: if false;
+    }
+
+    match /resourceflowErrorLogs/{errorId} {
+      allow read, write: if false;
+    }
+
+    match /resourceflowAudit/{auditId} {
+      allow read, write: if false;
+    }
+  }
+}

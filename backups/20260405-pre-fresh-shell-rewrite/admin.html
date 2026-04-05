@@ -1,0 +1,558 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1A362D">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <title>ResourceFlow | Admin</title>
+  <link rel="stylesheet" href="./styles.css?v=20260405-design6">
+  <style>
+    body[data-page="admin"] .section-hint {
+      margin: 10px 0 0;
+      max-width: 58ch;
+      color: #5f5952;
+      line-height: 1.65;
+    }
+
+    body[data-page="admin"] .portal-sidebar-panel .stack-card strong,
+    body[data-page="admin"] .shared-card-head strong {
+      color: #1c1c19;
+      font-size: 1.08rem;
+      line-height: 1.2;
+    }
+
+    body[data-page="admin"] .portal-sidebar-panel .stack-card .card-meta,
+    body[data-page="admin"] .shared-subtitle,
+    body[data-page="admin"] .shared-metric-card .shared-metric-label,
+    body[data-page="admin"] .shared-metric-card .shared-metric-meta,
+    body[data-page="admin"] .shared-detail-item .shared-detail-label,
+    body[data-page="admin"] .outreach-form label,
+    body[data-page="admin"] .outreach-form .chip-row {
+      color: #5f5952;
+    }
+
+    body[data-page="admin"] .shared-record-card .shared-detail-item {
+      background: #faf7f2;
+      border: 1px solid #e5e4e0;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.84);
+    }
+
+    body[data-page="admin"] .shared-detail-item .shared-detail-label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 0.72rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #7a746b;
+    }
+
+    body[data-page="admin"] .shared-detail-item .shared-detail-value,
+    body[data-page="admin"] .shared-metric-card .shared-metric-value {
+      color: #1c1c19;
+      line-height: 1.45;
+    }
+
+    body[data-page="admin"] .shared-metric-card .shared-metric-label {
+      display: block;
+      font-size: 0.78rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    body[data-page="admin"] .shared-metric-card .shared-metric-value {
+      display: block;
+      margin-top: 10px;
+      font-size: clamp(2rem, 4vw, 2.8rem);
+      line-height: 1;
+    }
+
+    body[data-page="admin"] .shared-metric-card .shared-metric-meta {
+      display: block;
+      margin-top: 10px;
+      line-height: 1.55;
+    }
+
+    body[data-page="admin"] .shared-card-head .storage-pill,
+    body[data-page="admin"] .shared-card-head .record-status-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 40px;
+      padding: 9px 14px;
+      border-radius: 999px;
+      font-size: 0.82rem;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      white-space: nowrap;
+      border: 1px solid transparent;
+    }
+
+    body[data-page="admin"] .record-status-pill-success,
+    body[data-page="admin"] .shared-card-head .storage-pill[data-tone="success"] {
+      background: rgba(40, 126, 92, 0.12);
+      color: #21684d;
+      border-color: rgba(40, 126, 92, 0.16);
+    }
+
+    body[data-page="admin"] .record-status-pill-pending,
+    body[data-page="admin"] .shared-card-head .storage-pill[data-tone="pending"] {
+      background: rgba(194, 89, 52, 0.12);
+      color: #9e4e31;
+      border-color: rgba(194, 89, 52, 0.16);
+    }
+
+    body[data-page="admin"] .record-status-pill-muted,
+    body[data-page="admin"] .shared-card-head .storage-pill[data-tone="muted"] {
+      background: rgba(99, 94, 87, 0.10);
+      color: #5f5952;
+      border-color: rgba(99, 94, 87, 0.14);
+    }
+
+    body[data-page="admin"] .outreach-form {
+      gap: 16px;
+    }
+
+    body[data-page="admin"] .outreach-form label {
+      padding: 14px 16px;
+      border-radius: 20px;
+      border: 1px solid #e5e4e0;
+      background: linear-gradient(180deg, rgba(250, 247, 242, 0.96), rgba(255, 255, 255, 0.96));
+    }
+
+    body[data-page="admin"] .outreach-form .chip-row {
+      padding: 12px 14px;
+      border-radius: 18px;
+      border: 1px solid #e5e4e0;
+      background: rgba(250, 247, 242, 0.94);
+    }
+
+    body[data-page="admin"] .outreach-form .chip-row label {
+      padding: 0;
+      border: 0;
+      background: transparent;
+    }
+
+    html.rf-theme-dark body[data-page="admin"] .section-hint,
+    html.rf-theme-dark body[data-page="admin"] .portal-sidebar-panel .stack-card .card-meta,
+    html.rf-theme-dark body[data-page="admin"] .shared-subtitle,
+    html.rf-theme-dark body[data-page="admin"] .shared-metric-card .shared-metric-label,
+    html.rf-theme-dark body[data-page="admin"] .shared-metric-card .shared-metric-meta,
+    html.rf-theme-dark body[data-page="admin"] .shared-detail-item .shared-detail-label,
+    html.rf-theme-dark body[data-page="admin"] .outreach-form label,
+    html.rf-theme-dark body[data-page="admin"] .outreach-form .chip-row {
+      color: rgba(240, 233, 224, 0.82) !important;
+    }
+
+    html.rf-theme-dark body[data-page="admin"] .portal-sidebar-panel .stack-card strong,
+    html.rf-theme-dark body[data-page="admin"] .shared-card-head strong,
+    html.rf-theme-dark body[data-page="admin"] .shared-detail-item .shared-detail-value,
+    html.rf-theme-dark body[data-page="admin"] .shared-metric-card .shared-metric-value {
+      color: #fff !important;
+    }
+
+    html.rf-theme-dark body[data-page="admin"] .shared-record-card .shared-detail-item,
+    html.rf-theme-dark body[data-page="admin"] .outreach-form label,
+    html.rf-theme-dark body[data-page="admin"] .outreach-form .chip-row {
+      background: rgba(255, 255, 255, 0.04) !important;
+      border-color: rgba(255, 255, 255, 0.1) !important;
+      box-shadow: none !important;
+    }
+
+    html.rf-theme-dark body[data-page="admin"] .record-status-pill-success,
+    html.rf-theme-dark body[data-page="admin"] .shared-card-head .storage-pill[data-tone="success"] {
+      background: rgba(35, 185, 129, 0.18);
+      color: #dffcee;
+      border-color: rgba(35, 185, 129, 0.22);
+    }
+
+    html.rf-theme-dark body[data-page="admin"] .record-status-pill-pending,
+    html.rf-theme-dark body[data-page="admin"] .shared-card-head .storage-pill[data-tone="pending"] {
+      background: rgba(194, 89, 52, 0.18);
+      color: #ffe1d5;
+      border-color: rgba(194, 89, 52, 0.22);
+    }
+
+    html.rf-theme-dark body[data-page="admin"] .record-status-pill-muted,
+    html.rf-theme-dark body[data-page="admin"] .shared-card-head .storage-pill[data-tone="muted"] {
+      background: rgba(255, 255, 255, 0.08);
+      color: #f5efe7;
+      border-color: rgba(255, 255, 255, 0.12);
+    }
+  </style>
+</head>
+<body data-page="admin">
+  <a class="skip-link" href="#mainContent">Skip to content</a>
+  <div class="site-shell">
+    <header class="site-header">
+      <a class="brand" href="./overview.html" aria-label="ResourceFlow community portal">
+        <span class="brand-mark">RF</span>
+        <span>
+          <strong>ResourceFlow</strong>
+          <small>Admin Console</small>
+        </span>
+      </a>
+
+      <nav class="site-nav" aria-label="Primary">
+        <a class="nav-link" data-nav="home" href="./overview.html">Community Portal</a>
+        <a class="nav-link" data-nav="operations" href="./operations.html">Operations</a>
+        <a class="nav-link" data-nav="volunteer" href="./volunteer.html">Volunteer Portal</a>
+        <a class="nav-link" data-nav="directory" href="./directory.html">Volunteer Directory</a>
+        <a class="nav-link" data-nav="donations" href="./donations.html">Donations</a>
+        <a class="nav-link" data-nav="insights" href="./insights.html">AI Insights</a>
+        <a class="nav-link" data-nav="admin" href="./admin.html">Admin</a>
+        <a class="nav-link" data-nav="judge" href="./judge.html">Judge Mode</a>
+      </nav>
+
+      <div class="header-actions">
+        <button class="ghost-button" type="button" data-entity-action="refresh-admin">Refresh Snapshot</button>
+        <button class="ghost-button" type="button" data-action="export-governance">Export Governance</button>
+        <a class="ghost-link" href="./impact.html">Public Impact</a>
+        <a class="primary-link" href="./tests.html">Open Tests</a>
+      </div>
+    </header>
+
+    <main id="mainContent" class="page-stack" tabindex="-1">
+      <div id="announce" class="sr-only" aria-live="polite"></div>
+
+      <section class="page-intro">
+        <div>
+          <p class="eyebrow">Workspace Governance</p>
+          <h1>Manage roles, outreach drafts, and operational signals.</h1>
+        </div>
+        <div class="button-row">
+          <span class="storage-pill" id="adminRoleStatus">Guest access</span>
+          <span class="storage-pill" id="adminBackendStatus">Checking backend</span>
+        </div>
+      </section>
+
+      <section class="stats-grid role-stats">
+        <article class="stat-card role-stat-card">
+          <p class="eyebrow">Tracked Users</p>
+          <strong id="adminStatUsers">0</strong>
+          <p id="adminStatUsersText" class="card-meta">Profiles tracked across the workspace.</p>
+        </article>
+        <article class="stat-card role-stat-card">
+          <p class="eyebrow">Review Queue</p>
+          <strong id="adminStatReviews">0</strong>
+          <p id="adminStatReviewsText" class="card-meta">Role requests and risk items waiting for review.</p>
+        </article>
+        <article class="stat-card role-stat-card">
+          <p class="eyebrow">Outreach Drafts</p>
+          <strong id="adminStatDrafts">0</strong>
+          <p id="adminStatDraftsText" class="card-meta">Queued or drafted updates for operators and volunteers.</p>
+        </article>
+        <article class="stat-card role-stat-card">
+          <p class="eyebrow">Audit Signals</p>
+          <strong id="adminStatAudits">0</strong>
+          <p id="adminStatAuditsText" class="card-meta">Recent governance and workspace activity markers.</p>
+        </article>
+      </section>
+
+      <section class="admin-mini-nav">
+        <aside class="panel compact">
+          <p class="eyebrow">Admin Navigation</p>
+          <div class="mini-links">
+            <a href="#sharedAdminData">Shared Records</a>
+            <a href="#adminReviewList">Review Queue</a>
+            <a href="#adminUserList">User Roles</a>
+            <a href="#adminNotificationList">Outreach Drafts</a>
+            <a href="#adminAuditList">Audit Trail</a>
+            <a href="#adminArchiveList">Archive Restore</a>
+          </div>
+        </aside>
+
+        <article class="panel compact">
+          <p class="eyebrow">Admin Workspace</p>
+          <h2>Keep volunteers, donations, outreach, and governance in one trusted control center</h2>
+          <p class="card-meta">This console is designed as the operational oversight lane for NGO admins: review records, check audit signals, and manage role-sensitive actions without losing visibility of the field response.</p>
+          <div class="role-badge-strip">
+            <span class="chip">Volunteer oversight</span>
+            <span class="chip">Donation workflow</span>
+            <span class="chip">User review</span>
+            <span class="chip">Audit activity</span>
+          </div>
+        </article>
+      </section>
+
+      <section id="sharedAdminData" class="panel">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">Shared Backend Dashboard</p>
+            <h2>Manage volunteer profiles and donation records from Firestore</h2>
+          </div>
+          <a class="ghost-link" href="./donations.html">Open Donation Portal</a>
+        </div>
+        <div id="sharedAdminStatus" class="notice-box">
+          Admin or coordinator access is required to manage shared volunteer and donation records.
+        </div>
+        <div id="adminSharedSummary" class="shared-metric-grid" aria-live="polite">
+          <div class="empty-box">Shared backend metrics will appear here after admin sign-in.</div>
+        </div>
+        <div class="two-column">
+          <article class="panel compact">
+            <p class="eyebrow">Volunteer Activity Status</p>
+            <div id="adminVolunteerStatusBoard" class="shared-metric-grid" aria-live="polite">
+              <div class="empty-box">Volunteer activity status counts will appear here.</div>
+            </div>
+          </article>
+
+          <article class="panel compact">
+            <p class="eyebrow">Donation Workflow Status</p>
+            <div id="adminDonationStatusBoard" class="shared-metric-grid" aria-live="polite">
+              <div class="empty-box">Donation workflow status counts will appear here.</div>
+            </div>
+          </article>
+        </div>
+        <div class="two-column">
+          <article class="panel compact">
+            <p class="eyebrow">Volunteer Directory Records</p>
+            <p class="card-meta section-hint">Review volunteer names, NGO groups, skills, contact details, and live availability with clearer status labels.</p>
+            <div id="adminVolunteerRecords" class="shared-record-grid" aria-live="polite">
+              <div class="empty-box">Shared volunteer profiles will appear here.</div>
+            </div>
+          </article>
+
+          <article class="panel compact">
+            <p class="eyebrow">Donation Records</p>
+            <p class="card-meta section-hint">Track donor names, donation type, amount or quantity, contact details, and workflow status in one readable queue.</p>
+            <div id="adminDonationRecords" class="shared-record-grid" aria-live="polite">
+              <div class="empty-box">Shared donation records will appear here.</div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="two-column portal-split">
+        <article class="panel compact portal-sidebar-panel">
+          <p class="eyebrow">Sidebar</p>
+          <h2>Visible spaces and governance lane</h2>
+          <p class="card-meta section-hint">Use this sidebar summary to see which portal spaces are open, what is restricted, and what the live snapshot looks like right now.</p>
+          <div id="adminPortalSidebar" class="stack-list">
+            <div class="empty-box">Admin portal guidance will appear here.</div>
+          </div>
+        </article>
+
+        <article class="panel compact">
+          <p class="eyebrow">Governance Pulse</p>
+          <h2>Audit, review, and trust signals</h2>
+          <p class="card-meta section-hint">This panel highlights governance trends, role risk, outreach pressure, and audit activity in a clearer visual summary.</p>
+          <div id="adminAuditTrendChart" class="stack-list">
+            <div class="empty-box">Governance trend chart will appear here.</div>
+          </div>
+        </article>
+      </section>
+
+      <section class="three-column">
+        <article class="panel compact">
+          <p class="eyebrow">Audit Dashboard</p>
+          <h2>Signals that matter for governance</h2>
+          <div id="adminAuditDashboard" class="stack-list">
+            <div class="empty-box">Audit dashboard cards will appear here.</div>
+          </div>
+        </article>
+
+        <article class="panel compact">
+          <p class="eyebrow">User Review Snapshot</p>
+          <h2>Who needs approval or attention now</h2>
+          <div id="adminUserReviewSnapshot" class="stack-list">
+            <div class="empty-box">User review summary cards will appear here.</div>
+          </div>
+        </article>
+
+        <article class="panel compact">
+          <p class="eyebrow">Restricted Actions</p>
+          <h2>High-sensitivity controls at a glance</h2>
+          <div id="adminRestrictedActionsPanel" class="stack-list">
+            <div class="empty-box">Restricted admin actions and risk notes will appear here.</div>
+          </div>
+        </article>
+      </section>
+
+      <section class="two-column">
+        <article class="panel">
+          <p class="eyebrow">Admin Access</p>
+          <h2>Activate the configured admin profile</h2>
+          <p class="card-meta">
+            In Spark-safe mode, the configured admin email becomes the admin profile after sign-in. The button below simply refreshes that profile state.
+          </p>
+          <form id="bootstrapAdminForm" class="form-grid" aria-label="Bootstrap admin form">
+            <label>
+              Refresh Token
+              <input name="accessCode" type="password" placeholder="Optional in Spark-safe mode">
+            </label>
+            <button class="primary-button" type="submit">Refresh Admin Access</button>
+          </form>
+        </article>
+
+        <article class="panel">
+          <p class="eyebrow">Admin Snapshot</p>
+          <div id="adminSummary" class="highlight-box">Load the backend snapshot to inspect users, errors, notifications, and audit events.</div>
+        </article>
+      </section>
+
+      <section class="panel">
+        <p class="eyebrow">Review Queue</p>
+        <div id="adminReviewList" class="stack-list">
+          <div class="empty-box">High-risk and uncovered requests will appear here for admin review.</div>
+        </div>
+      </section>
+
+      <section class="two-column">
+        <article class="panel">
+          <p class="eyebrow">User Role Management</p>
+          <p class="card-meta section-hint">Review each signed-in user, their requested role, current access, district context, and approval state.</p>
+          <div id="adminUserList" class="stack-list">
+            <div class="empty-box">User roles will appear here after the backend snapshot loads.</div>
+          </div>
+        </article>
+
+        <article class="panel">
+          <p class="eyebrow">Outreach Center</p>
+          <p class="card-meta section-hint">Draft outreach updates with clear subject, message, and recipient blocks for email or WhatsApp delivery.</p>
+          <form id="notificationForm" class="form-grid outreach-form" aria-label="Notification queue form">
+            <label>
+              Subject
+              <input name="subject" type="text" placeholder="Urgent field update" required>
+            </label>
+            <label>
+              Message
+              <textarea name="message" rows="5" placeholder="Write the operational update to send." required></textarea>
+            </label>
+            <label>
+              Recipients
+              <textarea name="recipients" rows="5" placeholder="Name | email@example.com | +919999999999&#10;Another User | second@example.com | +918888888888" required></textarea>
+            </label>
+            <div class="chip-row">
+              <label><input type="checkbox" name="channels" value="email" checked> Email</label>
+              <label><input type="checkbox" name="channels" value="whatsapp"> WhatsApp</label>
+            </div>
+            <button class="primary-button" type="submit">Create Outreach Draft</button>
+          </form>
+        </article>
+      </section>
+
+      <section class="two-column">
+        <article class="panel">
+          <p class="eyebrow">Outreach Drafts</p>
+          <div id="adminNotificationList" class="stack-list">
+            <div class="empty-box">Drafted email and WhatsApp outreach packs will appear here.</div>
+          </div>
+        </article>
+
+        <article class="panel">
+          <p class="eyebrow">Error Monitor</p>
+          <div id="adminErrorList" class="stack-list">
+            <div class="empty-box">Recent client-side issues will appear here.</div>
+          </div>
+        </article>
+      </section>
+
+      <section class="panel">
+        <p class="eyebrow">Audit Trail</p>
+        <div id="adminAuditList" class="stack-list">
+          <div class="empty-box">Role changes, workspace sync events, and notification processing activity will appear here.</div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <p class="eyebrow">Archive Restore</p>
+        <div id="adminArchiveList" class="stack-list">
+          <div class="empty-box">Archived requests and volunteers can be restored from here.</div>
+        </div>
+      </section>
+
+      <section class="two-column">
+        <article class="panel">
+          <p class="eyebrow">Data Cleanup Tools</p>
+          <h2>Duplicate warnings and merge review</h2>
+          <div id="adminCleanupList" class="stack-list">
+            <div class="empty-box">Duplicate and incomplete-record warnings will appear here.</div>
+          </div>
+        </article>
+
+        <article class="panel">
+          <p class="eyebrow">Accessibility + Device Controls</p>
+          <h2>Browser notifications and visual comfort</h2>
+          <div id="adminControlCenter" class="stack-list">
+            <div class="empty-box">Notification and accessibility controls will appear here.</div>
+          </div>
+        </article>
+      </section>
+    </main>
+  </div>
+
+  <script src="./firebase-config.js?v=20260405-design6"></script>
+  <script src="./app.js?v=20260405-design6"></script>
+  <script src="./resourceflow-shared.js?v=20260405-design6"></script>
+  <script>
+    (function () {
+      function statusTone(text) {
+        var normalized = String(text || "").trim().toLowerCase();
+        if (/active|available|approved|delivered|closed|completed/.test(normalized)) {
+          return "success";
+        }
+        if (/submitted|reviewing|pending|scheduled|queued|draft|on call/.test(normalized)) {
+          return "pending";
+        }
+        return "muted";
+      }
+
+      function patchAdminText() {
+        var sidebarEyebrow = document.querySelector(".portal-sidebar-panel .eyebrow");
+        if (sidebarEyebrow) {
+          sidebarEyebrow.textContent = "Sidebar";
+        }
+
+        var sidebarCards = document.querySelectorAll("#adminPortalSidebar .stack-card strong");
+        sidebarCards.forEach(function (node) {
+          var text = node.textContent.trim().toLowerCase();
+          if (text === "portal lane" || text === "debar") {
+            node.textContent = "Sidebar";
+          }
+          if (text === "visible spaces") {
+            node.textContent = "Visible Spaces";
+          }
+          if (text === "live snapshot") {
+            node.textContent = "Live Snapshot";
+          }
+        });
+
+        document.querySelectorAll(".shared-detail-item > span").forEach(function (node) {
+          node.classList.add("shared-detail-label");
+        });
+
+        document.querySelectorAll(".shared-detail-item > strong").forEach(function (node) {
+          node.classList.add("shared-detail-value");
+        });
+
+        document.querySelectorAll(".shared-metric-card > span").forEach(function (node) {
+          node.classList.add("shared-metric-label");
+        });
+
+        document.querySelectorAll(".shared-metric-card > strong").forEach(function (node) {
+          node.classList.add("shared-metric-value");
+        });
+
+        document.querySelectorAll(".shared-metric-card > small").forEach(function (node) {
+          node.classList.add("shared-metric-meta");
+        });
+
+        document.querySelectorAll(".shared-card-head .storage-pill").forEach(function (pill) {
+          pill.dataset.tone = statusTone(pill.textContent);
+        });
+      }
+
+      document.addEventListener("DOMContentLoaded", function () {
+        patchAdminText();
+        var observer = new MutationObserver(function () {
+          patchAdminText();
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+      });
+    })();
+  </script>
+  <script src="./criteria.js"></script>
+</body>
+</html>
+
