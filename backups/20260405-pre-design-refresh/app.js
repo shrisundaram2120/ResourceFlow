@@ -13,7 +13,6 @@
   const UI_PREFERENCES_KEY = "resourceflow-ui-preferences-v1";
   const OPS_NOTES_KEY = "resourceflow-ops-notes-v1";
   const ACCESS_NOTICE_KEY = "resourceflow-access-notice-v1";
-  const DONATION_VIEW_KEY = "resourceflow-donation-view-v1";
   const MAX_ACTIVITY_LOG = 48;
   const MAX_HISTORY_SNAPSHOTS = 30;
   const MAX_TEXT_FIELD = 180;
@@ -432,7 +431,6 @@
       enforcePortalAccess();
       renderAll();
       bindPageHandlers();
-      startInteractiveEnhancements();
       maybeLaunchOnboarding();
 
       initializeFirebaseRuntime().then(function () {
@@ -450,97 +448,7 @@
       updateSyncStatus("Offline Ready", "Local demo workspace loaded immediately.");
       renderAll();
       bindPageHandlers();
-      startInteractiveEnhancements();
     }
-  }
-
-  function startInteractiveEnhancements() {
-    bindDonationModeSwitches();
-    ensureInteractiveTestIds(document);
-    observeInteractiveTestIds();
-  }
-
-  function bindDonationModeSwitches() {
-    const modeGroups = document.querySelectorAll("[data-donation-mode-group]");
-    if (!modeGroups.length) {
-      return;
-    }
-    modeGroups.forEach(function (group) {
-      group.querySelectorAll("[data-donation-mode]").forEach(function (button) {
-        if (button.dataset.bound === "true") {
-          return;
-        }
-        button.dataset.bound = "true";
-        button.addEventListener("click", function () {
-          applyDonationMode(button.dataset.donationMode || "money");
-        });
-      });
-    });
-    const savedMode = safeText(sessionStorage.getItem(DONATION_VIEW_KEY) || "money", 20);
-    applyDonationMode(savedMode === "item" ? "item" : "money");
-  }
-
-  function applyDonationMode(mode) {
-    const normalized = mode === "item" ? "item" : "money";
-    document.querySelectorAll("[data-donation-mode]").forEach(function (button) {
-      button.classList.toggle("is-active", (button.dataset.donationMode || "money") === normalized);
-      button.setAttribute("aria-pressed", String((button.dataset.donationMode || "money") === normalized));
-    });
-    document.querySelectorAll("[data-donation-panel]").forEach(function (panel) {
-      panel.hidden = (panel.dataset.donationPanel || "money") !== normalized;
-    });
-    try {
-      sessionStorage.setItem(DONATION_VIEW_KEY, normalized);
-    } catch (error) {}
-  }
-
-  function ensureInteractiveTestIds(root) {
-    const scope = root && typeof root.querySelectorAll === "function" ? root : document;
-    const selector = "a[href], button, input, select, textarea";
-    const nodes = Array.from(scope.querySelectorAll(selector));
-    const seen = new Map();
-    nodes.forEach(function (node) {
-      if (node.dataset && node.dataset.testid) {
-        return;
-      }
-      const base = buildInteractiveTestId(node);
-      const count = seen.get(base) || 0;
-      seen.set(base, count + 1);
-      node.dataset.testid = count ? base + "-" + (count + 1) : base;
-    });
-  }
-
-  function buildInteractiveTestId(node) {
-    const tag = (node.tagName || "control").toLowerCase();
-    const type = safeText(node.getAttribute("type") || "", 40).toLowerCase();
-    const id = safeText(node.id || "", 80).toLowerCase();
-    const name = safeText(node.getAttribute("name") || "", 80).toLowerCase();
-    const nav = safeText(node.dataset.nav || "", 80).toLowerCase();
-    const action = safeText(node.dataset.action || "", 80).toLowerCase();
-    const entityAction = safeText(node.dataset.entityAction || "", 80).toLowerCase();
-    const label = safeText(node.getAttribute("aria-label") || node.textContent || node.getAttribute("placeholder") || "", 80).toLowerCase();
-    const seed = action || entityAction || nav || name || id || label || (type ? tag + "-" + type : tag);
-    return slugifyTestId(seed, tag);
-  }
-
-  function slugifyTestId(value, fallback) {
-    const slug = String(value || "")
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 64);
-    return slug || fallback || "control";
-  }
-
-  function observeInteractiveTestIds() {
-    if (window.__resourceflowTestIdObserverStarted || !document.body || typeof MutationObserver !== "function") {
-      return;
-    }
-    window.__resourceflowTestIdObserverStarted = true;
-    const observer = new MutationObserver(function () {
-      ensureInteractiveTestIds(document);
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
   }
 
   function createEmptyState() {
@@ -1758,7 +1666,6 @@
       "</select>",
       "</label>",
       '<div class="auth-actions">',
-      '<button class="ghost-button" id="themeToggleButton" type="button" data-testid="theme-toggle-button">Dark Mode</button>',
       '<button class="ghost-button" id="signInButton" type="button" hidden>Secure Access</button>',
       '<button class="ghost-button" id="switchRoleButton" type="button" hidden>Switch Portal</button>',
       '<button class="ghost-button" id="signOutButton" type="button" hidden>Sign Out</button>',
@@ -2471,9 +2378,8 @@
     const signInButton = document.getElementById("signInButton");
     const switchRoleButton = document.getElementById("switchRoleButton");
     const signOutButton = document.getElementById("signOutButton");
-    const themeToggleButton = document.getElementById("themeToggleButton");
     const uiLanguageSelect = document.getElementById("uiLanguageSelect");
-    if (!userLabel || !roleLabel || !roleBadges || !signInButton || !switchRoleButton || !signOutButton || !themeToggleButton || !uiLanguageSelect) {
+    if (!userLabel || !roleLabel || !roleBadges || !signInButton || !switchRoleButton || !signOutButton || !uiLanguageSelect) {
       return;
     }
     const accessRole = activeAccessRole();
@@ -2549,13 +2455,6 @@
       signOutButton.dataset.bound = "true";
       signOutButton.addEventListener("click", function () { signOutSession(); });
     }
-    if (themeToggleButton.dataset.bound !== "true") {
-      themeToggleButton.dataset.bound = "true";
-      themeToggleButton.addEventListener("click", function () {
-        const next = (state.uiPreferences.themeMode || "light") === "dark" ? "light" : "dark";
-        setUiPreference("themeMode", next);
-      });
-    }
     if (uiLanguageSelect.dataset.bound !== "true") {
       uiLanguageSelect.dataset.bound = "true";
       uiLanguageSelect.addEventListener("change", function () {
@@ -2569,8 +2468,6 @@
       });
     }
     uiLanguageSelect.value = UI_LANGUAGE_OPTIONS.indexOf(state.uiLanguage) >= 0 ? state.uiLanguage : "English";
-    themeToggleButton.textContent = (state.uiPreferences.themeMode || "light") === "dark" ? "Light Mode" : "Dark Mode";
-    themeToggleButton.classList.add("theme-toggle-emphasis");
 
     syncPermissionUi();
   }
@@ -3142,7 +3039,6 @@
 
   function defaultUiPreferences() {
     return {
-      themeMode: "light",
       highContrast: false,
       reducedMotion: false,
       fontScale: "default",
@@ -3155,7 +3051,6 @@
       const raw = localStorage.getItem(UI_PREFERENCES_KEY);
       const parsed = raw ? JSON.parse(raw) : {};
       state.uiPreferences = Object.assign(defaultUiPreferences(), parsed || {});
-      state.uiPreferences.themeMode = state.uiPreferences.themeMode === "dark" ? "dark" : "light";
       state.uiPreferences.notificationsEnabled = Boolean(state.uiPreferences.notificationsEnabled);
     } catch (error) {
       console.warn("Could not restore UI preferences.", error);
@@ -3174,8 +3069,6 @@
   function applyUiPreferences() {
     const root = document.documentElement;
     const prefs = state.uiPreferences || defaultUiPreferences();
-    root.classList.toggle("rf-theme-light", (prefs.themeMode || "light") !== "dark");
-    root.classList.toggle("rf-theme-dark", (prefs.themeMode || "light") === "dark");
     root.classList.toggle("rf-high-contrast", Boolean(prefs.highContrast));
     root.classList.toggle("rf-reduced-motion", Boolean(prefs.reducedMotion));
     root.classList.toggle("rf-font-lg", prefs.fontScale === "large");
@@ -3298,10 +3191,6 @@
     const prefs = state.uiPreferences || defaultUiPreferences();
     return [
       {
-        title: "Theme: " + titleCase(prefs.themeMode || "light"),
-        text: "Switch between a warm light workspace and a darker control-room view depending on your environment."
-      },
-      {
         title: "High contrast " + (prefs.highContrast ? "on" : "off"),
         text: "Improves separation between cards, inputs, and action buttons for bright screens and projectors."
       },
@@ -3324,13 +3213,11 @@
     const prefs = state.uiPreferences || defaultUiPreferences();
     return [
       '<div class="stack-card"><strong>Display comfort</strong><div class="chip-row">' +
-        renderChip("Theme: " + titleCase(prefs.themeMode || "light")) +
         renderChip(prefs.highContrast ? "High contrast on" : "High contrast off") +
         renderChip(prefs.reducedMotion ? "Reduced motion on" : "Reduced motion off") +
         renderChip("Font: " + (prefs.fontScale === "default" ? "default" : prefs.fontScale)) +
       '</div></div>',
       '<div class="button-row compact-controls">',
-      '<button class="ghost-button" type="button" data-action="toggle-theme-mode">Toggle Theme</button>',
       '<button class="ghost-button" type="button" data-action="toggle-high-contrast">Toggle Contrast</button>',
       '<button class="ghost-button" type="button" data-action="toggle-reduced-motion">Toggle Motion</button>',
       '<button class="ghost-button" type="button" data-action="cycle-font-scale">Font Size</button>',
@@ -3351,16 +3238,6 @@
   }
 
   function bindAccessibilityControls() {
-    document.querySelectorAll('[data-action="toggle-theme-mode"]').forEach(function (button) {
-      if (button.dataset.bound === "true") {
-        return;
-      }
-      button.dataset.bound = "true";
-      button.addEventListener("click", function () {
-        const next = (state.uiPreferences.themeMode || "light") === "dark" ? "light" : "dark";
-        setUiPreference("themeMode", next);
-      });
-    });
     document.querySelectorAll('[data-action="toggle-high-contrast"]').forEach(function (button) {
       if (button.dataset.bound === "true") {
         return;
@@ -5564,8 +5441,6 @@
     renderInsights();
     renderAdmin();
     renderImpact();
-    bindDonationModeSwitches();
-    ensureInteractiveTestIds(document);
   }
 
   function renderCommon() {
@@ -8737,29 +8612,23 @@
     const primaryPortal = portalLabelForRole(normalizedRole);
     const pageLabel = pageLabelForAccess(page);
     const scenario = scenarioTitle(loadDemoScenario());
-    const visibleSpaces = allowed.length ? allowed : ["Access pending"];
     return [
       {
-        title: "Sidebar",
-        text: "Use the sidebar to move through the spaces available to the " + currentRoleMeta(normalizedRole).label + " role. You are currently viewing " + pageLabel + ".",
-        chips: [primaryPortal, pageLabel, scenario]
+        title: "Portal lane",
+        text: currentRoleMeta(normalizedRole).label + " is currently inside " + pageLabel + ". This role is optimized for " + primaryPortal + ".",
+        chips: [primaryPortal, scenario]
       },
       {
-        title: "Visible Spaces",
-        text: allowed.length ? "This role can currently open " + allowed.join(", ") + "." : "No portal spaces are available until access is granted.",
-        chips: visibleSpaces
+        title: "Visible spaces",
+        text: allowed.length ? allowed.join(", ") + "." : "No portal spaces are available until access is granted.",
+        chips: [allowed.length + " visible areas", metrics.coverage + "% coverage"]
       },
       {
-        title: "Live Snapshot",
+        title: "Live snapshot",
         text: metrics.requests
-          ? metrics.requests + " requests, " + metrics.volunteers + " volunteers ready, " + metrics.assignments + " assignments, and " + metrics.beneficiaries + " projected beneficiaries are visible right now."
+          ? metrics.requests + " requests, " + metrics.assignments + " assignments, and " + metrics.beneficiaries + " projected beneficiaries are visible right now."
           : "Load a demo scenario to reveal the response board, matching flow, and impact numbers for this role.",
-        chips: [
-          metrics.requests + " requests",
-          metrics.assignments + " assignments",
-          metrics.beneficiaries + " people",
-          "Readiness " + metrics.readinessScore + "/100"
-        ]
+        chips: [metrics.volunteers + " volunteers", "Readiness " + metrics.readinessScore + "/100"]
       }
     ];
   }

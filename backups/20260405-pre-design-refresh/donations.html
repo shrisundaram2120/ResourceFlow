@@ -1,12 +1,12 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#1A362D">
+  <meta name="theme-color" content="#061521">
   <link rel="manifest" href="./manifest.webmanifest">
   <title>ResourceFlow | Donation Portal</title>
-  <link rel="stylesheet" href="./styles.css?v=20260405-design3">
+  <link rel="stylesheet" href="./styles.css?v=20260404-shareddb3">
 </head>
 <body data-page="donations">
   <a class="skip-link" href="#mainContent">Skip to content</a>
@@ -56,15 +56,11 @@
           </div>
           <a class="ghost-link" href="./admin.html">View Admin Dashboard</a>
         </div>
-        <div class="donation-mode-switch" data-donation-mode-group aria-label="Donation mode switch">
-          <button class="mode-toggle-button is-active" type="button" data-donation-mode="money">Money Donation</button>
-          <button class="mode-toggle-button" type="button" data-donation-mode="item">Item Donation</button>
-        </div>
         <div id="donationPortalStatus" class="notice-box">
           Sign in to store donation records in Firestore and track their status.
         </div>
         <div class="two-column donation-forms-grid">
-          <article class="panel compact donation-mode-panel" data-donation-panel="money">
+          <article class="panel compact">
             <p class="eyebrow">Money Donation</p>
             <form id="moneyDonationForm" class="form-grid" aria-label="Money donation form">
               <label>
@@ -96,7 +92,7 @@
             </form>
           </article>
 
-          <article class="panel compact donation-mode-panel" data-donation-panel="item" hidden>
+          <article class="panel compact">
             <p class="eyebrow">Item Donation</p>
             <form id="itemDonationForm" class="form-grid" aria-label="Item donation form">
               <label>
@@ -151,10 +147,9 @@
     </main>
   </div>
 
-  <script src="./firebase-config.js?v=20260405-design3"></script>
-  <script src="./app.js?v=20260405-design3"></script>
-  <script src="./resourceflow-shared.js?v=20260405-design3"></script>
+  <script src="./firebase-config.js?v=20260404-authrestore1"></script>
+  <script src="./app.js?v=20260404-shareddb3"></script>
+  <script src="./resourceflow-shared.js?v=20260404-shareddb3"></script>
   <script src="./criteria.js?v=20260402-rolelock2"></script>
 </body>
 </html>
-

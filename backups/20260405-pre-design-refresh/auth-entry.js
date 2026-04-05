@@ -116,8 +116,6 @@
   document.addEventListener("DOMContentLoaded", function () {
     cacheRefs();
     bindEvents();
-    ensureInteractiveTestIds(document);
-    observeInteractiveTestIds();
     setMode("signin");
     setStatus("Secure access screen is ready. Sign in can start in a moment.", "info");
     initializeFirebase();
@@ -426,7 +424,7 @@
       return [
         '<label class="entry-field">',
         '<span>' + escapeHtml(field.label) + '</span>',
-        '<select name="' + escapeHtml(field.name) + '" data-testid="portal-field-' + escapeHtml(field.name) + '"' + (field.required ? ' required' : '') + '>',
+        '<select name="' + escapeHtml(field.name) + '"' + (field.required ? ' required' : '') + '>',
         '<option value="">Choose</option>',
         field.options.map(function (option) {
           return '<option value="' + escapeHtml(option) + '"' + (value === option ? ' selected' : '') + '>' + escapeHtml(option) + '</option>';
@@ -438,55 +436,9 @@
     return [
       '<label class="entry-field">',
       '<span>' + escapeHtml(field.label) + '</span>',
-      '<input name="' + escapeHtml(field.name) + '" data-testid="portal-field-' + escapeHtml(field.name) + '" type="text" placeholder="' + escapeHtml(field.placeholder || "") + '" value="' + escapeHtml(value) + '"' + (field.required ? ' required' : '') + '>',
+      '<input name="' + escapeHtml(field.name) + '" type="text" placeholder="' + escapeHtml(field.placeholder || "") + '" value="' + escapeHtml(value) + '"' + (field.required ? ' required' : '') + '>',
       '</label>'
     ].join("");
-  }
-
-  function ensureInteractiveTestIds(root) {
-    const scope = root && typeof root.querySelectorAll === "function" ? root : document;
-    const selector = "a[href], button, input, select, textarea";
-    const nodes = Array.from(scope.querySelectorAll(selector));
-    const seen = new Map();
-    nodes.forEach(function (node) {
-      if (node.dataset && node.dataset.testid) {
-        return;
-      }
-      const seed = safeValue(
-        node.id
-        || node.getAttribute("name")
-        || node.dataset.authMode
-        || node.dataset.portal
-        || node.textContent
-        || node.getAttribute("placeholder")
-        || node.getAttribute("aria-label")
-        || node.tagName
-      );
-      const base = slugifyTestId(seed, (node.tagName || "control").toLowerCase());
-      const count = seen.get(base) || 0;
-      seen.set(base, count + 1);
-      node.dataset.testid = count ? base + "-" + (count + 1) : base;
-    });
-  }
-
-  function slugifyTestId(value, fallback) {
-    const slug = String(value || "")
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 64);
-    return slug || fallback || "control";
-  }
-
-  function observeInteractiveTestIds() {
-    if (window.__resourceflowEntryTestObserverStarted || !document.body || typeof MutationObserver !== "function") {
-      return;
-    }
-    window.__resourceflowEntryTestObserverStarted = true;
-    const observer = new MutationObserver(function () {
-      ensureInteractiveTestIds(document);
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
   }
 
   function setPortalSetupStatus(message, tone) {

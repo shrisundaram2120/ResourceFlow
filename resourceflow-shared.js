@@ -630,8 +630,10 @@
     }).join("");
     const details = [
       renderDetailItem("NGO Group", item.ngoGroup || "Not shared"),
+      renderDetailItem("Skills", item.skills.length ? item.skills.map(titleCase).join(", ") : "Not shared"),
       renderDetailItem("Availability", item.availability || "Not shared"),
-      renderDetailItem("Contact", [item.email, item.phone].filter(Boolean).join(" | ") || "Not shared")
+      renderDetailItem("Contact", [item.email, item.phone].filter(Boolean).join(" | ") || "Not shared"),
+      renderDetailItem("Status", titleCase(item.activityStatus || "available"))
     ];
     if (item.location) {
       details.push(renderDetailItem("Location", item.location));
@@ -654,8 +656,9 @@
       '<div class="stack-card shared-record-card">',
       '<div class="shared-card-head">',
       "<strong>" + escapeHtml(item.fullName) + "</strong>",
-      '<span class="storage-pill">' + escapeHtml(titleCase(item.activityStatus)) + "</span>",
+      renderRecordStatusPill(item.activityStatus, "volunteer"),
       "</div>",
+      '<p class="card-meta shared-subtitle">Volunteer profile' + (item.ngoGroup ? " - " + escapeHtml(item.ngoGroup) : "") + "</p>",
       '<div class="shared-detail-grid">' + details.join("") + "</div>",
       '<div class="shared-divider"></div>',
       '<div class="chip-row">' + skills + (item.location ? renderChip(item.location) : "") + "</div>",
@@ -676,7 +679,8 @@
           renderDetailItem("Donation Type", "Money"),
           renderDetailItem("Amount", formatCurrency(item.amount)),
           renderDetailItem("Payment", item.paymentMethod || "Manual"),
-          renderDetailItem("Contact", item.ownerEmail || "Not shared")
+          renderDetailItem("Contact", item.ownerEmail || "Not shared"),
+          renderDetailItem("Status", titleCase(item.status || "submitted"))
         ]
       : [
           renderDetailItem("Donation Type", titleCase(item.itemType || "Item")),
@@ -702,9 +706,9 @@
       '<div class="stack-card shared-record-card">',
       '<div class="shared-card-head">',
       "<strong>" + escapeHtml(item.donorName) + "</strong>",
-      '<span class="storage-pill">' + escapeHtml(titleCase(item.status)) + "</span>",
+      renderRecordStatusPill(item.status, "donation"),
       "</div>",
-      '<p class="card-meta">' + escapeHtml(headline) + "</p>",
+      '<p class="card-meta shared-subtitle">' + escapeHtml(headline) + "</p>",
       '<div class="shared-detail-grid">' + details.join("") + "</div>",
       '<div class="shared-divider"></div>',
       '<div class="chip-row">' + renderChip(titleCase(item.kind)) + renderChip(formatShortDate(item.createdAt)) + "</div>",
@@ -717,10 +721,22 @@
   function renderDetailItem(label, value) {
     return [
       '<div class="shared-detail-item">',
-      '<span>' + escapeHtml(label) + "</span>",
-      "<strong>" + escapeHtml(value || "Not shared") + "</strong>",
+      '<span class="shared-detail-label">' + escapeHtml(label) + "</span>",
+      "<strong class=\"shared-detail-value\">" + escapeHtml(value || "Not shared") + "</strong>",
       "</div>"
     ].join("");
+  }
+
+  function renderRecordStatusPill(status, type) {
+    const normalized = normalizeText(status || "tracked");
+    const tone = /(active|available|approved|delivered|closed|completed)/.test(normalized)
+      ? "success"
+      : /(submitted|reviewing|pending|scheduled|on call|queued|draft)/.test(normalized)
+        ? "pending"
+        : /(rejected|archived|cancelled|unavailable|inactive)/.test(normalized)
+          ? "muted"
+          : (type === "volunteer" ? "success" : "pending");
+    return '<span class="record-status-pill record-status-pill-' + tone + '">' + escapeHtml(titleCase(status || "tracked")) + "</span>";
   }
 
   function syncVolunteerTopStats() {
@@ -1038,15 +1054,15 @@
     });
   }
 
-  function metricCard(label, value, text) {
-    return [
-      '<article class="stat-card shared-metric-card">',
-      "<span>" + escapeHtml(label) + "</span>",
-      "<strong>" + escapeHtml(value) + "</strong>",
-      "<small>" + escapeHtml(text) + "</small>",
-      "</article>"
-    ].join("");
-  }
+function metricCard(label, value, text) {
+  return [
+    '<article class="stat-card shared-metric-card">',
+    '<span class="shared-metric-label">' + escapeHtml(label) + "</span>",
+    "<strong class=\"shared-metric-value\">" + escapeHtml(value) + "</strong>",
+    "<small class=\"shared-metric-meta\">" + escapeHtml(text) + "</small>",
+    "</article>"
+  ].join("");
+}
 
   function renderChip(value) {
     return '<span class="chip">' + escapeHtml(value) + "</span>";

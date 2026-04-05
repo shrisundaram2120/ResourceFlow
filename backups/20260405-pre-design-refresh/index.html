@@ -1,17 +1,17 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="Secure ResourceFlow sign in and portal selection.">
-  <meta name="theme-color" content="#1A362D">
+  <meta name="theme-color" content="#f1ede3">
   <title>ResourceFlow | Sign In</title>
   <style>
     html, body { min-height: 100%; margin: 0; }
     body {
       font-family: "Segoe UI", Arial, sans-serif;
-      background: #F9F8F6;
-      color: #1C1C19;
+      background: #e9edf5;
+      color: #1f2534;
     }
     .entry-boot {
       display: none;
@@ -19,13 +19,13 @@
       margin: 24px auto;
       padding: 24px;
       border-radius: 24px;
-      background: rgba(255, 255, 255, 0.96);
-      box-shadow: 0 20px 48px rgba(28, 28, 25, 0.08);
+      background: rgba(255,252,247,0.96);
+      box-shadow: 0 24px 80px rgba(31, 40, 59, 0.12);
     }
     .entry-boot strong { display: block; font-size: 1.2rem; margin-bottom: 8px; }
     .entry-boot p { margin: 0; line-height: 1.6; color: #4c5770; }
   </style>
-  <link rel="stylesheet" href="./auth-entry.css?v=20260405-design3">
+  <link rel="stylesheet" href="./auth-entry.css?v=20260404-portaljump4">
   <script>
     (function () {
       try {
@@ -73,9 +73,9 @@
         <p class="entry-lead">Sign in with email/password or Google before entering the live coordination interface.</p>
 
         <div class="entry-mode-tabs" role="tablist" aria-label="Authentication mode">
-          <button type="button" class="entry-mode-button is-active" data-auth-mode="signin" data-testid="auth-mode-signin">Sign In</button>
-          <button type="button" class="entry-mode-button" data-auth-mode="signup" data-testid="auth-mode-signup">Create Account</button>
-          <button type="button" class="entry-mode-button" data-auth-mode="reset" data-testid="auth-mode-reset">Reset</button>
+          <button type="button" class="entry-mode-button is-active" data-auth-mode="signin">Sign In</button>
+          <button type="button" class="entry-mode-button" data-auth-mode="signup">Create Account</button>
+          <button type="button" class="entry-mode-button" data-auth-mode="reset">Reset</button>
         </div>
 
         <p id="entryStatus" class="entry-status">Secure access screen is ready. Sign in can start in a moment.</p>
@@ -85,32 +85,32 @@
           <div id="signupFields" class="entry-optional-fields" hidden>
             <label class="entry-field">
               <span>Full name</span>
-              <input id="entryNameInput" name="displayName" type="text" autocomplete="name" placeholder="Shri Sundaram" data-testid="auth-input-display-name">
+              <input id="entryNameInput" name="displayName" type="text" autocomplete="name" placeholder="Shri Sundaram">
             </label>
             <label class="entry-field">
               <span>Location</span>
-              <input id="entryLocationInput" name="location" type="text" autocomplete="address-level2" placeholder="Kolkata, West Bengal" data-testid="auth-input-location">
+              <input id="entryLocationInput" name="location" type="text" autocomplete="address-level2" placeholder="Kolkata, West Bengal">
             </label>
           </div>
 
           <label class="entry-field">
             <span>Email</span>
-            <input id="entryEmailInput" name="email" type="email" autocomplete="email" placeholder="you@example.com" required data-testid="auth-input-email">
+            <input id="entryEmailInput" name="email" type="email" autocomplete="email" placeholder="you@example.com" required>
           </label>
 
           <div id="passwordField" class="entry-field">
             <label class="entry-field">
               <span>Password</span>
-              <input id="entryPasswordInput" name="password" type="password" autocomplete="current-password" placeholder="Enter your password" required data-testid="auth-input-password">
+              <input id="entryPasswordInput" name="password" type="password" autocomplete="current-password" placeholder="Enter your password" required>
             </label>
           </div>
 
-          <button id="entrySubmitButton" class="entry-submit" type="submit" data-testid="auth-submit">Sign In</button>
+          <button id="entrySubmitButton" class="entry-submit" type="submit">Sign In</button>
         </form>
 
         <div class="entry-secondary-actions">
-          <button id="entryGoogleButton" type="button" class="entry-secondary-button" data-testid="auth-google">Continue with Google</button>
-          <button id="entryDemoButton" type="button" class="entry-secondary-button" data-testid="auth-demo">Preview Demo Access</button>
+          <button id="entryGoogleButton" type="button" class="entry-secondary-button">Continue with Google</button>
+          <button id="entryDemoButton" type="button" class="entry-secondary-button">Preview Demo Access</button>
         </div>
       </section>
 
@@ -152,7 +152,7 @@
           <h2>Choose how you want to enter ResourceFlow</h2>
           <p id="portalLead" class="portal-stage-copy">Choose the portal that matches your role and enter the workspace.</p>
         </div>
-        <button id="entrySignOutButton" type="button" class="entry-secondary-button" data-testid="portal-signout">Sign Out</button>
+        <button id="entrySignOutButton" type="button" class="entry-secondary-button">Sign Out</button>
       </div>
 
       <div class="portal-user-summary">
@@ -167,28 +167,28 @@
           <span class="portal-chip">Community User</span>
           <h3>Community Portal</h3>
           <p>View trusted updates, impact summary, and the public-facing overview of the platform.</p>
-          <button type="button" class="entry-submit portal-enter-button" data-portal="user" data-testid="portal-user">Continue As Community User</button>
+          <button type="button" class="entry-submit portal-enter-button" data-portal="user">Continue As Community User</button>
         </article>
 
         <article class="portal-card portal-card-volunteer">
           <span class="portal-chip">Volunteer</span>
           <h3>Volunteer Portal</h3>
           <p>Register skills, availability, and respond to the highest-priority opportunities.</p>
-          <button type="button" class="entry-submit portal-enter-button" data-portal="volunteer" data-testid="portal-volunteer">Continue As Volunteer</button>
+          <button type="button" class="entry-submit portal-enter-button" data-portal="volunteer">Continue As Volunteer</button>
         </article>
 
         <article class="portal-card portal-card-government">
           <span class="portal-chip">Government</span>
           <h3>Government Operations</h3>
           <p>Coordinate requests, review staffing, and monitor live response operations.</p>
-          <button type="button" class="entry-submit portal-enter-button" data-portal="government" data-testid="portal-government">Continue As Government</button>
+          <button type="button" class="entry-submit portal-enter-button" data-portal="government">Continue As Government</button>
         </article>
 
         <article class="portal-card portal-card-admin">
           <span class="portal-chip">Admin</span>
           <h3>Admin Console</h3>
           <p>Manage governance, audit signals, and platform access. Reserved for approved admins.</p>
-          <button type="button" class="entry-submit portal-enter-button" data-portal="admin" data-testid="portal-admin">Continue As Admin</button>
+          <button type="button" class="entry-submit portal-enter-button" data-portal="admin">Continue As Admin</button>
         </article>
       </div>
 
@@ -199,21 +199,21 @@
             <h2 id="portalSetupTitle">Complete your portal profile</h2>
             <p id="portalSetupLead" class="portal-stage-copy">Tell us a little more so the workspace can match the right tools to your role.</p>
           </div>
-          <button id="portalSetupBack" type="button" class="entry-secondary-button" data-testid="portal-setup-back">Back</button>
+          <button id="portalSetupBack" type="button" class="entry-secondary-button">Back</button>
         </div>
 
         <p id="portalSetupStatus" class="entry-status">Complete your profile before entering the workspace.</p>
 
         <form id="portalSetupForm" class="entry-form" novalidate>
           <div id="portalSetupFields" class="entry-optional-fields"></div>
-          <button id="portalSetupSubmit" class="entry-submit" type="submit" data-testid="portal-setup-submit">Save And Open Portal</button>
+          <button id="portalSetupSubmit" class="entry-submit" type="submit">Save And Open Portal</button>
         </form>
       </section>
     </section>
   </main>
 
-  <script src="./firebase-config.js?v=20260405-design3"></script>
-  <script src="./auth-entry.js?v=20260405-design3"></script>
+  <script src="./firebase-config.js?v=20260404-portaljump4"></script>
+  <script src="./auth-entry.js?v=20260404-portaljump4"></script>
   <script>
     window.setTimeout(function () {
       var shell = document.querySelector(".entry-shell");
@@ -225,4 +225,3 @@
   </script>
 </body>
 </html>
-
