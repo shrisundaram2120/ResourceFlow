@@ -30,6 +30,7 @@ body {
 body.entry-body {
   margin: 0;
   min-height: 100vh;
+  overflow-x: hidden;
   font-family: "Segoe UI", "Aptos", system-ui, sans-serif;
   color: var(--entry-text);
   background:
@@ -39,8 +40,8 @@ body.entry-body {
 }
 
 .entry-shell {
-  width: min(1240px, calc(100% - 32px));
-  margin: 24px auto 40px;
+  width: min(1240px, calc(100% - clamp(16px, 4vw, 40px)));
+  margin: clamp(12px, 3vw, 24px) auto 40px;
   display: grid;
   gap: 20px;
 }
@@ -76,6 +77,8 @@ body.entry-body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .entry-brand {
@@ -169,6 +172,8 @@ body.entry-body {
   font-weight: 700;
   cursor: pointer;
   transition: transform 160ms ease, background 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+  text-align: center;
+  white-space: normal;
 }
 
 .entry-mode-button:hover,
@@ -243,6 +248,7 @@ body.entry-body {
   padding: 16px 18px;
   color: var(--entry-text);
   font: inherit;
+  font-size: 16px;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
   transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
 }
@@ -432,6 +438,7 @@ body.entry-body {
   box-shadow: 0 16px 32px rgba(28, 28, 25, 0.05);
   display: grid;
   gap: 14px;
+  min-width: 0;
 }
 
 .portal-card::before {
@@ -460,6 +467,7 @@ body.entry-body {
   margin: 0;
   font-size: 1.55rem;
   letter-spacing: -0.03em;
+  overflow-wrap: anywhere;
 }
 
 .portal-card p {
@@ -514,6 +522,23 @@ body.entry-body {
 
   .entry-visual-panel {
     min-height: 420px;
+  }
+}
+
+@media (max-width: 920px) {
+  .entry-panel,
+  .portal-stage-card {
+    padding: 28px;
+  }
+
+  .portal-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .entry-mode-tabs,
+  .entry-secondary-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -573,5 +598,61 @@ body.entry-body {
   .entry-floating-card {
     justify-self: stretch;
     max-width: none;
+  }
+}
+
+@media (max-width: 540px) {
+  .entry-shell {
+    width: calc(100% - 12px);
+    gap: 14px;
+  }
+
+  .entry-card,
+  .portal-stage-card {
+    border-radius: 20px;
+  }
+
+  .entry-panel,
+  .portal-stage-card {
+    padding: 18px;
+  }
+
+  .entry-brand-mark {
+    width: 48px;
+    height: 48px;
+    border-radius: 16px;
+    font-size: 1.1rem;
+  }
+
+  .entry-brand strong {
+    font-size: 1.02rem;
+  }
+
+  .entry-brand small,
+  .entry-help-text,
+  .entry-lead,
+  .portal-stage-copy,
+  .entry-status {
+    font-size: 0.94rem;
+  }
+
+  .entry-mode-tabs,
+  .entry-secondary-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .portal-card {
+    padding: 20px;
+    border-radius: 22px;
+  }
+
+  .portal-card-media {
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+  }
+
+  .entry-calendar-card {
+    grid-template-columns: repeat(4, 1fr);
   }
 }

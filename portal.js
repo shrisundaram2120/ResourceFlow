@@ -6,6 +6,7 @@
   const DEMO_AUTH_KEY = "resourceflow-demo-auth-v1";
   const THEME_KEY = "resourceflow-theme-mode-v2";
   const WORKSPACE_KEY = "resourceflow-demo-workspace-v2";
+  const CACHE_RESET_KEY = "resourceflow-portal-cache-reset-v1";
   const FIREBASE_SDK_VERSION = "10.12.5";
 
   const PAGE_TITLES = {
@@ -48,13 +49,13 @@
   };
 
   const SIDEBAR_ITEMS = [
-    { key: "overview", label: "Community", href: "./overview.html", roles: ["user", "admin"] },
-    { key: "volunteer", label: "Volunteer", href: "./volunteer.html", roles: ["volunteer", "admin"] },
-    { key: "directory", label: "Directory", href: "./directory.html", roles: ["volunteer", "admin"] },
-    { key: "donations", label: "Donations", href: "./donations.html", roles: ["user", "admin"] },
-    { key: "operations", label: "NGO / Government", href: "./operations.html", roles: ["government", "admin"] },
-    { key: "insights", label: "AI Insights", href: "./insights.html", roles: ["government", "admin"] },
-    { key: "admin", label: "Admin", href: "./admin.html", roles: ["admin"] }
+    { key: "overview", label: "Community Portal", shortLabel: "Community", href: "./overview.html", icon: "home", caption: "Public view and requests", roles: ["user", "admin"] },
+    { key: "volunteer", label: "Volunteer Hub", shortLabel: "Volunteer", href: "./volunteer.html", icon: "volunteer_activism", caption: "Assignments and impact", roles: ["volunteer", "admin"] },
+    { key: "directory", label: "Volunteer Directory", shortLabel: "Directory", href: "./directory.html", icon: "groups", caption: "Shared responder profiles", roles: ["volunteer", "admin"] },
+    { key: "donations", label: "Donation Center", shortLabel: "Donations", href: "./donations.html", icon: "redeem", caption: "Money and item support", roles: ["user", "admin"] },
+    { key: "operations", label: "Government Ops", shortLabel: "Operations", href: "./operations.html", icon: "shield_person", caption: "District coordination board", roles: ["government", "admin"] },
+    { key: "insights", label: "AI Prediction", shortLabel: "AI", href: "./insights.html", icon: "monitoring", caption: "Forecasts and risk analysis", roles: ["government", "admin"] },
+    { key: "admin", label: "Admin Dashboard", shortLabel: "Admin", href: "./admin.html", icon: "admin_panel_settings", caption: "Governance and control", roles: ["admin"] }
   ];
 
   const SCENARIO_PRESETS = {
@@ -185,9 +186,37 @@
     if (!root) {
       return;
     }
+    clearLegacyCachesOnce();
     applyTheme(loadTheme());
     renderApp(root);
     observeInteractiveTestIds();
+  }
+
+  function clearLegacyCachesOnce() {
+    try {
+      if (window.sessionStorage && window.sessionStorage.getItem(CACHE_RESET_KEY) === "done") {
+        return;
+      }
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function (registrations) {
+          registrations.forEach(function (registration) {
+            registration.unregister();
+          });
+        }).catch(function () {});
+      }
+      if (window.caches && typeof window.caches.keys === "function") {
+        window.caches.keys().then(function (keys) {
+          return Promise.all(keys.map(function (key) {
+            return window.caches.delete(key);
+          }));
+        }).catch(function () {});
+      }
+      if (window.sessionStorage) {
+        window.sessionStorage.setItem(CACHE_RESET_KEY, "done");
+      }
+    } catch (error) {
+      // Ignore storage/cache cleanup failures and continue rendering.
+    }
   }
 
   function renderApp(root) {
@@ -202,14 +231,16 @@
 
     root.innerHTML = [
       '<div class="drawer-backdrop" data-action="close-menu"></div>',
-      renderHeader(page),
+      renderHeader(page, session),
       '<div class="rf-layout">',
       renderSidebar(page, session),
       '<main id="portalMain" class="main-stack" tabindex="-1">',
       allowed ? renderPage(page, session, workspace) : renderAccessRestricted(page, session),
       "</main>",
-      renderRail(workspace),
+      renderRail(page, session, workspace),
       "</div>"
+      ,
+      renderMobileDock(page, session)
     ].join("");
 
     document.body.classList.remove("rf-sidebar-open");
@@ -217,18 +248,26 @@
     ensureInteractiveTestIds(document);
   }
 
-  function renderHeader(page) {
+  function renderHeader(page, session) {
+    const roleData = ROLE_CONFIG[session.role] || ROLE_CONFIG.user;
     return [
       '<header class="rf-header">',
+      '<div class="rf-header-main">',
+      '<button class="menu-button header-menu-button" type="button" data-action="toggle-menu" data-testid="toggle-menu" aria-label="Toggle sidebar menu"><span></span><span></span><span></span></button>',
       '<a class="rf-brand" href="./index.html" data-testid="brand-home">',
       '<span class="rf-brand-mark">RF</span>',
-      '<span class="rf-brand-copy"><strong>ResourceFlow</strong><small>' + escapeHtml(PAGE_TITLES[page] || "Portal") + "</small></span>",
+      '<span class="rf-brand-copy"><strong>ResourceFlow</strong><small>Management Console</small></span>',
       "</a>",
-      '<div class="rf-header-tools">',
-      '<button class="menu-button" type="button" data-action="toggle-menu" data-testid="toggle-menu" aria-label="Toggle sidebar menu"><span></span><span></span><span></span></button>',
-      '<button class="ghost-button theme-toggle" type="button" data-action="toggle-theme" data-testid="toggle-theme">' + escapeHtml(themeToggleLabel()) + "</button>",
-      '<button class="ghost-button" type="button" data-action="switch-portal" data-testid="switch-portal">Switch Portal</button>',
-      '<button class="primary-button" type="button" data-action="signout" data-testid="sign-out">Sign Out</button>',
+      '<div class="rf-page-intro">',
+      '<span class="rf-page-kicker">' + escapeHtml(roleData.label) + '</span>',
+      '<strong>' + escapeHtml(PAGE_TITLES[page] || "Portal") + '</strong>',
+      "</div>",
+      "</div>",
+      '<div class="rf-header-actions">',
+      '<div class="rf-header-chip">Live workspace</div>',
+      '<button class="ghost-button theme-toggle header-theme-button" type="button" data-action="toggle-theme" data-testid="toggle-theme"><span class="button-full-label">' + escapeHtml(themeToggleLabel()) + '</span><span class="button-short-label">Theme</span></button>',
+      '<button class="ghost-button header-switch-button" type="button" data-action="switch-portal" data-testid="switch-portal">Switch Portal</button>',
+      '<button class="primary-button header-signout-button" type="button" data-action="signout" data-testid="sign-out">Sign Out</button>',
       "</div>",
       "</header>"
     ].join("");
@@ -247,17 +286,23 @@
         allowed ? "" : ' data-locked="true"',
         ' data-nav-target="' + escapeHtml(item.key) + '"',
         ' data-testid="nav-' + escapeHtml(item.key) + '">',
-        '<span>' + escapeHtml(item.label) + "</span>",
-        "<span>" + (allowed ? (active ? "Open" : "Go") : "Restricted") + "</span>",
+        '<span class="tab-icon"><span class="rf-symbol" aria-hidden="true">' + escapeHtml(item.icon) + '</span></span>',
+        '<span class="tab-copy"><strong>' + escapeHtml(item.label) + '</strong><small>' + escapeHtml(item.caption) + '</small></span>',
+        '<span class="tab-state">' + (allowed ? (active ? "Open" : "Go") : "Locked") + "</span>",
         "</a>"
       ].join("");
     }).join("");
 
     return [
       '<aside class="rf-sidebar">',
+      '<section class="surface-card sidebar-brand-card">',
+      '<p class="section-label">Portal View</p>',
+      '<h2 class="session-name">Operational Control</h2>',
+      '<p class="section-copy">A stitched command shell for community, volunteer, government, and admin response lanes.</p>',
+      "</section>",
       '<section class="surface-card session-card">',
-      '<p class="section-label">Sidebar</p>',
-      '<h2 class="session-name">' + escapeHtml(roleData.label) + "</h2>",
+      '<p class="section-label">Current Access</p>',
+      '<h3 class="section-title">' + escapeHtml(roleData.label) + "</h3>",
       '<p class="section-copy">' + escapeHtml(session.summary) + "</p>",
       '<div class="chip-row">' + roleData.chips.map(function (chip) { return '<span class="chip">' + escapeHtml(chip) + "</span>"; }).join("") + "</div>",
       "</section>",
@@ -265,7 +310,7 @@
       '<p class="section-label">Visible Spaces</p>',
       '<div class="space-nav">' + nav + "</div>",
       "</section>",
-      '<section class="surface-card">',
+      '<section class="surface-card sidebar-profile-card">',
       '<p class="section-label">Profile</p>',
       '<h3 class="section-title">' + escapeHtml(session.name) + "</h3>",
       '<p class="section-copy">' + escapeHtml(session.email || "Signed-in workspace session") + "</p>",
@@ -273,18 +318,20 @@
       '<span class="chip">' + escapeHtml(roleData.label) + "</span>",
       session.profile.primarySummary ? '<span class="chip">' + escapeHtml(session.profile.primarySummary) + "</span>" : "",
       "</div>",
+      '<button class="ghost-button sidebar-footer-action" type="button" data-action="seed-demo" data-scenario="flood" data-testid="sidebar-load-demo">Load Flood Demo</button>',
       "</section>",
       "</aside>"
     ].join("");
   }
 
-  function renderRail(workspace) {
+  function renderRail(page, session, workspace) {
     const insightItems = buildInsightItems(workspace);
     const donations = workspace.donations.slice(0, 3);
     return [
       '<aside class="rf-rail right-stack">',
       '<section class="surface-card">',
       '<p class="section-label">Scenario Switcher</p>',
+      '<h3 class="section-title">Change the live response story</h3>',
       '<form id="scenarioControlForm" class="form-grid compact-form" data-testid="scenario-control-form">',
       '<label><span>Active Scenario</span><select id="scenarioSelect" class="text-select" data-testid="scenario-select">' + renderScenarioOptions(workspace.scenario) + "</select></label>",
       '<div class="action-stack">',
@@ -296,6 +343,7 @@
       "</section>",
       '<section class="surface-card">',
       '<p class="section-label">Quick Actions</p>',
+      '<h3 class="section-title">Fast workspace moves</h3>',
       '<div class="quick-actions">',
       '<button class="primary-button" type="button" data-action="seed-demo" data-scenario="flood" data-testid="load-demo">Load Demo</button>',
       '<button class="ghost-button" type="button" data-action="seed-demo" data-scenario="cyclone" data-testid="load-cyclone">Cyclone Demo</button>',
@@ -305,6 +353,7 @@
       "</section>",
       '<section class="surface-card">',
       '<p class="section-label">AI Insights</p>',
+      '<h3 class="section-title">Why the system is recommending this next step</h3>',
       '<div class="stack-list">',
       insightItems.map(function (item) {
         return '<div class="feed-card"><div class="feed-card-head"><div><strong>' + escapeHtml(item.title) + '</strong><p class="feed-meta">' + escapeHtml(item.meta) + '</p></div></div><p class="card-copy">' + escapeHtml(item.copy) + "</p></div>";
@@ -313,6 +362,7 @@
       "</section>",
       '<section class="surface-card">',
       '<p class="section-label">Donation Records</p>',
+      '<h3 class="section-title">Live widget</h3>',
       '<div class="stack-list">',
       donations.length ? donations.map(function (item) {
         return '<div class="feed-card"><div class="feed-card-head"><div><strong>' + escapeHtml(item.donor) + '</strong><p class="feed-meta">' + escapeHtml(formatDonationLine(item)) + '</p></div>' + renderStatus(item.status || "tracked") + "</div></div>";
@@ -321,6 +371,16 @@
       "</section>",
       "</aside>"
     ].join("");
+  }
+
+  function renderMobileDock(page, session) {
+    const items = SIDEBAR_ITEMS.filter(function (item) {
+      return item.roles.indexOf(session.role) !== -1;
+    }).slice(0, 4);
+    return '<nav class="rf-mobile-dock">' + items.map(function (item) {
+      const active = item.key === page;
+      return '<a class="rf-mobile-link' + (active ? ' is-active' : '') + '" href="' + escapeHtml(item.href) + '" data-testid="mobile-nav-' + escapeHtml(item.key) + '"><span class="rf-symbol" aria-hidden="true">' + escapeHtml(item.icon) + '</span><span>' + escapeHtml(item.shortLabel || item.label) + '</span></a>';
+    }).join("") + "</nav>";
   }
 
   function renderPage(page, session, workspace) {
@@ -352,19 +412,32 @@
     return [
       renderHero({
         eyebrow: "Community Portal",
-        title: "Track the community response in one readable place.",
+        title: "A public-facing response board that stays calm and readable.",
         copy: workspace.summary,
         primary: '<button class="primary-button" type="button" data-action="seed-demo" data-scenario="flood" data-testid="overview-load-demo">Load Flood Demo</button>',
         secondary: '<a class="ghost-button" href="./donations.html" data-testid="overview-donate">Donation Portal</a>',
         sideCards: [
-          miniCard("Workspace", workspace.label || "No demo loaded", "Faster local-first shell with shared backend widgets."),
-          miniCard("Visible Spaces", "Community, Volunteer, Donations", "Use the sidebar to enter the spaces your role can access.")
+          miniCard("Workspace", workspace.label || "No demo loaded", "A single community lane that shows urgent needs, support, and progress."),
+          miniCard("Visible Spaces", "Community, Volunteer, Donations", "Each portal stays visually separate while sharing one response story.")
         ]
       }),
+      renderActionTiles([
+        { label: "I Need Help", copy: "Raise an urgent community request", href: "#communityRequestForm", tone: "brand" },
+        { label: "I Want to Donate", copy: "Open money and item support", href: "./donations.html", tone: "outline" },
+        { label: "Track Requests", copy: "See live request movement", href: "#communityTrackerSection", tone: "muted" }
+      ]),
       renderMetrics(workspaceMetrics(workspace)),
-      '<section class="two-col"><article class="surface-card"><p class="section-label">Request Status Tracker</p><h2 class="section-title">Follow each request from intake to delivery</h2>' + renderStatusBoard(workspace.requests) + '</article><article class="surface-card"><p class="section-label">AI Matching Story</p><h2 class="section-title">How this scenario moves from request to response</h2><div class="feed-list">' + renderWorkflowCards(buildMatchingSteps(workspace)) + "</div></article></section>",
-      '<section class="surface-card"><p class="section-label">Community Feed</p><h2 class="section-title">Live requests and visible response spaces</h2><div class="feed-list">' + renderRequestCards(workspace.requests) + "</div></section>",
-      '<section class="two-col"><article class="surface-card"><p class="section-label">Community Request Form</p><h2 class="section-title">Raise a support request</h2><form id="communityRequestForm" class="form-grid" data-testid="community-request-form"><label><span>Request title</span><input class="text-input" name="title" type="text" placeholder="Emergency food kits for affected streets" required></label><div class="grid-2"><label><span>Category</span><select class="text-select" name="category" required><option value="">Choose category</option><option>Food</option><option>Medical</option><option>Shelter</option><option>Education</option><option>Logistics</option></select></label><label><span>District</span><input class="text-input" name="district" type="text" placeholder="Chennai" required></label></div><div class="grid-2"><label><span>Location address</span><input class="text-input" name="location" type="text" placeholder="Velachery, Chennai" required></label><label><span>Estimated people affected</span><input class="text-input" name="beneficiaries" type="number" min="1" step="1" placeholder="40" required></label></div><div class="grid-2"><label><span>Urgency</span><select class="text-select" name="priority" required><option value="Submitted">Submitted</option><option value="Reviewed">Reviewed</option><option value="Assigned">Assigned</option><option value="In Progress">In Progress</option></select></label><label><span>Need summary</span><input class="text-input" name="shortSummary" type="text" placeholder="Families need food, blankets, and safe shelter." required></label></div><label><span>Detailed context</span><textarea class="text-area" name="summary" placeholder="Describe the situation, road access, vulnerable groups, and immediate needs." required></textarea></label><button class="primary-button" type="submit" data-testid="submit-community-request">Submit Request</button></form><div id="communityRequestStatus" class="notice-box">Submitted requests are added to the tracker below and become part of the visible feed immediately.</div></article><article class="surface-card"><p class="section-label">Community Request Tracker</p><h2 class="section-title">See what is active right now</h2><div class="feed-list">' + renderCommunityTracker(workspace.requests) + "</div></article></section>"
+      '<section class="page-columns"><div class="page-columns-main">' +
+      renderMapStage(workspace, {
+        eyebrow: "Live Impact Map",
+        title: "Visible pressure zones and mapped requests",
+        meta: workspace.label || "No demo loaded",
+        location: firstMapLocation(workspace),
+        summary: "Every card in the feed links back to a mappable location so teams can move from overview to action quickly."
+      }) +
+      '<section class="surface-card"><div class="section-head"><div><p class="section-label">Active Needs</p><h2 class="section-title">Latest community requests</h2></div></div><div class="feed-list">' + renderRequestCards(workspace.requests) + "</div></section></div>" +
+      '<div class="page-columns-side"><section class="surface-card"><p class="section-label">Request Status Tracker</p><h2 class="section-title">See what is moving right now</h2>' + renderStatusBoard(workspace.requests) + '</section><section id="communityTrackerSection" class="surface-card"><p class="section-label">Community Request Tracker</p><h2 class="section-title">Requests currently visible to the network</h2><div class="feed-list">' + renderCommunityTracker(workspace.requests) + '</div></section><section class="surface-card"><p class="section-label">AI Matching Story</p><h2 class="section-title">How ResourceFlow explains the next step</h2><div class="feed-list">' + renderWorkflowCards(buildMatchingSteps(workspace)) + "</div></section></div></section>" +
+      '<section class="two-col"><article class="surface-card"><p class="section-label">Community Request Form</p><h2 class="section-title">Raise a support request</h2><form id="communityRequestForm" class="form-grid" data-testid="community-request-form"><label><span>Request title</span><input class="text-input" name="title" type="text" placeholder="Emergency food kits for affected streets" required></label><div class="grid-2"><label><span>Category</span><select class="text-select" name="category" required><option value="">Choose category</option><option>Food</option><option>Medical</option><option>Shelter</option><option>Education</option><option>Logistics</option></select></label><label><span>District</span><input class="text-input" name="district" type="text" placeholder="Chennai" required></label></div><div class="grid-2"><label><span>Location address</span><input class="text-input" name="location" type="text" placeholder="Velachery, Chennai" required></label><label><span>Estimated people affected</span><input class="text-input" name="beneficiaries" type="number" min="1" step="1" placeholder="40" required></label></div><div class="grid-2"><label><span>Urgency</span><select class="text-select" name="priority" required><option value="Submitted">Submitted</option><option value="Reviewed">Reviewed</option><option value="Assigned">Assigned</option><option value="In Progress">In Progress</option></select></label><label><span>Need summary</span><input class="text-input" name="shortSummary" type="text" placeholder="Families need food, blankets, and safe shelter." required></label></div><label><span>Detailed context</span><textarea class="text-area" name="summary" placeholder="Describe the situation, road access, vulnerable groups, and immediate needs." required></textarea></label><button class="primary-button" type="submit" data-testid="submit-community-request">Submit Request</button></form><div id="communityRequestStatus" class="notice-box">Submitted requests are added to the tracker below and become part of the visible feed immediately.</div></article><article class="surface-card"><p class="section-label">Response Story</p><h2 class="section-title">What changes after a request is entered</h2><div class="feed-list">' + renderListCards(["The request appears in the community tracker immediately.", "Operations can open the mapped location and review urgency, district, and people affected.", "The AI story updates as volunteers, donations, and assignments are attached.", "Admins can later use the same request in reports and public impact summaries."]) + "</div></article></section>"
     ].join("");
   }
 
@@ -373,15 +446,25 @@
     return [
       renderHero({
         eyebrow: "Volunteer Portal",
-        title: "Focus on your assignments, impact points, and completed work.",
+        title: safeText(session.name || "Volunteer", 80) + "'s response board",
         copy: personal.summary,
         primary: '<a class="primary-button" href="./directory.html" data-testid="open-directory">Open Volunteer Directory</a>',
         secondary: '<button class="ghost-button" type="button" data-action="seed-demo" data-scenario="flood" data-testid="volunteer-load-demo">Load Demo</button>',
         sideCards: [
           miniCard("Current District", personal.district, "The top district is derived from the active requests in the current scenario."),
-          miniCard("Achievements", personal.badges.join(", "), "Badges update when the demo assignments and your contribution history change.")
+          miniCard("Current Impact", String(personal.completed) + " tasks completed", "Points and badges update as the volunteer archive grows.")
         ]
       }),
+      renderAlertBanner(workspace, "Flash flood warning", "The volunteer lane should make one next action obvious, even on small screens."),
+      '<section class="page-columns"><div class="page-columns-main">' +
+      renderMapStage(workspace, {
+        eyebrow: "Live Sentinel Monitoring",
+        title: "A visual map for the volunteer task queue",
+        meta: topDistrict(workspace) || "No district selected",
+        location: firstMapLocation(workspace),
+        summary: "Volunteers can inspect the zone context, then jump out to Google Maps from each assignment card."
+      }) +
+      '</div><div class="page-columns-side"><section class="surface-card"><p class="section-label">Current Impact</p><h2 class="section-title">' + escapeHtml(String(personal.points)) + ' points earned</h2><div class="chip-row">' + personal.badges.map(function (badge) { return '<span class="chip">' + escapeHtml(badge) + '</span>'; }).join("") + '</div><p class="section-copy">Attendance, completed tasks, and active assignments are shown below so every volunteer can see their contribution clearly.</p></section><section class="surface-card"><p class="section-label">AI Task Priority</p><h2 class="section-title">Optimized for ' + escapeHtml(firstName(session.name)) + '</h2><div class="stack-list">' + renderPriorityQueue(personal.activeTasks.length ? personal.activeTasks : workspace.requests.slice(0, 3)) + "</div></section></div></section>",
       renderMetrics([
         metric("Points", String(personal.points), "Response points earned from completed assignments."),
         metric("Completed Tasks", String(personal.completed), "Closed assignments tied to your volunteer profile."),
@@ -397,7 +480,7 @@
     return [
       renderHero({
         eyebrow: "Volunteer Directory",
-        title: "Register once and share your volunteer profile with the whole network.",
+        title: "Shared volunteer visibility with one searchable directory.",
         copy: "This page uses the real Firestore backend. New volunteer profiles are stored permanently and become visible to every signed-in volunteer.",
         primary: '<a class="primary-button" href="./volunteer.html" data-testid="back-to-volunteer">Volunteer Portal</a>',
         secondary: '<button class="ghost-button" type="button" data-action="seed-demo" data-scenario="flood" data-testid="directory-load-demo">Load Demo</button>',
@@ -406,7 +489,7 @@
           miniCard("Filters", "Skills, NGO, location", "Use the filters to narrow the directory quickly.")
         ]
       }),
-      '<section class="surface-card"><p class="section-label">Volunteer Registration</p><div id="sharedVolunteerStatus" class="notice-box">Sign in to create your volunteer profile and see the shared directory from Firestore.</div><div class="two-col"><article class="surface-card"><form id="sharedVolunteerForm" class="form-grid" data-testid="shared-volunteer-form"><label><span>Full Name</span><input class="text-input" name="fullName" type="text" placeholder="Thenmozhi P" required></label><label><span>NGO Group Name</span><input class="text-input" name="ngoGroup" type="text" placeholder="Care Bridge" required></label><label><span>Skills</span><input class="text-input" name="skills" type="text" placeholder="first aid, food distribution, registration" required></label><div class="grid-2"><label><span>Phone</span><input class="text-input" name="phone" type="text" placeholder="+91 98765 43210" required></label><label><span>Email</span><input class="text-input" name="email" type="email" placeholder="volunteer@example.com" required></label></div><div class="grid-2"><label><span>Availability</span><select class="text-select" name="availability" required><option value="">Choose availability</option><option>Full Day</option><option>Half Day</option><option>Evening</option><option>Weekend</option><option>On Call</option></select></label><label><span>Activity Status</span><select class="text-select" name="activityStatus" required><option value="available">Available</option><option value="on call">On Call</option><option value="active">Active</option><option value="inactive">Inactive</option></select></label></div><label><span>Location (Optional)</span><input class="text-input" name="location" type="text" placeholder="Salt Lake, Kolkata"></label><button class="primary-button" type="submit" data-testid="save-volunteer-profile">Save Shared Volunteer Profile</button></form></article><article class="surface-card"><p class="section-label">Filters</p><div class="form-grid"><label><span>Search</span><input id="sharedVolunteerSearch" class="text-input" type="text" placeholder="Search by name, skill, NGO, or contact" data-testid="shared-volunteer-search"></label><div class="grid-2"><label><span>Skills</span><input id="sharedVolunteerSkillFilter" class="text-input" type="text" placeholder="first aid, logistics" data-testid="shared-volunteer-skill-filter"></label><label><span>NGO Group</span><input id="sharedVolunteerNgoFilter" class="text-input" type="text" placeholder="Care Bridge" data-testid="shared-volunteer-ngo-filter"></label></div><label><span>Location</span><input id="sharedVolunteerLocationFilter" class="text-input" type="text" placeholder="Kolkata, Chennai, Salt Lake" data-testid="shared-volunteer-location-filter"></label></div><div id="sharedVolunteerDirectoryStats" class="shared-metric-grid"><div class="empty-box">Directory metrics will appear here after sign-in.</div></div></article></div><div class="surface-card"><p class="section-label">Volunteer Directory Records</p><div id="sharedVolunteerDirectoryList" class="stack-list"><div class="empty-box">Volunteer cards will appear here after sign-in.</div></div></div></section>'
+      '<section class="two-col"><article class="surface-card"><p class="section-label">Volunteer Registration</p><h2 class="section-title">Create or update a shared profile</h2><div id="sharedVolunteerStatus" class="notice-box">Sign in to create your volunteer profile and see the shared directory from Firestore.</div><form id="sharedVolunteerForm" class="form-grid" data-testid="shared-volunteer-form"><label><span>Full Name</span><input class="text-input" name="fullName" type="text" placeholder="Thenmozhi P" required></label><label><span>NGO Group Name</span><input class="text-input" name="ngoGroup" type="text" placeholder="Care Bridge" required></label><label><span>Skills</span><input class="text-input" name="skills" type="text" placeholder="first aid, food distribution, registration" required></label><div class="grid-2"><label><span>Phone</span><input class="text-input" name="phone" type="text" placeholder="+91 98765 43210" required></label><label><span>Email</span><input class="text-input" name="email" type="email" placeholder="volunteer@example.com" required></label></div><div class="grid-2"><label><span>Availability</span><select class="text-select" name="availability" required><option value="">Choose availability</option><option>Full Day</option><option>Half Day</option><option>Evening</option><option>Weekend</option><option>On Call</option></select></label><label><span>Activity Status</span><select class="text-select" name="activityStatus" required><option value="available">Available</option><option value="on call">On Call</option><option value="active">Active</option><option value="inactive">Inactive</option></select></label></div><label><span>Location (Optional)</span><input class="text-input" name="location" type="text" placeholder="Salt Lake, Kolkata"></label><button class="primary-button" type="submit" data-testid="save-volunteer-profile">Save Shared Volunteer Profile</button></form></article><article class="surface-card"><p class="section-label">Filters</p><h2 class="section-title">Search by skill, NGO, or location</h2><div class="form-grid"><label><span>Search</span><input id="sharedVolunteerSearch" class="text-input" type="text" placeholder="Search by name, skill, NGO, or contact" data-testid="shared-volunteer-search"></label><div class="grid-2"><label><span>Skills</span><input id="sharedVolunteerSkillFilter" class="text-input" type="text" placeholder="first aid, logistics" data-testid="shared-volunteer-skill-filter"></label><label><span>NGO Group</span><input id="sharedVolunteerNgoFilter" class="text-input" type="text" placeholder="Care Bridge" data-testid="shared-volunteer-ngo-filter"></label></div><label><span>Location</span><input id="sharedVolunteerLocationFilter" class="text-input" type="text" placeholder="Kolkata, Chennai, Salt Lake" data-testid="shared-volunteer-location-filter"></label></div><div id="sharedVolunteerDirectoryStats" class="shared-metric-grid"><div class="empty-box">Directory metrics will appear here after sign-in.</div></div></article></section><section class="surface-card"><p class="section-label">Volunteer Directory Records</p><h2 class="section-title">Shared volunteer profiles</h2><div id="sharedVolunteerDirectoryList" class="stack-list"><div class="empty-box">Volunteer cards will appear here after sign-in.</div></div></section>'
     ].join("");
   }
 
@@ -414,7 +497,7 @@
     return [
       renderHero({
         eyebrow: "Donation Portal",
-        title: "Record money and item donations in the shared backend.",
+        title: "Track money and useful item support in one donation center.",
         copy: "Money and useful item donations are stored in Firestore, then surfaced to admin for review and coordination.",
         primary: '<button class="primary-button" type="button" data-action="show-donation-tab" data-tab="money" data-testid="show-money-donation">Money Donation</button>',
         secondary: '<button class="ghost-button" type="button" data-action="show-donation-tab" data-tab="item" data-testid="show-item-donation">Item Donation</button>',
@@ -423,7 +506,7 @@
           miniCard("Admin Visibility", "Live records", "Admins can review every donation submission inside the dashboard.")
         ]
       }),
-      '<section class="surface-card"><p class="section-label">Donation Records</p><div id="donationPortalStatus" class="notice-box">Sign in to store donation records in Firestore and track their status.</div><div class="two-col donation-panels"><article class="surface-card" data-donation-panel="money"><p class="section-label">Money Donation</p><form id="moneyDonationForm" class="form-grid" data-testid="money-donation-form"><label><span>Donor Name</span><input class="text-input" name="donorName" type="text" placeholder="Shri Sundaram" required></label><div class="grid-2"><label><span>Amount</span><input class="text-input" name="amount" type="number" min="1" step="1" placeholder="1000" required></label><label><span>Payment Method</span><select class="text-select" name="paymentMethod" required><option value="">Choose method</option><option>UPI</option><option>Bank Transfer</option><option>Card</option><option>Cash</option><option>Cheque</option></select></label></div><label><span>Message / Note</span><textarea class="text-area" name="message" placeholder="Add a note for the receiving team."></textarea></label><button class="primary-button" type="submit" data-testid="save-money-donation">Save Money Donation</button></form></article><article class="surface-card" data-donation-panel="item" hidden><p class="section-label">Item Donation</p><form id="itemDonationForm" class="form-grid" data-testid="item-donation-form"><label><span>Donor Name</span><input class="text-input" name="donorName" type="text" placeholder="Diya Raman" required></label><div class="grid-2"><label><span>Item Type</span><select class="text-select" name="itemType" required><option value="">Choose item type</option><option>Clothes</option><option>Food</option><option>Books</option><option>Other Useful Items</option></select></label><label><span>Quantity</span><input class="text-input" name="quantity" type="number" min="1" step="1" placeholder="12" required></label></div><label><span>Description</span><textarea class="text-area" name="description" placeholder="Describe the items being donated." required></textarea></label><label><span>Contact Details</span><input class="text-input" name="contactDetails" type="text" placeholder="+91 98765 43210 | donor@example.com" required></label><button class="primary-button" type="submit" data-testid="save-item-donation">Save Item Donation</button></form></article></div></section>',
+      '<section class="surface-card"><p class="section-label">Donation Records</p><h2 class="section-title">Submit a money or item donation</h2><div id="donationPortalStatus" class="notice-box">Sign in to store donation records in Firestore and track their status.</div><div class="two-col donation-panels"><article class="surface-card nested-card" data-donation-panel="money"><p class="section-label">Money Donation</p><form id="moneyDonationForm" class="form-grid" data-testid="money-donation-form"><label><span>Donor Name</span><input class="text-input" name="donorName" type="text" placeholder="Shri Sundaram" required></label><div class="grid-2"><label><span>Amount</span><input class="text-input" name="amount" type="number" min="1" step="1" placeholder="1000" required></label><label><span>Payment Method</span><select class="text-select" name="paymentMethod" required><option value="">Choose method</option><option>UPI</option><option>Bank Transfer</option><option>Card</option><option>Cash</option><option>Cheque</option></select></label></div><label><span>Message / Note</span><textarea class="text-area" name="message" placeholder="Add a note for the receiving team."></textarea></label><button class="primary-button" type="submit" data-testid="save-money-donation">Save Money Donation</button></form></article><article class="surface-card nested-card" data-donation-panel="item" hidden><p class="section-label">Item Donation</p><form id="itemDonationForm" class="form-grid" data-testid="item-donation-form"><label><span>Donor Name</span><input class="text-input" name="donorName" type="text" placeholder="Diya Raman" required></label><div class="grid-2"><label><span>Item Type</span><select class="text-select" name="itemType" required><option value="">Choose item type</option><option>Clothes</option><option>Food</option><option>Books</option><option>Other Useful Items</option></select></label><label><span>Quantity</span><input class="text-input" name="quantity" type="number" min="1" step="1" placeholder="12" required></label></div><label><span>Description</span><textarea class="text-area" name="description" placeholder="Describe the items being donated." required></textarea></label><label><span>Contact Details</span><input class="text-input" name="contactDetails" type="text" placeholder="+91 98765 43210 | donor@example.com" required></label><button class="primary-button" type="submit" data-testid="save-item-donation">Save Item Donation</button></form></article></div></section>',
       '<section class="two-col"><article class="surface-card"><p class="section-label">Live Snapshot</p><div id="donationSummaryGrid" class="shared-metric-grid"><div class="empty-box">Your shared donation summary will appear here after sign-in.</div></div></article><article class="surface-card"><p class="section-label">Donation Records</p><div id="donationHistoryList" class="stack-list"><div class="empty-box">Recent donation records from your account will appear here.</div></div></article></section>'
     ].join("");
   }
@@ -432,7 +515,7 @@
     return [
       renderHero({
         eyebrow: "Government Operations",
-        title: "Coordinate districts, pending approvals, and AI-backed dispatch from one board.",
+        title: "National emergency response monitoring with one clear operations board.",
         copy: workspace.summary,
         primary: '<button class="primary-button" type="button" data-action="seed-demo" data-scenario="flood" data-testid="operations-load-demo">Load Demo</button>',
         secondary: '<a class="ghost-button" href="./insights.html" data-testid="operations-open-insights">Open AI Insights</a>',
@@ -441,10 +524,23 @@
           miniCard("Response Status", String(workspace.assignments.length) + " live assignments", "Assignments update in the vertical feed below.")
         ]
       }),
-      renderMetrics(workspaceMetrics(workspace)),
-      '<section class="two-col"><article class="surface-card"><p class="section-label">Request Workflow</p><h2 class="section-title">Status pipeline across the active scenario</h2>' + renderStatusBoard(workspace.requests) + '</article><article class="surface-card"><p class="section-label">District Pressure Board</p><h2 class="section-title">Where teams should move next</h2><div class="feed-list">' + renderDistrictSummaryCards(workspace) + "</div></article></section>",
-      '<section class="surface-card"><p class="section-label">Vertical Feed</p><h2 class="section-title">Requests, assignments, and dispatch reasons</h2><div class="feed-list">' + renderRequestCards(workspace.requests) + "</div></section>",
-      '<section class="two-col"><article class="surface-card"><p class="section-label">Active Dispatch</p><div class="feed-list">' + renderAssignmentCards(workspace.assignments) + '</div></article><article class="surface-card"><p class="section-label">AI Matching Story</p><div class="feed-list">' + renderWorkflowCards(buildMatchingSteps(workspace)) + "</div></article></section>"
+      renderMetrics([
+        metric("Active Zones", String(buildDistrictSummary(workspace).length), "Districts with visible pressure in the current scenario."),
+        metric("Aid Requests", String(workspace.requests.length), "Requests waiting for review, assignment, or delivery."),
+        metric("Assignments", String(workspace.assignments.length), "Live dispatch items created from the active scenario."),
+        metric("Beneficiaries", String(totalBeneficiaries(workspace)), "People projected to be supported across the board.")
+      ]),
+      '<section class="page-columns"><div class="page-columns-main">' +
+      renderMapStage(workspace, {
+        eyebrow: "Live Deployment Map",
+        title: "District movement and resource view",
+        meta: topDistrict(workspace) || "No district yet",
+        location: firstMapLocation(workspace),
+        summary: "Use the mapped location to pivot from the oversight board into Google Maps routing."
+      }) +
+      '</div><div class="page-columns-side"><section class="surface-card"><p class="section-label">Urgent Requests</p><h2 class="section-title">What needs action first</h2><div class="stack-list">' + renderRequestCards(workspace.requests.slice(0, 3)) + '</div></section><section class="surface-card"><p class="section-label">AI Dispatch Story</p><h2 class="section-title">Why this district is being prioritized</h2><div class="feed-list">' + renderWorkflowCards(buildMatchingSteps(workspace)) + "</div></section></div></section>" +
+      '<section class="two-col"><article class="surface-card"><p class="section-label">District Pressure Board</p><h2 class="section-title">Where teams should move next</h2><div class="feed-list">' + renderDistrictSummaryCards(workspace) + '</div></article><article class="surface-card"><p class="section-label">Active Dispatch</p><h2 class="section-title">Assignments currently being coordinated</h2><div class="feed-list">' + renderAssignmentCards(workspace.assignments) + "</div></article></section>" +
+      '<section class="surface-card"><p class="section-label">Request Workflow</p><h2 class="section-title">Status pipeline across the active scenario</h2>' + renderStatusBoard(workspace.requests) + "</section>"
     ].join("");
   }
 
@@ -453,7 +549,7 @@
     return [
       renderHero({
         eyebrow: "AI Insights",
-        title: "Explain why the system matched this request to this responder.",
+        title: "AI prediction and resource forecasting in one explainable view.",
         copy: "Use the insight feed to explain district pressure, volunteer fit, and how the current scenario is unfolding.",
         primary: '<button class="primary-button" type="button" data-action="seed-demo" data-scenario="medical" data-testid="insights-load-demo">Load Medical Demo</button>',
         secondary: '<a class="ghost-button" href="./operations.html" data-testid="insights-back-operations">Back To Operations</a>',
@@ -462,7 +558,16 @@
           miniCard("AI Story", String(items.length) + " live cards", "Each card explains a decision in plain language.")
         ]
       }),
-      '<section class="surface-card"><p class="section-label">Insight Feed</p><div class="feed-list">' + items.map(function (item) { return '<div class="feed-card"><div class="feed-card-head"><div><strong>' + escapeHtml(item.title) + '</strong><p class="feed-meta">' + escapeHtml(item.meta) + '</p></div></div><p class="card-copy">' + escapeHtml(item.copy) + "</p></div>"; }).join("") + "</div></section>"
+      '<section class="page-columns"><div class="page-columns-main">' +
+      renderMapStage(workspace, {
+        eyebrow: "AI Heatmap",
+        title: "Predicted shortage and district risk view",
+        meta: workspace.label || "No demo loaded",
+        location: firstMapLocation(workspace),
+        summary: "The prediction view surfaces where resources may run short before the next response step begins."
+      }) +
+      '</div><div class="page-columns-side"><section class="surface-card"><p class="section-label">Predicted Funding</p><h2 class="section-title">' + escapeHtml(formatCurrency(totalBeneficiaries(workspace) * 420)) + '</h2><p class="section-copy">A simple estimate based on the visible requests, beneficiaries, and the currently loaded scenario.</p></section><section class="surface-card"><p class="section-label">Resource Gaps</p><div class="feed-list">' + renderProjectionCards(workspace.requests) + "</div></section></div></section>" +
+      '<section class="two-col"><article class="surface-card"><p class="section-label">Requirement Projections</p><h2 class="section-title">Category-level demand forecast</h2><div class="feed-list">' + renderProjectionCards(workspace.requests, true) + '</div></article><article class="surface-card"><p class="section-label">Coordination Log</p><h2 class="section-title">AI explanation and analyst notes</h2><div class="feed-list">' + items.map(function (item) { return '<div class="feed-card"><div class="feed-card-head"><div><strong>' + escapeHtml(item.title) + '</strong><p class="feed-meta">' + escapeHtml(item.meta) + '</p></div></div><p class="card-copy">' + escapeHtml(item.copy) + "</p></div>"; }).join("") + "</div></article></section>"
     ].join("");
   }
 
@@ -470,7 +575,7 @@
     return [
       renderHero({
         eyebrow: "Admin Dashboard",
-        title: "Governance, live snapshot, and outreach all in one clear control room.",
+        title: "Governance, live snapshot, and outreach in one admin control room.",
         copy: "The admin lane combines local demo intelligence with shared Firestore-backed volunteer and donation management.",
         primary: '<button class="primary-button" type="button" data-action="seed-demo" data-scenario="flood" data-testid="admin-load-demo">Load Demo</button>',
         secondary: '<a class="ghost-button" href="./impact.html" data-testid="admin-open-impact">Public Impact</a>',
@@ -485,10 +590,9 @@
         metric("Beneficiaries", String(totalBeneficiaries(workspace)), "Projected people supported by the loaded scenario."),
         metric("Donation Records", String(workspace.donations.length), "Local scenario donation records plus shared backend entries below.")
       ]),
-      '<section class="two-col"><article class="surface-card"><p class="section-label">Governance Pulse</p><div class="feed-list">' + renderListCards(workspace.audit) + '</div><div id="adminVolunteerStatusBoard" class="shared-metric-grid" style="margin-top:16px;"><div class="empty-box">Volunteer activity status cards will appear here.</div></div><div id="adminDonationStatusBoard" class="shared-metric-grid" style="margin-top:16px;"><div class="empty-box">Donation workflow status cards will appear here.</div></div></article><article class="surface-card"><p class="section-label">Live Snapshot</p><div id="sharedAdminStatus" class="notice-box">Admin dashboard is checking the shared backend.</div><div id="adminSharedSummary" class="shared-metric-grid"><div class="empty-box">Admin metrics will appear here after sign-in.</div></div></article></section>',
-      '<section class="surface-card"><p class="section-label">User Role Management</p><div class="table-shell"><table><thead><tr><th>Name</th><th>Role</th><th>Current Access</th><th>Status</th></tr></thead><tbody>' + renderRoleRows() + '</tbody></table></div></section>',
-      '<section class="surface-card"><p class="section-label">Volunteer Directory Records</p><div id="adminVolunteerRecords" class="stack-list"><div class="empty-box">Shared volunteer management is loading.</div></div></section>',
-      '<section class="surface-card"><p class="section-label">Donation Records</p><div id="adminDonationRecords" class="stack-list"><div class="empty-box">Shared donation management is loading.</div></div></section>',
+      '<section class="two-col"><article class="surface-card"><p class="section-label">Governance Pulse</p><h2 class="section-title">Audit events, review queue, and outreach drafts</h2><div class="feed-list">' + renderListCards(workspace.audit) + '</div><div id="adminVolunteerStatusBoard" class="shared-metric-grid" style="margin-top:16px;"><div class="empty-box">Volunteer activity status cards will appear here.</div></div><div id="adminDonationStatusBoard" class="shared-metric-grid" style="margin-top:16px;"><div class="empty-box">Donation workflow status cards will appear here.</div></div></article><article class="surface-card"><p class="section-label">Live Snapshot</p><h2 class="section-title">Shared backend summary</h2><div id="sharedAdminStatus" class="notice-box">Admin dashboard is checking the shared backend.</div><div id="adminSharedSummary" class="shared-metric-grid"><div class="empty-box">Admin metrics will appear here after sign-in.</div></div></article></section>',
+      '<section class="surface-card"><p class="section-label">User Role Management</p><h2 class="section-title">Who can access which portal right now</h2><div class="table-shell"><table><thead><tr><th>Name</th><th>Role</th><th>Current Access</th><th>Status</th></tr></thead><tbody>' + renderRoleRows() + '</tbody></table></div></section>',
+      '<section class="two-col"><article class="surface-card"><p class="section-label">Volunteer Directory Records</p><h2 class="section-title">Shared volunteer visibility</h2><div id="adminVolunteerRecords" class="stack-list"><div class="empty-box">Shared volunteer management is loading.</div></div></article><article class="surface-card"><p class="section-label">Donation Records</p><h2 class="section-title">Money and item support from the backend</h2><div id="adminDonationRecords" class="stack-list"><div class="empty-box">Shared donation management is loading.</div></div></article></section>',
       '<section class="two-col"><article class="surface-card"><p class="section-label">Outreach Center</p><form id="adminOutreachForm" class="form-grid" data-testid="outreach-center-form"><label><span>Subject</span><input class="text-input" name="subject" type="text" placeholder="Volunteer briefing for evening flood response"></label><label><span>Message</span><textarea class="text-area" name="message" placeholder="Share timing, district, safety notes, and reporting instructions."></textarea></label><label><span>Recipients</span><input class="text-input" name="recipients" type="text" placeholder="Community, Volunteer, Donation portal"></label><button class="primary-button" type="button" data-action="save-outreach" data-testid="save-outreach-draft">Save Draft</button></form></article><article class="surface-card"><p class="section-label">Outreach Drafts</p><div id="adminOutreachDrafts" class="feed-list">' + renderListCards(workspace.outreach) + "</div></article></section>"
     ].join("");
   }
@@ -497,7 +601,7 @@
     return [
       renderHero({
         eyebrow: "Public Impact",
-        title: "Show judges and partners a clear story of requests, matches, and outcomes.",
+        title: "A public story of requests, assignments, and measurable outcomes.",
         copy: "This page translates the live workspace into a simple story: who needed help, how the AI matched support, and what changed on the ground.",
         primary: '<button class="primary-button" type="button" data-action="seed-demo" data-scenario="flood" data-testid="impact-load-demo">Load Demo</button>',
         secondary: '<a class="ghost-button" href="./judge.html" data-testid="impact-open-judge">Judge Mode</a>',
@@ -507,7 +611,7 @@
         ]
       }),
       renderMetrics(workspaceMetrics(workspace)),
-      '<section class="surface-card"><p class="section-label">Impact Feed</p><div class="feed-list">' + renderImpactCards(workspace) + "</div></section>"
+      '<section class="page-columns"><div class="page-columns-main"><section class="surface-card"><p class="section-label">Impact Feed</p><h2 class="section-title">Visible progress for judges, partners, and NGOs</h2><div class="feed-list">' + renderImpactCards(workspace) + '</div></section></div><div class="page-columns-side"><section class="surface-card"><p class="section-label">Snapshot</p><h2 class="section-title">' + escapeHtml(String(totalBeneficiaries(workspace))) + ' people supported</h2><p class="section-copy">This page is designed as a clean, presentation-friendly summary of the live response workspace.</p></section></div></section>'
     ].join("");
   }
 
@@ -515,7 +619,7 @@
     return [
       renderHero({
         eyebrow: "Judge Mode",
-        title: "Explain the product quickly: problem, AI logic, and measurable impact.",
+        title: "A simplified pitch view for problem, AI logic, and proof.",
         copy: "Judge Mode keeps the story focused on disaster coordination, volunteer assignment, donation flow, and public visibility.",
         primary: '<button class="primary-button" type="button" data-action="seed-demo" data-scenario="cyclone" data-testid="judge-load-demo">Load Cyclone Demo</button>',
         secondary: '<a class="ghost-button" href="./impact.html" data-testid="judge-open-impact">Impact Page</a>',
@@ -530,7 +634,7 @@
         metric("Operations", String(workspace.assignments.length), "Assignments connected to requests and volunteers."),
         metric("Evidence", String(workspace.donations.length), "Donation records and activity proof available for review.")
       ]),
-      '<section class="surface-card"><p class="section-label">Submission Flow</p><div class="feed-list">' + renderListCards(["Community users raise requests or view progress in a clean portal.", "Volunteers see assignments, points, attendance, and completed work.", "Government operations monitor requests and AI dispatch from a district-focused board.", "Admins manage donation records, volunteer records, outreach, and governance in one place."]) + "</div></section>"
+      '<section class="surface-card"><p class="section-label">Submission Flow</p><h2 class="section-title">How the product works end to end</h2><div class="feed-list">' + renderListCards(["Community users raise requests or view progress in a clean portal.", "Volunteers see assignments, points, attendance, and completed work.", "Government operations monitor requests and AI dispatch from a district-focused board.", "Admins manage donation records, volunteer records, outreach, and governance in one place."]) + "</div></section>"
     ].join("");
   }
 
@@ -539,11 +643,75 @@
   }
 
   function renderHero(config) {
-    return '<section class="hero-card"><div class="hero-grid"><div><p class="section-label">' + escapeHtml(config.eyebrow) + '</p><h1>' + escapeHtml(config.title) + '</h1><p class="section-copy">' + escapeHtml(config.copy) + '</p><div class="action-stack" style="margin-top:18px;">' + config.primary + config.secondary + '</div></div><div class="hero-side">' + (config.sideCards || []).join("") + "</div></div></section>";
+    return '<section class="hero-card"><div class="hero-grid"><div class="hero-copy"><p class="section-label">' + escapeHtml(config.eyebrow) + '</p><h1>' + escapeHtml(config.title) + '</h1><p class="section-copy">' + escapeHtml(config.copy) + '</p><div class="action-stack hero-actions">' + config.primary + config.secondary + '</div></div><div class="hero-side">' + (config.sideCards || []).join("") + "</div></div></section>";
   }
 
   function miniCard(label, title, copy) {
     return '<article class="mini-card"><span class="section-label">' + escapeHtml(label) + '</span><strong>' + escapeHtml(title) + '</strong><p class="card-copy">' + escapeHtml(copy) + "</p></article>";
+  }
+
+  function renderActionTiles(items) {
+    if (!items || !items.length) {
+      return "";
+    }
+    return '<section class="action-tile-grid">' + items.map(function (item) {
+      const element = item.href ? "a" : "button";
+      const attrs = item.href ? ' href="' + escapeHtml(item.href) + '"' : ' type="button"';
+      const dataAttrs = item.testId ? ' data-testid="' + escapeHtml(item.testId) + '"' : "";
+      return '<' + element + ' class="action-tile action-tile-' + escapeHtml(item.tone || "brand") + '"' + attrs + dataAttrs + '><strong>' + escapeHtml(item.label) + '</strong><span>' + escapeHtml(item.copy) + '</span></' + element + ">";
+    }).join("") + "</section>";
+  }
+
+  function renderAlertBanner(workspace, title, copy) {
+    if (!workspace.requests.length) {
+      return "";
+    }
+    return '<section class="alert-banner"><span class="alert-icon">!</span><div><strong>' + escapeHtml(title) + '</strong><p>' + escapeHtml(copy) + '</p></div><button class="primary-button alert-button" type="button" data-action="seed-demo" data-scenario="' + escapeHtml(workspace.scenario === "none" ? "flood" : workspace.scenario) + '" data-testid="refresh-alert-scenario">Acknowledge</button></section>';
+  }
+
+  function renderMapStage(workspace, config) {
+    const location = safeText(config.location || firstMapLocation(workspace) || "India", 180);
+    const scenarioClass = "scenario-" + escapeHtml(workspace.scenario || "none");
+    return '<section class="surface-card map-stage ' + scenarioClass + '"><div class="section-head"><div><p class="section-label">' + escapeHtml(config.eyebrow) + '</p><h2 class="section-title">' + escapeHtml(config.title) + '</h2></div><div class="map-stage-meta">' + escapeHtml(config.meta || workspace.label || "Workspace") + '</div></div><div class="map-canvas"><div class="map-grid-lines"></div><div class="map-gradient"></div><div class="map-stage-pill">Live data</div><div class="map-focus-card"><strong>' + escapeHtml(location) + '</strong><p>' + escapeHtml(config.summary || "Open the location in Google Maps to inspect the route and surrounding context.") + '</p></div><div class="map-legend"><span><i class="legend-dot critical"></i>Critical</span><span><i class="legend-dot rising"></i>Rising</span><span><i class="legend-dot stable"></i>Stable</span></div><button class="ghost-button map-link-button" type="button" data-map-location="' + escapeHtml(location) + '" data-testid="map-stage-open">View on Map</button></div></section>';
+  }
+  function firstMapLocation(workspace) {
+    return safeText((workspace.requests[0] && workspace.requests[0].location) || (workspace.assignments[0] && workspace.assignments[0].location) || (workspace.volunteers[0] && workspace.volunteers[0].location) || "", 180);
+  }
+
+  function firstName(name) {
+    return safeText(String(name || "").split(/\s+/)[0] || "Volunteer", 40);
+  }
+
+  function renderPriorityQueue(items) {
+    if (!items || !items.length) {
+      return '<div class="empty-box">Load a scenario to populate the AI task priority list.</div>';
+    }
+    return items.slice(0, 3).map(function (item, index) {
+      const title = safeText(item.title || item.summary || "Priority task", 140);
+      const meta = safeText(item.location || item.district || item.date || "Route available", 120);
+      const status = item.status || (index === 0 ? "High" : index === 1 ? "Medium" : "Low");
+      return '<article class="priority-card"><div class="priority-card-head"><span class="priority-index">0' + String(index + 1) + '</span>' + renderStatus(status) + '</div><strong>' + escapeHtml(title) + '</strong><p class="feed-meta">' + escapeHtml(meta) + '</p></article>';
+    }).join("");
+  }
+
+  function renderProjectionCards(items, detailed) {
+    if (!items || !items.length) {
+      return '<div class="empty-box">Load a scenario to see projected resource gaps.</div>';
+    }
+    const grouped = {};
+    items.forEach(function (item) {
+      const key = safeText(item.category || "Other", 40);
+      if (!grouped[key]) {
+        grouped[key] = { category: key, beneficiaries: 0, requests: 0 };
+      }
+      grouped[key].beneficiaries += Number(item.beneficiaries || 0);
+      grouped[key].requests += 1;
+    });
+    return Object.keys(grouped).slice(0, detailed ? 4 : 3).map(function (key) {
+      const item = grouped[key];
+      const estimate = Math.max(item.beneficiaries * (key.toLowerCase() === "medical" ? 12 : 7), item.requests * 20);
+      return '<article class="feed-card"><div class="feed-card-head"><div><strong>' + escapeHtml(item.category) + '</strong><p class="feed-meta">' + escapeHtml(String(item.requests)) + ' request(s)</p></div><span class="metric-inline">' + escapeHtml(String(estimate)) + '</span></div><p class="card-copy">Predicted need based on visible people affected and the current district mix.</p></article>';
+    }).join("");
   }
 
   function renderMetrics(items) {
@@ -576,11 +744,7 @@
       const stage = normalizeRequestStatus(item.status);
       return '<article class="feed-card"><div class="feed-card-head"><div><strong>' + escapeHtml(item.title) + '</strong><p class="feed-meta">' + escapeHtml(item.summary) + '</p></div>' + renderStatus(stage) + '</div><div class="feed-chip-row"><span class="feed-chip">' + escapeHtml(item.category) + '</span><span class="feed-chip">' + escapeHtml(item.district) + '</span><span class="feed-chip">' + escapeHtml(String(item.beneficiaries)) + ' beneficiaries</span><span class="feed-chip">' + escapeHtml(item.priority) + '</span></div>' + renderStepper(stage) + '<p class="card-copy"><strong>AI match:</strong> ' + escapeHtml(item.ai) + '</p><div class="action-stack" style="margin-top:14px;"><button class="ghost-button" type="button" data-map-location="' + escapeHtml(item.location) + '" data-testid="view-map-' + escapeHtml(item.id.toLowerCase()) + '">View on Map</button></div></article>';
     }).join("");
-    return items.map(function (item) {
-      return '<article class="feed-card"><div class="feed-card-head"><div><strong>' + escapeHtml(item.title) + '</strong><p class="feed-meta">' + escapeHtml(item.summary) + '</p></div>' + renderStatus(item.status) + '</div><div class="feed-chip-row"><span class="feed-chip">' + escapeHtml(item.category) + '</span><span class="feed-chip">' + escapeHtml(item.district) + '</span><span class="feed-chip">' + escapeHtml(String(item.beneficiaries)) + ' beneficiaries</span><span class="feed-chip">' + escapeHtml(item.priority) + '</span></div><p class="card-copy"><strong>AI match:</strong> ' + escapeHtml(item.ai) + '</p><div class="action-stack" style="margin-top:14px;"><button class="ghost-button" type="button" data-map-location="' + escapeHtml(item.location) + '" data-testid="view-map-' + escapeHtml(item.id.toLowerCase()) + '">📍 View on Map</button></div></article>';
-    }).join("");
   }
-
   function renderAssignmentCards(items) {
     if (!items.length) {
       return '<div class="empty-box">No assignments are visible yet. Load a demo scenario to populate assignments.</div>';
@@ -588,35 +752,23 @@
     return items.map(function (item) {
       return '<article class="feed-card"><div class="feed-card-head"><div><strong>' + escapeHtml(item.title) + '</strong><p class="feed-meta">' + escapeHtml(item.volunteer) + ' - ' + escapeHtml(item.date) + '</p></div>' + renderStatus(item.status) + '</div><div class="feed-chip-row"><span class="feed-chip">' + escapeHtml(item.district) + '</span><span class="feed-chip">' + escapeHtml(item.location) + '</span><span class="feed-chip">' + escapeHtml(String(item.points)) + ' pts</span></div><div class="action-stack" style="margin-top:14px;"><button class="ghost-button" type="button" data-map-location="' + escapeHtml(item.location) + '" data-testid="assignment-map-' + escapeHtml(item.id.toLowerCase()) + '">View on Map</button></div></article>';
     }).join("");
-    return items.map(function (item) {
-      return '<article class="feed-card"><div class="feed-card-head"><div><strong>' + escapeHtml(item.title) + '</strong><p class="feed-meta">' + escapeHtml(item.volunteer) + ' • ' + escapeHtml(item.date) + '</p></div>' + renderStatus(item.status) + '</div><div class="feed-chip-row"><span class="feed-chip">' + escapeHtml(item.district) + '</span><span class="feed-chip">' + escapeHtml(item.location) + '</span><span class="feed-chip">' + escapeHtml(String(item.points)) + ' pts</span></div><div class="action-stack" style="margin-top:14px;"><button class="ghost-button" type="button" data-map-location="' + escapeHtml(item.location) + '" data-testid="assignment-map-' + escapeHtml(item.id.toLowerCase()) + '">📍 View on Map</button></div></article>';
-    }).join("");
   }
-
   function renderArchiveCards(items) {
     if (!items.length) {
       return '<div class="empty-box">Completed volunteer work will appear here once assignments are finished.</div>';
     }
     return items.map(function (item) {
-      return '<article class="feed-card"><div class="feed-card-head"><div><strong>' + escapeHtml(item.title) + '</strong><p class="feed-meta">' + escapeHtml(item.volunteer) + ' - ' + escapeHtml(item.date) + '</p></div>' + renderStatus(item.status) + '</div><p class="card-copy">' + escapeHtml(item.location) + ' - ' + escapeHtml(item.district) + "</p></article>";
-    }).join("");
-    return items.map(function (item) {
-      return '<article class="feed-card"><div class="feed-card-head"><div><strong>' + escapeHtml(item.title) + '</strong><p class="feed-meta">' + escapeHtml(item.volunteer) + ' • ' + escapeHtml(item.date) + '</p></div>' + renderStatus(item.status) + '</div><p class="card-copy">' + escapeHtml(item.location) + ' • ' + escapeHtml(item.district) + "</p></article>";
+      return '<article class="feed-card"><div class="feed-card-head"><div><strong>' + escapeHtml(item.title) + '</strong><p class="feed-meta">' + escapeHtml(item.volunteer) + ' - ' + escapeHtml(item.date) + '</p></div>' + renderStatus(item.status) + '</div><p class="card-copy">' + escapeHtml(item.location) + ' - ' + escapeHtml(item.district) + '</p></article>';
     }).join("");
   }
-
   function renderVolunteerPreviewCards(items) {
     if (!items.length) {
       return '<div class="empty-box">Load demo data to preview the volunteer network.</div>';
     }
     return items.slice(0, 3).map(function (item) {
-      return '<article class="feed-card"><div class="feed-card-head"><div><strong>' + escapeHtml(item.name) + '</strong><p class="feed-meta">' + escapeHtml(item.ngo) + '</p></div>' + renderStatus(item.availability) + '</div><p class="card-copy">' + escapeHtml(item.skills.join(", ")) + ' - ' + escapeHtml(item.location) + "</p></article>";
-    }).join("");
-    return items.slice(0, 3).map(function (item) {
-      return '<article class="feed-card"><div class="feed-card-head"><div><strong>' + escapeHtml(item.name) + '</strong><p class="feed-meta">' + escapeHtml(item.ngo) + '</p></div>' + renderStatus(item.availability) + '</div><p class="card-copy">' + escapeHtml(item.skills.join(", ")) + ' • ' + escapeHtml(item.location) + "</p></article>";
+      return '<article class="feed-card"><div class="feed-card-head"><div><strong>' + escapeHtml(item.name) + '</strong><p class="feed-meta">' + escapeHtml(item.ngo) + '</p></div>' + renderStatus(item.availability) + '</div><p class="card-copy">' + escapeHtml(item.skills.join(", ")) + ' - ' + escapeHtml(item.location) + '</p></article>';
     }).join("");
   }
-
   function renderStatusBoard(items) {
     const counts = buildRequestStageCounts(items);
     return '<div class="status-board">' + REQUEST_STAGES.map(function (stage) {
@@ -760,9 +912,7 @@
       return formatCurrency(item.amount) + " via " + safeText(item.paymentMethod || "money", 40);
     }
     return safeText(item.itemType || "Item", 40) + " - Qty " + safeText(item.quantity || "1", 20);
-    return safeText(item.itemType || "Item", 40) + " • Qty " + safeText(item.quantity || "1", 20);
   }
-
   function normalizeRequestStatus(status) {
     const normalized = safeText(status, 40).toLowerCase();
     if (!normalized || normalized === "tracked") return "Submitted";
@@ -894,7 +1044,7 @@
         const next = loadTheme() === "dark" ? "light" : "dark";
         saveTheme(next);
         applyTheme(next);
-        button.textContent = themeToggleLabel(next);
+        updateThemeToggleButtons(root, next);
       });
     });
 
@@ -974,6 +1124,15 @@
     if (page === "donations") {
       showDonationTab("money");
     }
+  }
+
+  function updateThemeToggleButtons(root, theme) {
+    root.querySelectorAll(".header-theme-button").forEach(function (button) {
+      const fullLabel = button.querySelector(".button-full-label");
+      if (fullLabel) {
+        fullLabel.textContent = themeToggleLabel(theme);
+      }
+    });
   }
 
   function showDonationTab(tab) {
@@ -1261,3 +1420,4 @@
 
   init();
 })();
+
