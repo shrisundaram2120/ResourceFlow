@@ -258,19 +258,28 @@
       '<span class="rf-brand-mark">RF</span>',
       '<span class="rf-brand-copy"><strong>ResourceFlow</strong><small>Management Console</small></span>',
       "</a>",
-      '<div class="rf-page-intro">',
-      '<span class="rf-page-kicker">' + escapeHtml(roleData.label) + '</span>',
-      '<strong>' + escapeHtml(PAGE_TITLES[page] || "Portal") + '</strong>',
-      "</div>",
+      '<nav class="rf-top-nav" aria-label="Visible spaces">' + renderHeaderNav(page, session) + '</nav>',
       "</div>",
       '<div class="rf-header-actions">',
-      '<div class="rf-header-chip">Live workspace</div>',
+      '<label class="rf-search-shell"><span class="rf-symbol" aria-hidden="true">search</span><input class="rf-search-input" type="search" placeholder="Search requests, volunteers, donations..." aria-label="Search workspace" data-testid="header-search"></label>',
+      '<div class="rf-header-toolset">',
+      '<div class="rf-header-chip">' + escapeHtml(roleData.label) + '</div>',
       '<button class="ghost-button theme-toggle header-theme-button" type="button" data-action="toggle-theme" data-testid="toggle-theme"><span class="button-full-label">' + escapeHtml(themeToggleLabel()) + '</span><span class="button-short-label">Theme</span></button>',
       '<button class="ghost-button header-switch-button" type="button" data-action="switch-portal" data-testid="switch-portal">Switch Portal</button>',
       '<button class="primary-button header-signout-button" type="button" data-action="signout" data-testid="sign-out">Sign Out</button>',
       "</div>",
+      "</div>",
       "</header>"
     ].join("");
+  }
+
+  function renderHeaderNav(page, session) {
+    return SIDEBAR_ITEMS.filter(function (item) {
+      return item.roles.indexOf(session.role) !== -1;
+    }).slice(0, 5).map(function (item) {
+      const active = item.key === page;
+      return '<a class="rf-top-link' + (active ? ' is-active' : '') + '" href="' + escapeHtml(item.href) + '" data-testid="top-nav-' + escapeHtml(item.key) + '">' + escapeHtml(item.shortLabel || item.label) + "</a>";
+    }).join("");
   }
 
   function renderSidebar(page, session) {
@@ -297,8 +306,8 @@
       '<aside class="rf-sidebar">',
       '<section class="surface-card sidebar-brand-card">',
       '<p class="section-label">Portal View</p>',
-      '<h2 class="session-name">Operational Control</h2>',
-      '<p class="section-copy">A stitched command shell for community, volunteer, government, and admin response lanes.</p>',
+      '<h2 class="session-name">ResourceFlow Control</h2>',
+      '<p class="section-copy">A shared operating shell for community, volunteer, government, and admin response lanes.</p>',
       "</section>",
       '<section class="surface-card session-card">',
       '<p class="section-label">Current Access</p>',
@@ -307,7 +316,7 @@
       '<div class="chip-row">' + roleData.chips.map(function (chip) { return '<span class="chip">' + escapeHtml(chip) + "</span>"; }).join("") + "</div>",
       "</section>",
       '<section class="surface-card">',
-      '<p class="section-label">Visible Spaces</p>',
+      '<p class="section-label">Navigation</p>',
       '<div class="space-nav">' + nav + "</div>",
       "</section>",
       '<section class="surface-card sidebar-profile-card">',
