@@ -168,6 +168,67 @@ exports.generateWorkspaceAnalysis = onCall({ region: region }, async (request) =
   };
 });
 
+exports.chatResourceFlowCopilot = onCall({ region: region }, async (request) => {
+  ensureSignedIn(request);
+  if (!process.env.GEMINI_API_KEY) {
+    throw new HttpsError("failed-precondition", "GEMINI_API_KEY is not configured on the server.");
+  }
+
+  const message = safeText(request.data && request.data.message, 2000);
+  if (!message) {
+    throw new HttpsError("invalid-argument", "A chat message is required.");
+  }
+
+  const workspace = normalizeWorkspaceState(request.data && request.data.workspace);
+  const portalRole = safeText(request.data && request.data.portalRole, 40);
+  const history = Array.isArray(request.data && request.data.history)
+    ? request.data.history.slice(-8).map(function (entry) {
+        return {
+          speaker: safeText(entry && entry.speaker, 20),
+          text: safeText(entry && entry.text, 1000)
+        };
+      })
+    : [];
+
+  const prompt = buildCopilotPrompt(workspace, portalRole, message, history);
+  const response = await fetch(
+    "https://generativelanguage.googleapis.com/v1beta/models/" +
+      encodeURIComponent(process.env.GEMINI_MODEL || "gemini-2.5-flash") +
+      ":generateContent?key=" +
+      encodeURIComponent(process.env.GEMINI_API_KEY),
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: prompt }]
+          }
+        ],
+        generationConfig: {
+          temperature: 0.3,
+          maxOutputTokens: 700
+        }
+      })
+    }
+  );
+
+  if (!response.ok) {
+    const failure = await response.text();
+    logger.error("Gemini copilot failed.", { status: response.status, failure: failure });
+    throw new HttpsError("internal", "Gemini copilot request failed.");
+  }
+
+  const payload = await response.json();
+  const text = extractGeminiText(payload);
+  return {
+    ok: true,
+    model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
+    text: text
+  };
+});
+
 exports.computeSecureRoute = onCall({ region: region }, async (request) => {
   ensureManager(request);
   if (!process.env.MAPS_API_KEY) {
@@ -453,6 +514,7 @@ function normalizeWorkspaceState(input) {
     requests: Array.isArray(next.requests) ? next.requests : [],
     volunteers: Array.isArray(next.volunteers) ? next.volunteers : [],
     assignments: Array.isArray(next.assignments) ? next.assignments : [],
+    donations: Array.isArray(next.donations) ? next.donations : [],
     artifacts: Array.isArray(next.artifacts) ? next.artifacts : [],
     activityLog: Array.isArray(next.activityLog) ? next.activityLog.slice(0, 60) : [],
     history: Array.isArray(next.history) ? next.history.slice(0, 30) : [],
@@ -536,6 +598,32 @@ function buildWorkspacePrompt(workspace, requestedPrompt) {
       return "- " + safeText(item.name, 80) + " | " + safeText(item.zone, 40) + " | skills " + (Array.isArray(item.skills) ? item.skills.join(", ") : "");
     }).join("\n")
   ].join("\n");
+}
+
+function buildCopilotPrompt(workspace, portalRole, message, history) {
+  const safeHistory = Array.isArray(history) ? history : [];
+  return [
+    "You are ResourceFlow Copilot, an NGO disaster-response chatbot inside a coordination platform.",
+    "Answer briefly, clearly, and operationally.",
+    "Use only the workspace data provided. If data is missing, say so directly.",
+    "Tailor the response for the active portal role: " + safeText(portalRole || "user", 40) + ".",
+    safeHistory.length
+      ? "Recent conversation:\n" + safeHistory.map(function (entry) {
+          return (entry.speaker === "assistant" ? "Assistant" : "User") + ": " + safeText(entry.text, 1000);
+        }).join("\n")
+      : "",
+    "Workspace snapshot:\n" + JSON.stringify({
+      requests: (workspace.requests || []).slice(0, 6),
+      volunteers: (workspace.volunteers || []).slice(0, 6),
+      assignments: (workspace.assignments || []).slice(0, 6),
+      donations: (workspace.donations || []).slice(0, 6),
+      artifacts: (workspace.artifacts || []).slice(0, 6),
+      history: (workspace.history || []).slice(0, 6),
+      meta: workspace.meta || {}
+    }, null, 2),
+    "User question: " + safeText(message, 2000),
+    "Answer in this structure:\n1. Recommendation\n2. Why it matters now\n3. Next action"
+  ].filter(Boolean).join("\n\n");
 }
 
 function extractGeminiText(payload) {

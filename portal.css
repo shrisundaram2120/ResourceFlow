@@ -904,6 +904,34 @@ html.rf-theme-dark .shared-record-card {
   font-weight: 700;
 }
 
+.feed-chip-risk {
+  font-weight: 800;
+}
+
+.feed-chip-risk-critical {
+  background: rgba(186, 26, 26, 0.1);
+  color: var(--danger);
+  border-color: rgba(186, 26, 26, 0.18);
+}
+
+.feed-chip-risk-high {
+  background: rgba(192, 137, 0, 0.12);
+  color: #8a6400;
+  border-color: rgba(192, 137, 0, 0.18);
+}
+
+.feed-chip-risk-medium {
+  background: rgba(74, 111, 249, 0.12);
+  color: #3655c7;
+  border-color: rgba(74, 111, 249, 0.16);
+}
+
+.feed-chip-risk-low {
+  background: rgba(47, 125, 95, 0.12);
+  color: var(--success);
+  border-color: rgba(47, 125, 95, 0.18);
+}
+
 .map-stage {
   overflow: hidden;
 }
@@ -1201,6 +1229,157 @@ html.rf-theme-dark .priority-card {
   color: var(--accent);
   font-size: 0.94rem;
   font-weight: 800;
+}
+
+.chat-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin: 16px 0;
+  flex-wrap: wrap;
+}
+
+.ai-quick-prompts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.ai-prompt-chip {
+  min-height: 40px;
+  padding: 10px 14px;
+  border-radius: 18px;
+}
+
+.satellite-actions {
+  flex-wrap: wrap;
+}
+
+.satellite-note {
+  margin-top: 14px;
+}
+
+.chat-thread {
+  display: grid;
+  gap: 12px;
+  max-height: 420px;
+  overflow: auto;
+  padding-right: 6px;
+  margin-bottom: 16px;
+}
+
+.chat-bubble {
+  padding: 16px 18px;
+  border-radius: 22px;
+  border: 1px solid var(--line);
+  background: var(--surface-soft);
+}
+
+html.rf-theme-dark .chat-bubble {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.chat-bubble-user {
+  background: var(--brand-soft);
+}
+
+html.rf-theme-dark .chat-bubble-user {
+  background: rgba(182, 199, 235, 0.12);
+}
+
+.chat-bubble-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.chat-bubble p {
+  margin: 0;
+  line-height: 1.65;
+  color: var(--text);
+  white-space: pre-wrap;
+}
+
+.copilot-form {
+  margin-top: 4px;
+}
+
+.boosted-card {
+  overflow: hidden;
+}
+
+.prediction-meter {
+  width: 100%;
+  height: 10px;
+  margin: 14px 0 12px;
+  border-radius: 999px;
+  background: var(--surface-soft);
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+
+html.rf-theme-dark .prediction-meter {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.prediction-meter span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #2c694e 0%, #c25934 100%);
+}
+
+.prediction-factor-list {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.prediction-factor-list li + li {
+  margin-top: 4px;
+}
+
+.risk-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-weight: 800;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.risk-badge-critical {
+  color: #8e1919;
+  background: rgba(186, 26, 26, 0.12);
+  border-color: rgba(186, 26, 26, 0.18);
+}
+
+.risk-badge-high {
+  color: #8a6400;
+  background: rgba(192, 137, 0, 0.12);
+  border-color: rgba(192, 137, 0, 0.18);
+}
+
+.risk-badge-medium {
+  color: #3655c7;
+  background: rgba(74, 111, 249, 0.12);
+  border-color: rgba(74, 111, 249, 0.18);
+}
+
+.risk-badge-low {
+  color: var(--success);
+  background: rgba(47, 125, 95, 0.12);
+  border-color: rgba(47, 125, 95, 0.18);
 }
 
 .nested-card {

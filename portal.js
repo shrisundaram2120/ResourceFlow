@@ -7,7 +7,36 @@
   const THEME_KEY = "resourceflow-theme-mode-v2";
   const WORKSPACE_KEY = "resourceflow-demo-workspace-v2";
   const CACHE_RESET_KEY = "resourceflow-portal-cache-reset-v1";
+  const AI_CHAT_HISTORY_KEY = "resourceflow-ai-chat-v1";
   const FIREBASE_SDK_VERSION = "10.12.5";
+  const AI_QUICK_PROMPTS = [
+    "Which district is at the highest risk right now?",
+    "Why did the system match these volunteers to the top request?",
+    "What donations are missing for the active scenario?",
+    "Give me a short response plan for the next 2 hours."
+  ];
+  const CATEGORY_SKILLS = {
+    food: ["food", "ration", "kitchen", "distribution", "logistics"],
+    medical: ["medical", "medicine", "nurse", "first aid", "health", "clinic"],
+    shelter: ["shelter", "registration", "coordination", "logistics", "support"],
+    education: ["education", "teacher", "books", "child", "speaker"],
+    logistics: ["logistics", "driving", "operations", "routing", "supply"],
+    "community alert": ["outreach", "coordination", "bilingual", "speaker", "alert"]
+  };
+  const CATEGORY_DONATIONS = {
+    food: ["food", "money"],
+    medical: ["money", "other useful items", "food"],
+    shelter: ["clothes", "other useful items", "money"],
+    education: ["books", "money"],
+    logistics: ["money", "other useful items"],
+    "community alert": ["money", "other useful items"]
+  };
+  const AI_RUNTIME = {
+    busy: false,
+    status: "AI copilot is ready. Ask about districts, volunteers, donors, or the current scenario.",
+    tone: "",
+    engine: "local-boosted"
+  };
 
   const PAGE_TITLES = {
     overview: "Community Portal",
@@ -24,15 +53,15 @@
   const ROLE_CONFIG = {
     user: {
       label: "Community User",
-      description: "View community status, donate, and follow visible response progress.",
-      pages: ["overview", "donations"],
-      chips: ["Overview only", "Donation access", "Read-only tracking"]
+      description: "View community status, donate, and follow visible response progress with AI prediction support.",
+      pages: ["overview", "donations", "insights"],
+      chips: ["Overview only", "Donation access", "AI prediction"]
     },
     volunteer: {
       label: "Volunteer",
-      description: "Track your assignments, view the shared directory, and follow your response progress.",
-      pages: ["volunteer", "directory"],
-      chips: ["Assignments", "Achievements", "Shared directory"]
+      description: "Track your assignments, view the shared directory, and follow AI-supported response progress.",
+      pages: ["volunteer", "directory", "insights"],
+      chips: ["Assignments", "Achievements", "AI prediction"]
     },
     government: {
       label: "Government Employee",
@@ -54,7 +83,7 @@
     { key: "directory", label: "Volunteer Directory", shortLabel: "Directory", href: "./directory.html", icon: "groups", caption: "Shared responder profiles", roles: ["volunteer", "admin"] },
     { key: "donations", label: "Donation Center", shortLabel: "Donations", href: "./donations.html", icon: "redeem", caption: "Money and item support", roles: ["user", "admin"] },
     { key: "operations", label: "Government Ops", shortLabel: "Operations", href: "./operations.html", icon: "shield_person", caption: "District coordination board", roles: ["government", "admin"] },
-    { key: "insights", label: "AI Prediction", shortLabel: "AI", href: "./insights.html", icon: "monitoring", caption: "Forecasts and risk analysis", roles: ["government", "admin"] },
+    { key: "insights", label: "AI Prediction", shortLabel: "AI", href: "./insights.html", icon: "monitoring", caption: "Forecasts and risk analysis", roles: ["user", "volunteer", "government", "admin"] },
     { key: "admin", label: "Admin Dashboard", shortLabel: "Admin", href: "./admin.html", icon: "admin_panel_settings", caption: "Governance and control", roles: ["admin"] }
   ];
 
@@ -64,10 +93,10 @@
       label: "Flood Response",
       summary: "A flood warning has escalated into active street-level response across low-lying neighborhoods.",
       requests: [
-        { id: "REQ-104", title: "Dry ration kits for low-lying streets", category: "Food", district: "Chennai", location: "Velachery, Chennai", beneficiaries: 180, priority: "Critical", status: "Assigned", summary: "Families displaced by overnight flooding need ready-to-cook meal kits and drinking water.", ai: "AI matched food handlers and two-wheeler responders because they are within 4 km and available this evening." },
-        { id: "REQ-105", title: "Temporary shelter support at school hall", category: "Shelter", district: "Chennai", location: "Saidapet Government School, Chennai", beneficiaries: 140, priority: "High", status: "In Progress", summary: "Mats, blankets, and volunteer registration support are needed for the emergency shelter.", ai: "AI prioritized bilingual volunteers with registration support skills for faster intake at the shelter." },
-        { id: "REQ-106", title: "Medical support for senior citizens", category: "Medical", district: "Chennai", location: "Adyar Community Clinic, Chennai", beneficiaries: 65, priority: "Critical", status: "Queued", summary: "Medicine pickup and blood pressure checks are required for seniors isolated by waterlogging.", ai: "AI flagged the request because medicine lead time is short and the available nurse volunteer is nearby." },
-        { id: "REQ-107", title: "School book recovery and child-safe space", category: "Education", district: "Chennai", location: "Perungudi Relief Camp, Chennai", beneficiaries: 150, priority: "Medium", status: "Submitted", summary: "Children at the relief camp need book kits, mats, and supervised activity support.", ai: "AI recommended education volunteers and book donations to combine relief and child engagement in one trip." }
+        { id: "REQ-104", title: "Dry ration kits for low-lying streets", category: "Food", district: "Chennai", location: "Velachery, Chennai", lat: 12.9815, lng: 80.218, beneficiaries: 180, priority: "Critical", status: "Assigned", summary: "Families displaced by overnight flooding need ready-to-cook meal kits and drinking water.", ai: "AI matched food handlers and two-wheeler responders because they are within 4 km and available this evening." },
+        { id: "REQ-105", title: "Temporary shelter support at school hall", category: "Shelter", district: "Chennai", location: "Saidapet Government School, Chennai", lat: 13.023, lng: 80.223, beneficiaries: 140, priority: "High", status: "In Progress", summary: "Mats, blankets, and volunteer registration support are needed for the emergency shelter.", ai: "AI prioritized bilingual volunteers with registration support skills for faster intake at the shelter." },
+        { id: "REQ-106", title: "Medical support for senior citizens", category: "Medical", district: "Chennai", location: "Adyar Community Clinic, Chennai", lat: 13.0067, lng: 80.2573, beneficiaries: 65, priority: "Critical", status: "Queued", summary: "Medicine pickup and blood pressure checks are required for seniors isolated by waterlogging.", ai: "AI flagged the request because medicine lead time is short and the available nurse volunteer is nearby." },
+        { id: "REQ-107", title: "School book recovery and child-safe space", category: "Education", district: "Chennai", location: "Perungudi Relief Camp, Chennai", lat: 12.96, lng: 80.241, beneficiaries: 150, priority: "Medium", status: "Submitted", summary: "Children at the relief camp need book kits, mats, and supervised activity support.", ai: "AI recommended education volunteers and book donations to combine relief and child engagement in one trip." }
       ],
       assignments: [
         { id: "ASG-301", title: "Deliver 60 ration kits", volunteer: "Thenmozhi P", district: "Chennai", location: "Velachery, Chennai", status: "Completed", date: "Today 09:20", points: 30 },
@@ -104,9 +133,9 @@
       label: "Cyclone Preparedness",
       summary: "A cyclone warning is driving pre-positioning of volunteers, shelter supplies, and district control-room updates.",
       requests: [
-        { id: "REQ-210", title: "Pre-position shelter kits", category: "Shelter", district: "Nagapattinam", location: "Nagapattinam Collectorate", beneficiaries: 220, priority: "Critical", status: "Assigned", summary: "Before landfall, the district needs shelter kits moved to two evacuation centers.", ai: "AI prioritized logistics volunteers with vehicle access because the movement window closes by evening." },
-        { id: "REQ-211", title: "Fishing harbor warning support", category: "Community Alert", district: "Nagapattinam", location: "Akkaraipettai Harbor", beneficiaries: 90, priority: "High", status: "In Progress", summary: "Field teams are needed to spread evacuation and safe-return notices in person.", ai: "AI suggested bilingual volunteers because the harbor team needs Tamil and Telugu outreach support." },
-        { id: "REQ-212", title: "Emergency medicine staging", category: "Medical", district: "Cuddalore", location: "Cuddalore District Hospital", beneficiaries: 130, priority: "High", status: "Queued", summary: "Medicine packs and glucose supplies need staging ahead of expected outages.", ai: "AI flagged a high-value medicine window and recommended fast deployment before road closures." }
+        { id: "REQ-210", title: "Pre-position shelter kits", category: "Shelter", district: "Nagapattinam", location: "Nagapattinam Collectorate", lat: 10.7672, lng: 79.8428, beneficiaries: 220, priority: "Critical", status: "Assigned", summary: "Before landfall, the district needs shelter kits moved to two evacuation centers.", ai: "AI prioritized logistics volunteers with vehicle access because the movement window closes by evening." },
+        { id: "REQ-211", title: "Fishing harbor warning support", category: "Community Alert", district: "Nagapattinam", location: "Akkaraipettai Harbor", lat: 10.7656, lng: 79.8565, beneficiaries: 90, priority: "High", status: "In Progress", summary: "Field teams are needed to spread evacuation and safe-return notices in person.", ai: "AI suggested bilingual volunteers because the harbor team needs Tamil and Telugu outreach support." },
+        { id: "REQ-212", title: "Emergency medicine staging", category: "Medical", district: "Cuddalore", location: "Cuddalore District Hospital", lat: 11.7444, lng: 79.7684, beneficiaries: 130, priority: "High", status: "Queued", summary: "Medicine packs and glucose supplies need staging ahead of expected outages.", ai: "AI flagged a high-value medicine window and recommended fast deployment before road closures." }
       ],
       assignments: [
         { id: "ASG-401", title: "Move shelter mattresses", volunteer: "Thenmozhi P", district: "Nagapattinam", location: "Nagapattinam Collectorate", status: "Completed", date: "Today 08:15", points: 24 },
@@ -137,9 +166,9 @@
       label: "Mobile Medical Camp",
       summary: "A mobile health camp is coordinating registrations, medicine supply, and volunteer triage support.",
       requests: [
-        { id: "REQ-310", title: "Registration desk support", category: "Medical", district: "Kolkata", location: "Tangra Community Hall, Kolkata", beneficiaries: 160, priority: "High", status: "Assigned", summary: "Volunteers are needed to manage patient tokens, intake forms, and crowd flow.", ai: "AI matched volunteers with coordination and bilingual skills to reduce intake delays." },
-        { id: "REQ-311", title: "Medicine desk coordination", category: "Medical", district: "Kolkata", location: "Tangra Community Hall, Kolkata", beneficiaries: 160, priority: "High", status: "In Progress", summary: "Doctors need one runner and one record-keeper for medicine dispensation.", ai: "AI paired one logistics volunteer and one data-entry volunteer because both are already on-site." },
-        { id: "REQ-312", title: "Health awareness booklets", category: "Education", district: "Kolkata", location: "Tangra Community Hall, Kolkata", beneficiaries: 160, priority: "Medium", status: "Submitted", summary: "Printed materials and volunteer speakers are required for follow-up awareness sessions.", ai: "AI suggested clubbing booklets with the donation run to avoid a separate last-mile trip." }
+        { id: "REQ-310", title: "Registration desk support", category: "Medical", district: "Kolkata", location: "Tangra Community Hall, Kolkata", lat: 22.5492, lng: 88.4049, beneficiaries: 160, priority: "High", status: "Assigned", summary: "Volunteers are needed to manage patient tokens, intake forms, and crowd flow.", ai: "AI matched volunteers with coordination and bilingual skills to reduce intake delays." },
+        { id: "REQ-311", title: "Medicine desk coordination", category: "Medical", district: "Kolkata", location: "Tangra Community Hall, Kolkata", lat: 22.5492, lng: 88.4049, beneficiaries: 160, priority: "High", status: "In Progress", summary: "Doctors need one runner and one record-keeper for medicine dispensation.", ai: "AI paired one logistics volunteer and one data-entry volunteer because both are already on-site." },
+        { id: "REQ-312", title: "Health awareness booklets", category: "Education", district: "Kolkata", location: "Tangra Community Hall, Kolkata", lat: 22.5492, lng: 88.4049, beneficiaries: 160, priority: "Medium", status: "Submitted", summary: "Printed materials and volunteer speakers are required for follow-up awareness sessions.", ai: "AI suggested clubbing booklets with the donation run to avoid a separate last-mile trip." }
       ],
       assignments: [
         { id: "ASG-510", title: "Patient token intake", volunteer: "Thenmozhi P", district: "Kolkata", location: "Tangra Community Hall, Kolkata", status: "In Progress", date: "Today 09:00", points: 19 },
@@ -336,6 +365,7 @@
   function renderRail(page, session, workspace) {
     const insightItems = buildInsightItems(workspace);
     const donations = workspace.donations.slice(0, 3);
+    const topPrediction = buildBoostedPredictionRows(workspace)[0] || null;
     return [
       '<aside class="rf-rail right-stack">',
       '<section class="surface-card">',
@@ -368,6 +398,19 @@
         return '<div class="feed-card"><div class="feed-card-head"><div><strong>' + escapeHtml(item.title) + '</strong><p class="feed-meta">' + escapeHtml(item.meta) + '</p></div></div><p class="card-copy">' + escapeHtml(item.copy) + "</p></div>";
       }).join(""),
       "</div>",
+      "</section>",
+      '<section class="surface-card">',
+      '<p class="section-label">XGBoost Signal</p>',
+      '<h3 class="section-title">What the model would move first</h3>',
+      topPrediction ? renderBoostedSignal(topPrediction) : '<div class="empty-box">Load demo data to activate the boosted triage engine.</div>',
+      '<div class="action-stack" style="margin-top:14px;">',
+      '<a class="ghost-button" href="./insights.html" data-testid="open-ai-copilot">Open AI Copilot</a>',
+      "</div>",
+      "</section>",
+      '<section class="surface-card">',
+      '<p class="section-label">Satellite Intelligence</p>',
+      '<h3 class="section-title">Open the active zone in satellite imagery</h3>',
+      renderSatellitePanel(workspace),
       "</section>",
       '<section class="surface-card">',
       '<p class="section-label">Donation Records</p>',
@@ -405,7 +448,7 @@
       case "operations":
         return renderOperationsPage(workspace);
       case "insights":
-        return renderInsightsPage(workspace);
+        return renderInsightsPage(session, workspace);
       case "admin":
         return renderAdminPage(workspace);
       case "impact":
@@ -427,13 +470,14 @@
         secondary: '<a class="ghost-button" href="./donations.html" data-testid="overview-donate">Donation Portal</a>',
         sideCards: [
           miniCard("Workspace", workspace.label || "No demo loaded", "A single community lane that shows urgent needs, support, and progress."),
-          miniCard("Visible Spaces", "Community, Volunteer, Donations", "Each portal stays visually separate while sharing one response story.")
+          miniCard("Visible Spaces", "Community, Donations, AI Prediction", "Each portal stays visually separate while sharing one response story.")
         ]
       }),
       renderActionTiles([
         { label: "I Need Help", copy: "Raise an urgent community request", href: "#communityRequestForm", tone: "brand" },
         { label: "I Want to Donate", copy: "Open money and item support", href: "./donations.html", tone: "outline" },
-        { label: "Track Requests", copy: "See live request movement", href: "#communityTrackerSection", tone: "muted" }
+        { label: "Track Requests", copy: "See live request movement", href: "#communityTrackerSection", tone: "muted" },
+        { label: "AI Prediction", copy: "Open the forecasting and matching view", href: "./insights.html", tone: "outline", testId: "overview-open-ai" }
       ]),
       renderMetrics(workspaceMetrics(workspace)),
       '<section class="page-columns"><div class="page-columns-main">' +
@@ -465,6 +509,11 @@
         ]
       }),
       renderAlertBanner(workspace, "Flash flood warning", "The volunteer lane should make one next action obvious, even on small screens."),
+      renderActionTiles([
+        { label: "AI Prediction", copy: "See why the system is prioritizing these tasks", href: "./insights.html", tone: "outline", testId: "volunteer-open-ai" },
+        { label: "Volunteer Directory", copy: "Open shared volunteer profiles", href: "./directory.html", tone: "muted", testId: "volunteer-open-directory-tile" },
+        { label: "Load Demo", copy: "Refresh the active volunteer story", action: "seed-demo", scenario: "flood", tone: "brand", testId: "volunteer-load-demo-tile" }
+      ]),
       '<section class="page-columns"><div class="page-columns-main">' +
       renderMapStage(workspace, {
         eyebrow: "Live Sentinel Monitoring",
@@ -498,6 +547,9 @@
           miniCard("Filters", "Skills, NGO, location", "Use the filters to narrow the directory quickly.")
         ]
       }),
+      renderActionTiles([
+        { label: "AI Prediction", copy: "Open volunteer-fit forecasting", href: "./insights.html", tone: "outline", testId: "directory-open-ai" }
+      ]),
       '<section class="two-col"><article class="surface-card"><p class="section-label">Volunteer Registration</p><h2 class="section-title">Create or update a shared profile</h2><div id="sharedVolunteerStatus" class="notice-box">Sign in to create your volunteer profile and see the shared directory from Firestore.</div><form id="sharedVolunteerForm" class="form-grid" data-testid="shared-volunteer-form"><label><span>Full Name</span><input class="text-input" name="fullName" type="text" placeholder="Thenmozhi P" required></label><label><span>NGO Group Name</span><input class="text-input" name="ngoGroup" type="text" placeholder="Care Bridge" required></label><label><span>Skills</span><input class="text-input" name="skills" type="text" placeholder="first aid, food distribution, registration" required></label><div class="grid-2"><label><span>Phone</span><input class="text-input" name="phone" type="text" placeholder="+91 98765 43210" required></label><label><span>Email</span><input class="text-input" name="email" type="email" placeholder="volunteer@example.com" required></label></div><div class="grid-2"><label><span>Availability</span><select class="text-select" name="availability" required><option value="">Choose availability</option><option>Full Day</option><option>Half Day</option><option>Evening</option><option>Weekend</option><option>On Call</option></select></label><label><span>Activity Status</span><select class="text-select" name="activityStatus" required><option value="available">Available</option><option value="on call">On Call</option><option value="active">Active</option><option value="inactive">Inactive</option></select></label></div><label><span>Location (Optional)</span><input class="text-input" name="location" type="text" placeholder="Salt Lake, Kolkata"></label><button class="primary-button" type="submit" data-testid="save-volunteer-profile">Save Shared Volunteer Profile</button></form></article><article class="surface-card"><p class="section-label">Filters</p><h2 class="section-title">Search by skill, NGO, or location</h2><div class="form-grid"><label><span>Search</span><input id="sharedVolunteerSearch" class="text-input" type="text" placeholder="Search by name, skill, NGO, or contact" data-testid="shared-volunteer-search"></label><div class="grid-2"><label><span>Skills</span><input id="sharedVolunteerSkillFilter" class="text-input" type="text" placeholder="first aid, logistics" data-testid="shared-volunteer-skill-filter"></label><label><span>NGO Group</span><input id="sharedVolunteerNgoFilter" class="text-input" type="text" placeholder="Care Bridge" data-testid="shared-volunteer-ngo-filter"></label></div><label><span>Location</span><input id="sharedVolunteerLocationFilter" class="text-input" type="text" placeholder="Kolkata, Chennai, Salt Lake" data-testid="shared-volunteer-location-filter"></label></div><div id="sharedVolunteerDirectoryStats" class="shared-metric-grid"><div class="empty-box">Directory metrics will appear here after sign-in.</div></div></article></section><section class="surface-card"><p class="section-label">Volunteer Directory Records</p><h2 class="section-title">Shared volunteer profiles</h2><div id="sharedVolunteerDirectoryList" class="stack-list"><div class="empty-box">Volunteer cards will appear here after sign-in.</div></div></section>'
     ].join("");
   }
@@ -515,6 +567,9 @@
           miniCard("Admin Visibility", "Live records", "Admins can review every donation submission inside the dashboard.")
         ]
       }),
+      renderActionTiles([
+        { label: "AI Prediction", copy: "See the top donation gaps and funding forecast", href: "./insights.html", tone: "outline", testId: "donations-open-ai" }
+      ]),
       '<section class="surface-card"><p class="section-label">Donation Records</p><h2 class="section-title">Submit a money or item donation</h2><div id="donationPortalStatus" class="notice-box">Sign in to store donation records in Firestore and track their status.</div><div class="two-col donation-panels"><article class="surface-card nested-card" data-donation-panel="money"><p class="section-label">Money Donation</p><form id="moneyDonationForm" class="form-grid" data-testid="money-donation-form"><label><span>Donor Name</span><input class="text-input" name="donorName" type="text" placeholder="Shri Sundaram" required></label><div class="grid-2"><label><span>Amount</span><input class="text-input" name="amount" type="number" min="1" step="1" placeholder="1000" required></label><label><span>Payment Method</span><select class="text-select" name="paymentMethod" required><option value="">Choose method</option><option>UPI</option><option>Bank Transfer</option><option>Card</option><option>Cash</option><option>Cheque</option></select></label></div><label><span>Message / Note</span><textarea class="text-area" name="message" placeholder="Add a note for the receiving team."></textarea></label><button class="primary-button" type="submit" data-testid="save-money-donation">Save Money Donation</button></form></article><article class="surface-card nested-card" data-donation-panel="item" hidden><p class="section-label">Item Donation</p><form id="itemDonationForm" class="form-grid" data-testid="item-donation-form"><label><span>Donor Name</span><input class="text-input" name="donorName" type="text" placeholder="Diya Raman" required></label><div class="grid-2"><label><span>Item Type</span><select class="text-select" name="itemType" required><option value="">Choose item type</option><option>Clothes</option><option>Food</option><option>Books</option><option>Other Useful Items</option></select></label><label><span>Quantity</span><input class="text-input" name="quantity" type="number" min="1" step="1" placeholder="12" required></label></div><label><span>Description</span><textarea class="text-area" name="description" placeholder="Describe the items being donated." required></textarea></label><label><span>Contact Details</span><input class="text-input" name="contactDetails" type="text" placeholder="+91 98765 43210 | donor@example.com" required></label><button class="primary-button" type="submit" data-testid="save-item-donation">Save Item Donation</button></form></article></div></section>',
       '<section class="two-col"><article class="surface-card"><p class="section-label">Live Snapshot</p><div id="donationSummaryGrid" class="shared-metric-grid"><div class="empty-box">Your shared donation summary will appear here after sign-in.</div></div></article><article class="surface-card"><p class="section-label">Donation Records</p><div id="donationHistoryList" class="stack-list"><div class="empty-box">Recent donation records from your account will appear here.</div></div></article></section>'
     ].join("");
@@ -553,8 +608,9 @@
     ].join("");
   }
 
-  function renderInsightsPage(workspace) {
+  function renderInsightsPage(session, workspace) {
     const items = buildInsightItems(workspace);
+    const predictions = buildBoostedPredictionRows(workspace);
     return [
       renderHero({
         eyebrow: "AI Insights",
@@ -564,7 +620,7 @@
         secondary: '<a class="ghost-button" href="./operations.html" data-testid="insights-back-operations">Back To Operations</a>',
         sideCards: [
           miniCard("Scenario", workspace.label || "No demo loaded", "Insight cards become richer once requests, assignments, and donations exist."),
-          miniCard("AI Story", String(items.length) + " live cards", "Each card explains a decision in plain language.")
+          miniCard("AI Copilot", aiEngineLabel(), "A real chatbot uses Gemini when configured and falls back to the local XGBoost-style engine when not.")
         ]
       }),
       '<section class="page-columns"><div class="page-columns-main">' +
@@ -576,7 +632,8 @@
         summary: "The prediction view surfaces where resources may run short before the next response step begins."
       }) +
       '</div><div class="page-columns-side"><section class="surface-card"><p class="section-label">Predicted Funding</p><h2 class="section-title">' + escapeHtml(formatCurrency(totalBeneficiaries(workspace) * 420)) + '</h2><p class="section-copy">A simple estimate based on the visible requests, beneficiaries, and the currently loaded scenario.</p></section><section class="surface-card"><p class="section-label">Resource Gaps</p><div class="feed-list">' + renderProjectionCards(workspace.requests) + "</div></section></div></section>" +
-      '<section class="two-col"><article class="surface-card"><p class="section-label">Requirement Projections</p><h2 class="section-title">Category-level demand forecast</h2><div class="feed-list">' + renderProjectionCards(workspace.requests, true) + '</div></article><article class="surface-card"><p class="section-label">Coordination Log</p><h2 class="section-title">AI explanation and analyst notes</h2><div class="feed-list">' + items.map(function (item) { return '<div class="feed-card"><div class="feed-card-head"><div><strong>' + escapeHtml(item.title) + '</strong><p class="feed-meta">' + escapeHtml(item.meta) + '</p></div></div><p class="card-copy">' + escapeHtml(item.copy) + "</p></div>"; }).join("") + "</div></article></section>"
+      '<section class="two-col"><article class="surface-card"><p class="section-label">Requirement Projections</p><h2 class="section-title">Category-level demand forecast</h2><div class="feed-list">' + renderProjectionCards(workspace.requests, true) + '</div></article><article class="surface-card"><p class="section-label">Coordination Log</p><h2 class="section-title">AI explanation and analyst notes</h2><div class="feed-list">' + items.map(function (item) { return '<div class="feed-card"><div class="feed-card-head"><div><strong>' + escapeHtml(item.title) + '</strong><p class="feed-meta">' + escapeHtml(item.meta) + '</p></div></div><p class="card-copy">' + escapeHtml(item.copy) + "</p></div>"; }).join("") + "</div></article></section>" +
+      '<section class="two-col"><article class="surface-card"><p class="section-label">AI Copilot Chatbot</p><h2 class="section-title">Ask a real assistant about the active workspace</h2>' + renderAiCopilotPanel(session, workspace) + '</article><article class="surface-card"><p class="section-label">XGBoost Triage Engine</p><h2 class="section-title">XGBoost-style request scoring</h2><div class="stack-list">' + renderBoostedPredictionCards(predictions) + "</div></article></section>"
     ].join("");
   }
 
@@ -590,9 +647,13 @@
         secondary: '<a class="ghost-button" href="./impact.html" data-testid="admin-open-impact">Public Impact</a>',
         sideCards: [
           miniCard("Governance Pulse", "Audit events, review queue, outreach drafts", "These cards stay high-contrast in light and dark mode."),
-          miniCard("Visible Spaces", "Community, Volunteer, Donations", "The sidebar remains fixed while the feed and widgets scroll.")
+          miniCard("Visible Spaces", "Community, Volunteer, Donations, AI Prediction", "The sidebar remains fixed while the feed and widgets scroll.")
         ]
       }),
+      renderActionTiles([
+        { label: "AI Prediction", copy: "Open the explainable forecasting workspace", href: "./insights.html", tone: "outline", testId: "admin-open-ai" },
+        { label: "Public Impact", copy: "Switch to the NGO and judge story view", href: "./impact.html", tone: "muted", testId: "admin-open-impact-tile" }
+      ]),
       renderMetrics([
         metric("Live Snapshot", String(workspace.requests.length), "Requests currently visible in the workspace feed."),
         metric("Assignments", String(workspace.assignments.length), "Assignment stats linked to the active scenario."),
@@ -666,7 +727,11 @@
     return '<section class="action-tile-grid">' + items.map(function (item) {
       const element = item.href ? "a" : "button";
       const attrs = item.href ? ' href="' + escapeHtml(item.href) + '"' : ' type="button"';
-      const dataAttrs = item.testId ? ' data-testid="' + escapeHtml(item.testId) + '"' : "";
+      const dataAttrs = [
+        item.testId ? ' data-testid="' + escapeHtml(item.testId) + '"' : "",
+        item.action ? ' data-action="' + escapeHtml(item.action) + '"' : "",
+        item.scenario ? ' data-scenario="' + escapeHtml(item.scenario) + '"' : ""
+      ].join("");
       return '<' + element + ' class="action-tile action-tile-' + escapeHtml(item.tone || "brand") + '"' + attrs + dataAttrs + '><strong>' + escapeHtml(item.label) + '</strong><span>' + escapeHtml(item.copy) + '</span></' + element + ">";
     }).join("") + "</section>";
   }
@@ -703,6 +768,103 @@
     }).join("");
   }
 
+  function renderAiCopilotPanel(session, workspace) {
+    const history = getAiChatHistory(session.role);
+    const statusClass = AI_RUNTIME.tone === "error" ? " is-error" : AI_RUNTIME.tone === "success" ? " is-success" : "";
+    return [
+      '<div class="notice-box' + statusClass + '">' + escapeHtml(AI_RUNTIME.status || "AI copilot is ready.") + "</div>",
+      '<div class="chat-toolbar">',
+      '<div class="chip-row">',
+      '<span class="chip">Engine: ' + escapeHtml(aiEngineLabel()) + "</span>",
+      '<span class="chip">Role: ' + escapeHtml((ROLE_CONFIG[session.role] || ROLE_CONFIG.user).label) + "</span>",
+      '<span class="chip">Scenario: ' + escapeHtml(workspace.label || "No demo") + "</span>",
+      "</div>",
+      '<button class="ghost-button" type="button" data-action="clear-ai-chat" data-testid="clear-ai-chat">Clear Chat</button>',
+      "</div>",
+      '<div class="ai-quick-prompts">',
+      AI_QUICK_PROMPTS.map(function (prompt, index) {
+        return '<button class="inline-button ai-prompt-chip" type="button" data-action="ask-ai-prompt" data-ai-prompt="' + escapeHtml(prompt) + '" data-testid="ai-prompt-' + String(index + 1) + '">' + escapeHtml(prompt) + "</button>";
+      }).join(""),
+      "</div>",
+      '<div id="aiCopilotThread" class="chat-thread" data-testid="ai-copilot-thread">' + renderAiChatHistory(history) + "</div>",
+      '<form id="aiCopilotForm" class="form-grid copilot-form" data-testid="ai-copilot-form">',
+      '<label><span>Ask the chatbot</span><textarea id="aiCopilotMessage" class="text-area" name="message" placeholder="Example: Which district should we prioritize in the next 2 hours?" required></textarea></label>',
+      '<div class="action-stack">',
+      '<button class="primary-button" type="submit" data-testid="submit-ai-copilot">' + escapeHtml(AI_RUNTIME.busy ? "Thinking..." : "Ask AI Copilot") + "</button>",
+      '<a class="ghost-button" href="./operations.html" data-testid="ai-open-operations">Open Operations Board</a>',
+      "</div>",
+      "</form>"
+    ].join("");
+  }
+
+  function renderSatellitePanel(workspace) {
+    const target = getSatelliteTarget(workspace);
+    if (!target) {
+      return '<div class="empty-box">Load demo data to activate satellite review for the highest-priority location.</div>';
+    }
+    return [
+      '<article class="feed-card">',
+      '<div class="feed-card-head"><div><strong>' + escapeHtml(target.title) + '</strong><p class="feed-meta">' + escapeHtml(target.location) + '</p></div>' + renderStatus("Live") + "</div>",
+      '<p class="card-copy">Use the free satellite links below to inspect flood spread, road access, or surface conditions around the active response point.</p>',
+      '<div class="feed-chip-row"><span class="feed-chip">' + escapeHtml(target.district) + '</span><span class="feed-chip">Lat ' + escapeHtml(target.lat.toFixed(4)) + '</span><span class="feed-chip">Lng ' + escapeHtml(target.lng.toFixed(4)) + "</span></div>",
+      '<div class="action-stack satellite-actions">',
+      '<button class="ghost-button" type="button" data-satellite-view="worldview" data-satellite-lat="' + escapeHtml(String(target.lat)) + '" data-satellite-lng="' + escapeHtml(String(target.lng)) + '" data-map-location="' + escapeHtml(target.location) + '" data-testid="open-satellite-worldview">Open Satellite View</button>',
+      '<button class="ghost-button" type="button" data-satellite-view="google" data-satellite-lat="' + escapeHtml(String(target.lat)) + '" data-satellite-lng="' + escapeHtml(String(target.lng)) + '" data-map-location="' + escapeHtml(target.location) + '" data-testid="open-google-satellite">Google Satellite</button>',
+      "</div>",
+      '<p class="card-copy satellite-note"><strong>Landsat-ready workflow:</strong> Use the satellite view for quick terrain review, then move into the response board and XGBoost risk ranking for action.</p>',
+      "</article>"
+    ].join("");
+  }
+
+  function renderAiChatHistory(history) {
+    if (!history.length) {
+      return '<div class="empty-box">Ask the chatbot about high-risk districts, volunteer fit, donation gaps, or the next response move.</div>';
+    }
+    return history.map(function (entry) {
+      const who = entry.speaker === "assistant" ? "AI Copilot" : "You";
+      const meta = entry.source ? who + " - " + entry.source : who;
+      return '<article class="chat-bubble chat-bubble-' + escapeHtml(entry.speaker || "assistant") + '"><div class="chat-bubble-meta"><strong>' + escapeHtml(meta) + '</strong><span>' + escapeHtml(formatChatTime(entry.timestamp)) + '</span></div><p>' + escapeHtml(entry.text) + "</p></article>";
+    }).join("");
+  }
+
+  function renderBoostedSignal(prediction) {
+    if (!prediction) {
+      return '<div class="empty-box">Load demo data to surface the current highest-risk request.</div>';
+    }
+    return [
+      '<article class="feed-card">',
+      '<div class="feed-card-head"><div><strong>' + escapeHtml(prediction.request.title) + '</strong><p class="feed-meta">' + escapeHtml(prediction.request.district) + " - " + escapeHtml(prediction.request.location) + '</p></div>' + renderRiskBadge(prediction) + "</div>",
+      '<p class="card-copy">' + escapeHtml(prediction.explanation) + "</p>",
+      '<div class="prediction-meter"><span style="width:' + escapeHtml(String(prediction.score)) + '%"></span></div>',
+      '<div class="action-stack" style="margin-top:14px;"><button class="ghost-button" type="button" data-map-location="' + escapeHtml(prediction.request.location) + '" data-testid="top-risk-view-map">View on Map</button></div>',
+      "</article>"
+    ].join("");
+  }
+
+  function renderBoostedPredictionCards(predictions) {
+    if (!predictions.length) {
+      return '<div class="empty-box">Load demo data to calculate boosted request scores.</div>';
+    }
+    return predictions.slice(0, 5).map(function (prediction) {
+      return [
+        '<article class="feed-card boosted-card">',
+        '<div class="feed-card-head"><div><strong>' + escapeHtml(prediction.request.title) + '</strong><p class="feed-meta">' + escapeHtml(prediction.request.category) + " - " + escapeHtml(prediction.request.district) + '</p></div>' + renderRiskBadge(prediction) + "</div>",
+        '<div class="feed-chip-row">',
+        '<span class="feed-chip feed-chip-risk feed-chip-risk-' + escapeHtml(prediction.tone) + '">Risk ' + escapeHtml(String(prediction.score)) + "</span>",
+        '<span class="feed-chip">' + escapeHtml(String(prediction.matchedVolunteerCount)) + " volunteer match(es)</span>",
+        '<span class="feed-chip">' + escapeHtml(String(prediction.donationCoverage)) + "% donation cover</span>",
+        '<span class="feed-chip">' + escapeHtml(normalizeRequestStatus(prediction.request.status)) + "</span>",
+        "</div>",
+        '<p class="card-copy"><strong>Boosted explanation:</strong> ' + escapeHtml(prediction.explanation) + "</p>",
+        '<div class="prediction-meter"><span style="width:' + escapeHtml(String(prediction.score)) + '%"></span></div>',
+        '<ul class="prediction-factor-list">' + prediction.factors.map(function (factor) { return "<li>" + escapeHtml(factor) + "</li>"; }).join("") + "</ul>",
+        '<p class="card-copy"><strong>Recommended next move:</strong> ' + escapeHtml(prediction.recommendation) + "</p>",
+        '<div class="action-stack" style="margin-top:14px;"><button class="ghost-button" type="button" data-map-location="' + escapeHtml(prediction.request.location) + '" data-testid="prediction-map-' + escapeHtml(prediction.request.id.toLowerCase()) + '">View on Map</button></div>',
+        "</article>"
+      ].join("");
+    }).join("");
+  }
+
   function renderProjectionCards(items, detailed) {
     if (!items || !items.length) {
       return '<div class="empty-box">Load a scenario to see projected resource gaps.</div>';
@@ -735,10 +897,10 @@
 
   function renderRoleRows() {
     const rows = [
-      { name: "Community User", role: "Community", access: "Community Portal and Donations", status: "Visible" },
-      { name: "Volunteer", role: "Volunteer", access: "Volunteer Portal and Directory", status: "Available" },
-      { name: "Government Employee", role: "Government", access: "Operations and AI Insights", status: "Active" },
-      { name: "Admin", role: "Admin", access: "All portals", status: "Submitted" }
+      { name: "Community User", role: "Community", access: "Community Portal, Donations, AI Prediction", status: "Visible" },
+      { name: "Volunteer", role: "Volunteer", access: "Volunteer Portal, Directory, AI Prediction", status: "Available" },
+      { name: "Government Employee", role: "Government", access: "Operations and AI Prediction", status: "Active" },
+      { name: "Admin", role: "Admin", access: "All portals and AI Prediction", status: "Submitted" }
     ];
     return rows.map(function (row) {
       return "<tr><td>" + escapeHtml(row.name) + "</td><td>" + escapeHtml(row.role) + "</td><td>" + escapeHtml(row.access) + "</td><td>" + renderStatus(row.status) + "</td></tr>";
@@ -749,9 +911,11 @@
     if (!items.length) {
       return '<div class="empty-box">No active requests yet. Use Load Demo to bring in a fake disaster scenario.</div>';
     }
+    const workspace = getWorkspace();
     return items.map(function (item) {
       const stage = normalizeRequestStatus(item.status);
-      return '<article class="feed-card"><div class="feed-card-head"><div><strong>' + escapeHtml(item.title) + '</strong><p class="feed-meta">' + escapeHtml(item.summary) + '</p></div>' + renderStatus(stage) + '</div><div class="feed-chip-row"><span class="feed-chip">' + escapeHtml(item.category) + '</span><span class="feed-chip">' + escapeHtml(item.district) + '</span><span class="feed-chip">' + escapeHtml(String(item.beneficiaries)) + ' beneficiaries</span><span class="feed-chip">' + escapeHtml(item.priority) + '</span></div>' + renderStepper(stage) + '<p class="card-copy"><strong>AI match:</strong> ' + escapeHtml(item.ai) + '</p><div class="action-stack" style="margin-top:14px;"><button class="ghost-button" type="button" data-map-location="' + escapeHtml(item.location) + '" data-testid="view-map-' + escapeHtml(item.id.toLowerCase()) + '">View on Map</button></div></article>';
+      const prediction = predictRequestRisk(item, workspace);
+      return '<article class="feed-card"><div class="feed-card-head"><div><strong>' + escapeHtml(item.title) + '</strong><p class="feed-meta">' + escapeHtml(item.summary) + '</p></div>' + renderStatus(stage) + '</div><div class="feed-chip-row"><span class="feed-chip">' + escapeHtml(item.category) + '</span><span class="feed-chip">' + escapeHtml(item.district) + '</span><span class="feed-chip">' + escapeHtml(String(item.beneficiaries)) + ' beneficiaries</span><span class="feed-chip">' + escapeHtml(item.priority) + '</span><span class="feed-chip feed-chip-risk feed-chip-risk-' + escapeHtml(prediction.tone) + '">Risk ' + escapeHtml(String(prediction.score)) + '</span></div>' + renderStepper(stage) + '<p class="card-copy"><strong>Boosted triage:</strong> ' + escapeHtml(prediction.explanation) + '</p><p class="card-copy"><strong>AI match:</strong> ' + escapeHtml(item.ai) + '</p><div class="action-stack" style="margin-top:14px;"><button class="ghost-button" type="button" data-map-location="' + escapeHtml(item.location) + '" data-testid="view-map-' + escapeHtml(item.id.toLowerCase()) + '">View on Map</button></div></article>';
     }).join("");
   }
   function renderAssignmentCards(items) {
@@ -883,10 +1047,11 @@
       return [{ title: "Load demo data", meta: "No active scenario", copy: "Use the quick actions to load a flood, cyclone, or medical demo scenario." }];
     }
     const topRequest = workspace.requests[0];
+    const topPrediction = buildBoostedPredictionRows(workspace)[0] || null;
     return [
       { title: "Top pressure district", meta: topDistrict(workspace) || "No district", copy: "The system is prioritizing " + (topDistrict(workspace) || "the visible district") + " because it has the densest combination of urgent requests and pending assignments." },
       { title: "Best volunteer fit", meta: workspace.assignments.length + " assignment(s)", copy: topRequest.ai },
-      { title: "Next best action", meta: workspace.label || "Scenario", copy: "Move the highest-priority request first, then use the donation and volunteer records to show end-to-end proof." }
+      { title: "Boosted risk signal", meta: topPrediction ? (topPrediction.request.district + " - " + String(topPrediction.score) + "/100") : (workspace.label || "Scenario"), copy: topPrediction ? topPrediction.recommendation : "Load a scenario to activate the boosted ranking engine." }
     ];
   }
 
@@ -981,6 +1146,209 @@
         copy: donation ? ("Donation support from " + donation.donor + " backs the request and gives admins clear proof of movement and support.") : "When donations arrive, admins can connect them to the active request and show end-to-end proof."
       }
     ];
+  }
+
+  function buildBoostedPredictionRows(workspace) {
+    if (!workspace || !workspace.requests || !workspace.requests.length) {
+      return [];
+    }
+    return workspace.requests.map(function (request) {
+      return predictRequestRisk(request, workspace);
+    }).sort(function (a, b) {
+      return b.score - a.score;
+    });
+  }
+
+  function predictRequestRisk(request, workspace) {
+    const features = buildRequestFeatures(request, workspace);
+    const score = scoreBoostedTree(features);
+    const tone = score >= 80 ? "critical" : score >= 60 ? "high" : score >= 40 ? "medium" : "low";
+    const band = score >= 80 ? "Critical Risk" : score >= 60 ? "High Risk" : score >= 40 ? "Watchlist" : "Stable";
+    return {
+      request: request,
+      score: score,
+      tone: tone,
+      band: band,
+      matchedVolunteerCount: features.matchedVolunteerCount,
+      donationCoverage: Math.round(features.donationCoverage * 100),
+      explanation: buildPredictionExplanation(request, features, score),
+      recommendation: buildPredictionRecommendation(request, features, score),
+      factors: buildPredictionFactors(request, features)
+    };
+  }
+
+  function buildRequestFeatures(request, workspace) {
+    const category = safeText(request.category, 60).toLowerCase();
+    const district = safeText(request.district, 80).toLowerCase();
+    const relevantSkills = CATEGORY_SKILLS[category] || ["coordination", "support", "logistics"];
+    const relevantDonations = CATEGORY_DONATIONS[category] || ["money", "other useful items"];
+    const districtMax = Math.max.apply(null, buildDistrictSummary(workspace).map(function (item) {
+      return Number(item.beneficiaries || 0);
+    }).concat([1]));
+    const districtLoad = workspace.requests.filter(function (item) {
+      return safeText(item.district, 80).toLowerCase() === district;
+    }).reduce(function (sum, item) {
+      return sum + Number(item.beneficiaries || 0);
+    }, 0);
+    const matchingVolunteers = workspace.volunteers.filter(function (volunteer) {
+      const location = safeText(volunteer.location, 120).toLowerCase();
+      const skills = joinSkills(volunteer.skills).toLowerCase();
+      const districtMatch = district && location.indexOf(district) !== -1;
+      const skillMatch = relevantSkills.some(function (keyword) { return skills.indexOf(keyword) !== -1; });
+      return districtMatch || skillMatch;
+    });
+    const matchingDonations = workspace.donations.filter(function (donation) {
+      const kind = safeText(donation.kind, 40).toLowerCase();
+      const itemType = safeText(donation.itemType || donation.kind, 80).toLowerCase();
+      return relevantDonations.some(function (keyword) {
+        return itemType.indexOf(keyword) !== -1 || kind.indexOf(keyword) !== -1 || (keyword === "money" && kind === "money");
+      });
+    });
+    const priorityWeight = priorityScore(request.priority);
+    const stage = normalizeRequestStatus(request.status);
+    const stageIndex = REQUEST_STAGES.indexOf(stage);
+    const assignmentGap = stageIndex <= 0 ? 1 : stageIndex === 1 ? 0.82 : stageIndex === 2 ? 0.54 : stageIndex === 3 ? 0.2 : 0.04;
+    const volunteerCoverage = clamp01(matchingVolunteers.length / 3);
+    const donationCoverage = clamp01(matchingDonations.length / 2);
+    const stagnation = stageIndex <= 1 ? 0.9 : stageIndex === 2 ? 0.48 : stageIndex === 3 ? 0.2 : 0.06;
+    return {
+      beneficiaryDensity: clamp01(Number(request.beneficiaries || 0) / 220),
+      priorityWeight: priorityWeight,
+      assignmentGap: assignmentGap,
+      volunteerCoverage: volunteerCoverage,
+      donationCoverage: donationCoverage,
+      districtPressure: clamp01(districtLoad / districtMax),
+      stagnation: stagnation,
+      medicalRisk: category === "medical" ? 1 : 0,
+      shelterRisk: category === "shelter" ? 1 : 0,
+      foodRisk: category === "food" ? 1 : 0,
+      matchedVolunteerCount: matchingVolunteers.length,
+      matchingDonationCount: matchingDonations.length
+    };
+  }
+
+  function scoreBoostedTree(features) {
+    let margin = -0.44;
+    margin += features.beneficiaryDensity > 0.72 ? 0.54 : features.beneficiaryDensity > 0.45 ? 0.28 : -0.05;
+    margin += features.priorityWeight > 0.84 ? 0.66 : features.priorityWeight > 0.58 ? 0.28 : -0.08;
+    margin += features.assignmentGap > 0.78 ? 0.42 : features.assignmentGap > 0.45 ? 0.2 : -0.12;
+    margin += features.volunteerCoverage < 0.2 ? 0.52 : features.volunteerCoverage < 0.5 ? 0.24 : -0.14;
+    margin += features.donationCoverage < 0.2 ? 0.34 : features.donationCoverage < 0.5 ? 0.14 : -0.08;
+    margin += features.districtPressure > 0.7 ? 0.36 : features.districtPressure > 0.45 ? 0.16 : -0.04;
+    margin += features.stagnation > 0.7 ? 0.26 : features.stagnation > 0.35 ? 0.08 : -0.04;
+    margin += features.medicalRisk && features.volunteerCoverage < 0.5 ? 0.18 : 0;
+    margin += features.shelterRisk && features.assignmentGap > 0.45 ? 0.16 : 0;
+    margin += features.foodRisk && features.donationCoverage < 0.5 ? 0.12 : 0;
+    return Math.max(1, Math.min(99, Math.round((1 / (1 + Math.exp(-margin))) * 100)));
+  }
+
+  function buildPredictionExplanation(request, features, score) {
+    const parts = [];
+    parts.push(request.district + " is showing " + Math.round(features.districtPressure * 100) + "% of the current district pressure.");
+    if (features.volunteerCoverage < 0.5) {
+      parts.push("Volunteer coverage is limited for this category.");
+    }
+    if (features.donationCoverage < 0.5) {
+      parts.push("Donation support is still thin for this need.");
+    }
+    if (features.assignmentGap > 0.5) {
+      parts.push("The request has not progressed far enough in the response pipeline.");
+    }
+    if (score >= 80) {
+      parts.push("The model would move this to the top of the queue immediately.");
+    }
+    return parts.join(" ");
+  }
+
+  function buildPredictionRecommendation(request, features, score) {
+    const moves = [];
+    if (features.volunteerCoverage < 0.5) {
+      moves.push("pull volunteers with " + joinPredictionSkills(request.category));
+    }
+    if (features.donationCoverage < 0.5) {
+      moves.push("surface matching donations");
+    }
+    if (features.assignmentGap > 0.5) {
+      moves.push("advance the request from review into assignment");
+    }
+    if (!moves.length) {
+      moves.push("keep the assignment active and monitor field completion");
+    }
+    return (score >= 70 ? "Prioritize now: " : "Monitor closely: ") + moves.join(", ") + ".";
+  }
+
+  function buildPredictionFactors(request, features) {
+    const items = [
+      Math.round(features.priorityWeight * 100) + "% priority weight",
+      Math.round(features.beneficiaryDensity * 100) + "% beneficiary pressure",
+      Math.round((1 - features.volunteerCoverage) * 100) + "% volunteer gap",
+      Math.round((1 - features.donationCoverage) * 100) + "% donation gap"
+    ];
+    if (safeText(request.category, 60).toLowerCase() === "medical") {
+      items.push("Medical category gets extra urgency weighting.");
+    }
+    return items;
+  }
+
+  function renderRiskBadge(prediction) {
+    return '<span class="risk-badge risk-badge-' + escapeHtml(prediction.tone) + '">' + escapeHtml(prediction.band) + " - " + escapeHtml(String(prediction.score)) + "</span>";
+  }
+
+  function getSatelliteTarget(workspace) {
+    const topPrediction = buildBoostedPredictionRows(workspace)[0];
+    const request = topPrediction ? topPrediction.request : (workspace.requests && workspace.requests[0]);
+    if (!request) {
+      return null;
+    }
+    const lat = Number(request.lat);
+    const lng = Number(request.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      return null;
+    }
+    return {
+      title: request.title,
+      district: request.district,
+      location: request.location,
+      lat: lat,
+      lng: lng
+    };
+  }
+
+  function buildSatelliteWorldviewUrl(lat, lng) {
+    const west = (lng - 0.18).toFixed(4);
+    const south = (lat - 0.12).toFixed(4);
+    const east = (lng + 0.18).toFixed(4);
+    const north = (lat + 0.12).toFixed(4);
+    const day = new Date().toISOString().slice(0, 10);
+    return "https://worldview.earthdata.nasa.gov/?v=" + west + "," + south + "," + east + "," + north + "&t=" + day + "T00%3A00%3A00Z";
+  }
+
+  function buildGoogleSatelliteUrl(lat, lng, location) {
+    const query = Number.isFinite(lat) && Number.isFinite(lng) ? (String(lat) + "," + String(lng)) : location;
+    return "https://www.google.com/maps?q=" + encodeURIComponent(query) + "&t=k";
+  }
+
+  function priorityScore(priority) {
+    const normalized = safeText(priority, 40).toLowerCase();
+    if (normalized.indexOf("critical") !== -1) return 1;
+    if (normalized.indexOf("high") !== -1) return 0.82;
+    if (normalized.indexOf("medium") !== -1) return 0.56;
+    if (normalized.indexOf("low") !== -1) return 0.28;
+    return 0.48;
+  }
+
+  function clamp01(value) {
+    return Math.max(0, Math.min(1, Number(value || 0)));
+  }
+
+  function joinPredictionSkills(category) {
+    return (CATEGORY_SKILLS[safeText(category, 60).toLowerCase()] || ["coordination", "support"]).slice(0, 3).join(", ");
+  }
+
+  function aiEngineLabel() {
+    if (AI_RUNTIME.engine === "gemini-secure") return "Gemini secure backend";
+    if (AI_RUNTIME.engine === "gemini-direct") return "Gemini direct";
+    return "Local boosted engine";
   }
 
   function buildDistrictSummary(workspace) {
@@ -1094,6 +1462,19 @@
       });
     });
 
+    root.querySelectorAll("[data-satellite-view]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        const lat = Number(button.dataset.satelliteLat);
+        const lng = Number(button.dataset.satelliteLng);
+        const location = button.dataset.mapLocation || "";
+        const target = safeText(button.dataset.satelliteView, 20).toLowerCase();
+        const url = target === "google"
+          ? buildGoogleSatelliteUrl(lat, lng, location)
+          : buildSatelliteWorldviewUrl(lat, lng);
+        window.open(url, "_blank", "noopener");
+      });
+    });
+
     root.querySelectorAll("[data-action='show-donation-tab']").forEach(function (button) {
       button.addEventListener("click", function () {
         showDonationTab(button.dataset.tab || "money");
@@ -1129,6 +1510,34 @@
         saveOutreachDraft();
       });
     }
+
+    root.querySelectorAll("[data-action='ask-ai-prompt']").forEach(function (button) {
+      button.addEventListener("click", function () {
+        const form = document.getElementById("aiCopilotForm");
+        if (!form || !form.elements.message) {
+          return;
+        }
+        form.elements.message.value = safeText(button.dataset.aiPrompt, 320);
+        handleAiCopilotSubmit(form, session);
+      });
+    });
+
+    const aiForm = document.getElementById("aiCopilotForm");
+    if (aiForm) {
+      aiForm.addEventListener("submit", function (event) {
+        event.preventDefault();
+        handleAiCopilotSubmit(aiForm, session);
+      });
+    }
+
+    root.querySelectorAll("[data-action='clear-ai-chat']").forEach(function (button) {
+      button.addEventListener("click", function () {
+        clearAiChatHistory(session.role);
+        AI_RUNTIME.status = "Chat history cleared. Ask a fresh question about the current workspace.";
+        AI_RUNTIME.tone = "";
+        renderApp(document.getElementById("portalApp"));
+      });
+    });
 
     if (page === "donations") {
       showDonationTab("money");
@@ -1186,6 +1595,292 @@
     workspace.outreach.unshift(subject + " - " + safeText(data.get("recipients"), 120));
     saveWorkspace(workspace);
     renderApp(document.getElementById("portalApp"));
+  }
+
+  async function handleAiCopilotSubmit(form, session) {
+    if (AI_RUNTIME.busy) {
+      return;
+    }
+    const field = form && form.elements ? form.elements.message : null;
+    const message = safeText(field && field.value, 900);
+    if (!message) {
+      AI_RUNTIME.status = "Enter a question for the AI copilot first.";
+      AI_RUNTIME.tone = "error";
+      renderApp(document.getElementById("portalApp"));
+      return;
+    }
+
+    appendAiChatMessage(session.role, "user", message, "Workspace user");
+    if (field) {
+      field.value = "";
+    }
+
+    AI_RUNTIME.busy = true;
+    AI_RUNTIME.status = "AI chatbot is reviewing the current workspace, requests, donors, and volunteers...";
+    AI_RUNTIME.tone = "";
+    renderApp(document.getElementById("portalApp"));
+
+    try {
+      const workspace = getWorkspace();
+      const history = getAiChatHistory(session.role);
+      const result = await requestAiCopilot(message, session, workspace, history);
+      appendAiChatMessage(session.role, "assistant", result.text, result.sourceLabel);
+      AI_RUNTIME.engine = result.engine;
+      AI_RUNTIME.status = result.notice;
+      AI_RUNTIME.tone = result.engine === "local-boosted" ? "" : "success";
+    } catch (error) {
+      const fallback = buildLocalCopilotResponse(message, getWorkspace(), session);
+      appendAiChatMessage(session.role, "assistant", fallback.text, "Local boosted engine");
+      AI_RUNTIME.engine = "local-boosted";
+      AI_RUNTIME.status = "Live AI was unavailable, so the local boosted engine answered instead.";
+      AI_RUNTIME.tone = "error";
+    } finally {
+      AI_RUNTIME.busy = false;
+      renderApp(document.getElementById("portalApp"));
+    }
+  }
+
+  async function requestAiCopilot(message, session, workspace, history) {
+    const config = window.RESOURCEFLOW_FIREBASE_CONFIG || {};
+    if (config.secureBackendEnabled) {
+      try {
+        return await requestSecureCopilotResponse(message, session, workspace, history);
+      } catch (error) {
+        console.warn("Secure AI backend unavailable, trying direct/local fallback.", error);
+      }
+    }
+    if (safeText(config.geminiApiKey, 240)) {
+      try {
+        return await requestDirectGeminiResponse(message, session, workspace, history);
+      } catch (error) {
+        console.warn("Direct Gemini request failed, falling back to local response.", error);
+      }
+    }
+    return {
+      engine: "local-boosted",
+      sourceLabel: "Local boosted engine",
+      notice: "Gemini is not configured yet, so the local boosted engine is answering from the visible workspace.",
+      text: buildLocalCopilotResponse(message, workspace, session).text
+    };
+  }
+
+  async function requestSecureCopilotResponse(message, session, workspace, history) {
+    const config = window.RESOURCEFLOW_FIREBASE_CONFIG || {};
+    const functions = await ensureFirebaseFunctionsClient(config);
+    const callable = functions.httpsCallable("chatResourceFlowCopilot");
+    const result = await callable({
+      message: message,
+      portalRole: session.role,
+      history: history.slice(-8).map(function (entry) {
+        return {
+          speaker: safeText(entry.speaker, 20),
+          text: safeText(entry.text, 1200)
+        };
+      }),
+      workspace: workspace
+    });
+    const text = safeText(result && result.data && result.data.text, 6000);
+    if (!text) {
+      throw new Error("Secure copilot returned an empty response.");
+    }
+    return {
+      engine: "gemini-secure",
+      sourceLabel: "Gemini secure backend",
+      notice: "Secure Gemini backend responded with a live coordination recommendation.",
+      text: text
+    };
+  }
+
+  async function requestDirectGeminiResponse(message, session, workspace, history) {
+    const config = window.RESOURCEFLOW_FIREBASE_CONFIG || {};
+    const response = await fetch(
+      "https://generativelanguage.googleapis.com/v1beta/models/" +
+        encodeURIComponent(config.geminiModel || "gemini-2.5-flash") +
+        ":generateContent?key=" +
+        encodeURIComponent(config.geminiApiKey),
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [
+            {
+              role: "user",
+              parts: [{ text: buildCopilotPrompt(workspace, session, message, history) }]
+            }
+          ],
+          generationConfig: {
+            temperature: 0.3,
+            maxOutputTokens: 700
+          }
+        })
+      }
+    );
+    if (!response.ok) {
+      throw new Error("Gemini direct request failed.");
+    }
+    const payload = await response.json();
+    const text = extractGeminiTextClient(payload);
+    if (!text) {
+      throw new Error("Gemini returned an empty response.");
+    }
+    return {
+      engine: "gemini-direct",
+      sourceLabel: "Gemini direct",
+      notice: "Gemini answered directly from the configured browser key.",
+      text: text
+    };
+  }
+
+  function buildLocalCopilotResponse(message, workspace, session) {
+    const prompt = safeText(message, 900).toLowerCase();
+    const topPrediction = buildBoostedPredictionRows(workspace)[0] || null;
+    const topAssignment = workspace.assignments[0] || null;
+    const topDonation = workspace.donations[0] || null;
+    const topDistrictName = topDistrict(workspace) || "the active district";
+    let text = "The local boosted engine needs active workspace data to answer clearly. Load a scenario first.";
+
+    if (topPrediction) {
+      if (prompt.indexOf("district") !== -1 || prompt.indexOf("where") !== -1 || prompt.indexOf("priority") !== -1) {
+        text = topPrediction.request.district + " is the highest-priority district right now. " + topPrediction.explanation + " Next move: " + topPrediction.recommendation;
+      } else if (prompt.indexOf("volunteer") !== -1 || prompt.indexOf("assign") !== -1 || prompt.indexOf("match") !== -1) {
+        text = "The best current volunteer match is explained by the request itself: " + topPrediction.request.ai + " The boosted score is " + String(topPrediction.score) + "/100 because coverage and progress are still limited.";
+      } else if (prompt.indexOf("donation") !== -1 || prompt.indexOf("money") !== -1 || prompt.indexOf("item") !== -1) {
+        text = topDonation
+          ? ("The latest visible donation is from " + topDonation.donor + " - " + formatDonationLine(topDonation) + ". The boosted engine still recommends surfacing more " + safeText(topPrediction.request.category, 60).toLowerCase() + " support for " + topPrediction.request.district + ".")
+          : ("No donation records are visible yet. The model recommends surfacing donations for " + topPrediction.request.title + " first.");
+      } else if (prompt.indexOf("summary") !== -1 || prompt.indexOf("plan") !== -1 || prompt.indexOf("next") !== -1) {
+        text = "For the next 2 hours, focus on " + topPrediction.request.title + " in " + topPrediction.request.district + ". " + topPrediction.recommendation + " Current visible operations also show " + workspace.assignments.length + " assignment(s) and " + workspace.donations.length + " donation record(s).";
+      } else {
+        text = "ResourceFlow's local boosted engine recommends focusing on " + topPrediction.request.title + " in " + topPrediction.request.district + ". The request carries a " + String(topPrediction.score) + "/100 risk score. " + topPrediction.explanation;
+      }
+    } else if (workspace.requests.length) {
+      text = "The visible workspace has requests, but the boosted ranking engine does not yet have enough context to rank them strongly. Load or refresh a demo scenario.";
+    }
+
+    if (session.role === "volunteer") {
+      text += " In the volunteer lane, keep the answer focused on assignments, travel, and safe completion.";
+    } else if (session.role === "government") {
+      text += " In the government lane, focus on district pressure, sequencing, and deployment.";
+    } else if (session.role === "admin") {
+      text += " In the admin lane, combine this with donations, audit trail, and outreach drafts.";
+    }
+
+    return { text: text };
+  }
+
+  function buildCopilotPrompt(workspace, session, message, history) {
+    const snapshot = {
+      scenario: workspace.label,
+      summary: workspace.summary,
+      role: (ROLE_CONFIG[session.role] || ROLE_CONFIG.user).label,
+      topRequests: workspace.requests.slice(0, 5).map(function (item) {
+        return {
+          title: item.title,
+          district: item.district,
+          location: item.location,
+          priority: item.priority,
+          status: item.status,
+          beneficiaries: item.beneficiaries,
+          ai: item.ai
+        };
+      }),
+      assignments: workspace.assignments.slice(0, 5),
+      volunteers: workspace.volunteers.slice(0, 5),
+      donations: workspace.donations.slice(0, 5),
+      boostedSignals: buildBoostedPredictionRows(workspace).slice(0, 3).map(function (item) {
+        return {
+          title: item.request.title,
+          district: item.request.district,
+          score: item.score,
+          recommendation: item.recommendation
+        };
+      })
+    };
+    const transcript = history.slice(-6).map(function (item) {
+      return (item.speaker === "assistant" ? "Assistant" : "User") + ": " + item.text;
+    }).join("\n");
+    return [
+      "You are ResourceFlow Copilot, an NGO disaster-response chatbot inside a coordination platform.",
+      "Answer briefly, clearly, and operationally. Prefer short paragraphs or compact bullets.",
+      "Use only the workspace data provided. Mention exact districts, volunteers, donations, and statuses when relevant.",
+      "If data is missing, say so directly instead of inventing details.",
+      "The active portal role is: " + (ROLE_CONFIG[session.role] || ROLE_CONFIG.user).label + ". Tailor the answer to that role.",
+      transcript ? "Recent conversation:\n" + transcript : "",
+      "Workspace snapshot:\n" + JSON.stringify(snapshot, null, 2),
+      "User question: " + message
+    ].join("\n\n");
+  }
+
+  function extractGeminiTextClient(payload) {
+    const candidates = payload && payload.candidates;
+    if (!Array.isArray(candidates) || !candidates.length) {
+      return "";
+    }
+    const parts = candidates[0] && candidates[0].content && candidates[0].content.parts;
+    if (!Array.isArray(parts)) {
+      return "";
+    }
+    return parts.map(function (part) {
+      return safeText(part && part.text, 4000);
+    }).filter(Boolean).join("\n").trim();
+  }
+
+  async function ensureFirebaseFunctionsClient(config) {
+    await loadScript("https://www.gstatic.com/firebasejs/" + FIREBASE_SDK_VERSION + "/firebase-app-compat.js");
+    await loadScript("https://www.gstatic.com/firebasejs/" + FIREBASE_SDK_VERSION + "/firebase-auth-compat.js");
+    await loadScript("https://www.gstatic.com/firebasejs/" + FIREBASE_SDK_VERSION + "/firebase-functions-compat.js");
+    if (!window.firebase.apps.length) {
+      window.firebase.initializeApp(buildFirebaseInitConfig(config));
+    }
+    return window.firebase.app().functions(config.functionsRegion || "us-central1");
+  }
+
+  function buildFirebaseInitConfig(config) {
+    return {
+      apiKey: config.apiKey,
+      authDomain: config.authDomain,
+      projectId: config.projectId,
+      storageBucket: config.storageBucket,
+      messagingSenderId: config.messagingSenderId,
+      appId: config.appId,
+      measurementId: config.measurementId
+    };
+  }
+
+  function getAiChatHistory(role) {
+    return loadJson(buildAiChatKey(role), []).filter(function (item) {
+      return item && safeText(item.text, 4000);
+    }).slice(-12);
+  }
+
+  function appendAiChatMessage(role, speaker, text, source) {
+    const history = getAiChatHistory(role);
+    history.push({
+      speaker: speaker === "user" ? "user" : "assistant",
+      text: safeText(text, 4000),
+      source: safeText(source, 120),
+      timestamp: new Date().toISOString()
+    });
+    localStorage.setItem(buildAiChatKey(role), JSON.stringify(history.slice(-12)));
+  }
+
+  function clearAiChatHistory(role) {
+    localStorage.removeItem(buildAiChatKey(role));
+  }
+
+  function buildAiChatKey(role) {
+    return AI_CHAT_HISTORY_KEY + "-" + (normalizePortal(role) || "user");
+  }
+
+  function formatChatTime(value) {
+    if (!value) {
+      return "";
+    }
+    try {
+      return new Date(value).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    } catch (error) {
+      return "";
+    }
   }
 
   async function handleSignOut() {
@@ -1353,6 +2048,15 @@
     localStorage.removeItem(PORTAL_SELECTION_KEY);
     localStorage.removeItem(PORTAL_HANDOFF_KEY);
     localStorage.removeItem(DEMO_AUTH_KEY);
+  }
+
+  function joinSkills(value) {
+    if (Array.isArray(value)) {
+      return value.map(function (item) {
+        return safeText(item, 80);
+      }).filter(Boolean).join(", ");
+    }
+    return safeText(value, 240);
   }
 
   function loadJson(key, fallback) {
