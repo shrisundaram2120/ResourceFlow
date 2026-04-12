@@ -35,7 +35,8 @@
     busy: false,
     status: "AI copilot is ready. Ask about districts, volunteers, donors, or the current scenario.",
     tone: "",
-    engine: "local-boosted"
+    engine: "local-boosted",
+    drawerOpen: false
   };
 
   const PAGE_TITLES = {
@@ -267,12 +268,13 @@
       allowed ? renderPage(page, session, workspace) : renderAccessRestricted(page, session),
       "</main>",
       renderRail(page, session, workspace),
-      "</div>"
-      ,
+      "</div>",
+      renderAiAssistantShell(session, workspace),
       renderMobileDock(page, session)
     ].join("");
 
     document.body.classList.remove("rf-sidebar-open");
+    document.body.classList.toggle("rf-ai-open", !!AI_RUNTIME.drawerOpen);
     bindEvents(root, page, session);
     ensureInteractiveTestIds(document);
   }
@@ -422,6 +424,27 @@
       "</div>",
       "</section>",
       "</aside>"
+    ].join("");
+  }
+
+  function renderAiAssistantShell(session, workspace) {
+    return [
+      '<section class="ai-shell' + (AI_RUNTIME.drawerOpen ? ' is-open' : '') + '">',
+      '<div class="ai-drawer-backdrop" data-action="close-ai-drawer"></div>',
+      '<button class="ai-fab" type="button" data-action="toggle-ai-drawer" data-testid="toggle-ai-drawer" aria-label="Open AI copilot" aria-expanded="' + (AI_RUNTIME.drawerOpen ? "true" : "false") + '">',
+      '<span class="rf-symbol" aria-hidden="true">auto_awesome</span>',
+      '<span class="ai-fab-label">AI</span>',
+      "</button>",
+      '<aside class="ai-drawer" aria-label="AI copilot panel">',
+      '<div class="ai-drawer-header">',
+      '<div><p class="section-label">AI Copilot</p><h2 class="section-title">Gemini-style assistant</h2><p class="section-copy">Open this side chamber from any portal to ask about requests, volunteers, donors, districts, or the active scenario.</p></div>',
+      '<div class="ai-drawer-actions"><span class="chip">Engine: ' + escapeHtml(aiEngineLabel()) + '</span><button class="ghost-button ai-close-button" type="button" data-action="close-ai-drawer" data-testid="close-ai-drawer">Close</button></div>',
+      "</div>",
+      '<div class="ai-drawer-body">',
+      renderAiCopilotPanel(session, workspace, "drawer"),
+      "</div>",
+      "</aside>",
+      "</section>"
     ].join("");
   }
 
@@ -633,7 +656,7 @@
       }) +
       '</div><div class="page-columns-side"><section class="surface-card"><p class="section-label">Predicted Funding</p><h2 class="section-title">' + escapeHtml(formatCurrency(totalBeneficiaries(workspace) * 420)) + '</h2><p class="section-copy">A simple estimate based on the visible requests, beneficiaries, and the currently loaded scenario.</p></section><section class="surface-card"><p class="section-label">Resource Gaps</p><div class="feed-list">' + renderProjectionCards(workspace.requests) + "</div></section></div></section>" +
       '<section class="two-col"><article class="surface-card"><p class="section-label">Requirement Projections</p><h2 class="section-title">Category-level demand forecast</h2><div class="feed-list">' + renderProjectionCards(workspace.requests, true) + '</div></article><article class="surface-card"><p class="section-label">Coordination Log</p><h2 class="section-title">AI explanation and analyst notes</h2><div class="feed-list">' + items.map(function (item) { return '<div class="feed-card"><div class="feed-card-head"><div><strong>' + escapeHtml(item.title) + '</strong><p class="feed-meta">' + escapeHtml(item.meta) + '</p></div></div><p class="card-copy">' + escapeHtml(item.copy) + "</p></div>"; }).join("") + "</div></article></section>" +
-      '<section class="two-col"><article class="surface-card"><p class="section-label">AI Copilot Chatbot</p><h2 class="section-title">Ask a real assistant about the active workspace</h2>' + renderAiCopilotPanel(session, workspace) + '</article><article class="surface-card"><p class="section-label">XGBoost Triage Engine</p><h2 class="section-title">XGBoost-style request scoring</h2><div class="stack-list">' + renderBoostedPredictionCards(predictions) + "</div></article></section>"
+      '<section class="two-col"><article class="surface-card"><p class="section-label">AI Copilot Chatbot</p><h2 class="section-title">Ask a real assistant about the active workspace</h2>' + renderAiCopilotPanel(session, workspace, "insights") + '</article><article class="surface-card"><p class="section-label">XGBoost Triage Engine</p><h2 class="section-title">XGBoost-style request scoring</h2><div class="stack-list">' + renderBoostedPredictionCards(predictions) + "</div></article></section>"
     ].join("");
   }
 
@@ -768,7 +791,8 @@
     }).join("");
   }
 
-  function renderAiCopilotPanel(session, workspace) {
+  function renderAiCopilotPanel(session, workspace, panelId) {
+    const contextId = safeText(panelId || "default", 40) || "default";
     const history = getAiChatHistory(session.role);
     const statusClass = AI_RUNTIME.tone === "error" ? " is-error" : AI_RUNTIME.tone === "success" ? " is-success" : "";
     return [
@@ -779,19 +803,19 @@
       '<span class="chip">Role: ' + escapeHtml((ROLE_CONFIG[session.role] || ROLE_CONFIG.user).label) + "</span>",
       '<span class="chip">Scenario: ' + escapeHtml(workspace.label || "No demo") + "</span>",
       "</div>",
-      '<button class="ghost-button" type="button" data-action="clear-ai-chat" data-testid="clear-ai-chat">Clear Chat</button>',
+      '<button class="ghost-button" type="button" data-action="clear-ai-chat" data-ai-context="' + escapeHtml(contextId) + '" data-testid="clear-ai-chat-' + escapeHtml(contextId) + '">Clear Chat</button>',
       "</div>",
       '<div class="ai-quick-prompts">',
       AI_QUICK_PROMPTS.map(function (prompt, index) {
-        return '<button class="inline-button ai-prompt-chip" type="button" data-action="ask-ai-prompt" data-ai-prompt="' + escapeHtml(prompt) + '" data-testid="ai-prompt-' + String(index + 1) + '">' + escapeHtml(prompt) + "</button>";
+        return '<button class="inline-button ai-prompt-chip" type="button" data-action="ask-ai-prompt" data-ai-target="' + escapeHtml(contextId) + '" data-ai-prompt="' + escapeHtml(prompt) + '" data-testid="ai-prompt-' + escapeHtml(contextId) + '-' + String(index + 1) + '">' + escapeHtml(prompt) + "</button>";
       }).join(""),
       "</div>",
-      '<div id="aiCopilotThread" class="chat-thread" data-testid="ai-copilot-thread">' + renderAiChatHistory(history) + "</div>",
-      '<form id="aiCopilotForm" class="form-grid copilot-form" data-testid="ai-copilot-form">',
-      '<label><span>Ask the chatbot</span><textarea id="aiCopilotMessage" class="text-area" name="message" placeholder="Example: Which district should we prioritize in the next 2 hours?" required></textarea></label>',
+      '<div id="aiCopilotThread-' + escapeHtml(contextId) + '" class="chat-thread" data-testid="ai-copilot-thread-' + escapeHtml(contextId) + '">' + renderAiChatHistory(history) + "</div>",
+      '<form id="aiCopilotForm-' + escapeHtml(contextId) + '" class="form-grid copilot-form" data-ai-copilot-form="' + escapeHtml(contextId) + '" data-testid="ai-copilot-form-' + escapeHtml(contextId) + '">',
+      '<label><span>Ask the chatbot</span><textarea class="text-area" name="message" placeholder="Example: Which district should we prioritize in the next 2 hours?" required></textarea></label>',
       '<div class="action-stack">',
-      '<button class="primary-button" type="submit" data-testid="submit-ai-copilot">' + escapeHtml(AI_RUNTIME.busy ? "Thinking..." : "Ask AI Copilot") + "</button>",
-      '<a class="ghost-button" href="./operations.html" data-testid="ai-open-operations">Open Operations Board</a>',
+      '<button class="primary-button" type="submit" data-testid="submit-ai-copilot-' + escapeHtml(contextId) + '">' + escapeHtml(AI_RUNTIME.busy ? "Thinking..." : "Ask AI Copilot") + "</button>",
+      '<a class="ghost-button" href="./operations.html" data-testid="ai-open-operations-' + escapeHtml(contextId) + '">Open Operations Board</a>',
       "</div>",
       "</form>"
     ].join("");
@@ -1416,6 +1440,20 @@
       });
     });
 
+    root.querySelectorAll("[data-action='toggle-ai-drawer']").forEach(function (button) {
+      button.addEventListener("click", function () {
+        AI_RUNTIME.drawerOpen = !AI_RUNTIME.drawerOpen;
+        renderApp(document.getElementById("portalApp"));
+      });
+    });
+
+    root.querySelectorAll("[data-action='close-ai-drawer']").forEach(function (button) {
+      button.addEventListener("click", function () {
+        AI_RUNTIME.drawerOpen = false;
+        renderApp(document.getElementById("portalApp"));
+      });
+    });
+
     root.querySelectorAll("[data-action='toggle-theme']").forEach(function (button) {
       button.addEventListener("click", function () {
         const next = loadTheme() === "dark" ? "light" : "dark";
@@ -1513,7 +1551,8 @@
 
     root.querySelectorAll("[data-action='ask-ai-prompt']").forEach(function (button) {
       button.addEventListener("click", function () {
-        const form = document.getElementById("aiCopilotForm");
+        const target = safeText(button.dataset.aiTarget, 40) || "insights";
+        const form = root.querySelector('[data-ai-copilot-form="' + cssEscape(target) + '"]');
         if (!form || !form.elements.message) {
           return;
         }
@@ -1522,13 +1561,12 @@
       });
     });
 
-    const aiForm = document.getElementById("aiCopilotForm");
-    if (aiForm) {
+    root.querySelectorAll("[data-ai-copilot-form]").forEach(function (aiForm) {
       aiForm.addEventListener("submit", function (event) {
         event.preventDefault();
         handleAiCopilotSubmit(aiForm, session);
       });
-    }
+    });
 
     root.querySelectorAll("[data-action='clear-ai-chat']").forEach(function (button) {
       button.addEventListener("click", function () {
@@ -1542,6 +1580,23 @@
     if (page === "donations") {
       showDonationTab("money");
     }
+
+    document.onkeydown = function (event) {
+      if (event && event.key === "Escape") {
+        let changed = false;
+        if (document.body.classList.contains("rf-sidebar-open")) {
+          document.body.classList.remove("rf-sidebar-open");
+          changed = true;
+        }
+        if (AI_RUNTIME.drawerOpen) {
+          AI_RUNTIME.drawerOpen = false;
+          changed = true;
+        }
+        if (changed) {
+          renderApp(document.getElementById("portalApp"));
+        }
+      }
+    };
   }
 
   function updateThemeToggleButtons(root, theme) {
@@ -2121,6 +2176,14 @@
     return safeText(value).replace(/[&<>"']/g, function (match) {
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[match];
     });
+  }
+
+  function cssEscape(value) {
+    const text = safeText(value, 80);
+    if (typeof CSS !== "undefined" && CSS && typeof CSS.escape === "function") {
+      return CSS.escape(text);
+    }
+    return text.replace(/[^a-zA-Z0-9_-]/g, "");
   }
 
   function formatCurrency(value) {
