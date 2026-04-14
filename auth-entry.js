@@ -633,9 +633,7 @@
       throw new Error("Sign in first, then choose your portal.");
     }
 
-    const desiredRole = portal === "admin" && !isAdminEmail(state.user.email || "")
-      ? "user"
-      : portal;
+    const desiredRole = portal;
     const requestedRole = portal;
     localStorage.setItem(PORTAL_SELECTION_KEY, desiredRole);
     const localProfile = buildEntryProfile(state.user, {
@@ -953,19 +951,14 @@
   }
 
   function resolveDefaultRole(email) {
-    return isAdminEmail(email) ? "admin" : "user";
+    void email;
+    return "user";
   }
 
   function portalRouteWithSelection(role) {
     const nextRole = normalizePortal(role) || "user";
     const route = PORTAL_ROUTES[nextRole] || "./overview.html";
     return route + (route.indexOf("?") >= 0 ? "&" : "?") + "portal=" + encodeURIComponent(nextRole);
-  }
-
-  function isAdminEmail(email) {
-    const config = window.RESOURCEFLOW_FIREBASE_CONFIG || {};
-    const emails = Array.isArray(config.adminEmails) ? config.adminEmails : [];
-    return emails.indexOf(String(email || "").toLowerCase()) >= 0;
   }
 
   function normalizeRole(value) {
