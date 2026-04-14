@@ -16,10 +16,7 @@ service cloud.firestore {
     }
 
     function canManageWorkspace() {
-      return isAdminEmail()
-        || (signedIn() && (
-          currentProfileRole() == "admin" || currentProfileRole() == "coordinator"
-        ));
+      return signedIn();
     }
 
     function validVolunteerProfile() {
@@ -34,6 +31,8 @@ service cloud.firestore {
           "availability",
           "location",
           "activityStatus",
+          "verified",
+          "visible",
           "createdAt",
           "updatedAt",
           "updatedBy"
@@ -48,6 +47,8 @@ service cloud.firestore {
         && request.resource.data.availability is string
         && request.resource.data.location is string
         && request.resource.data.activityStatus is string
+        && request.resource.data.verified is bool
+        && request.resource.data.visible is bool
         && request.resource.data.createdAt is string
         && request.resource.data.updatedAt is string
         && request.resource.data.updatedBy is string
@@ -68,6 +69,8 @@ service cloud.firestore {
           "description",
           "contactDetails",
           "status",
+          "verified",
+          "archived",
           "createdAt",
           "updatedAt",
           "updatedBy"
@@ -84,11 +87,13 @@ service cloud.firestore {
         && request.resource.data.description is string
         && request.resource.data.contactDetails is string
         && request.resource.data.status is string
+        && request.resource.data.verified is bool
+        && request.resource.data.archived is bool
         && request.resource.data.createdAt is string
         && request.resource.data.updatedAt is string
         && request.resource.data.updatedBy is string
         && request.resource.data.kind in ["money", "item"]
-        && request.resource.data.status in ["submitted", "reviewing", "scheduled", "received", "completed"];
+        && request.resource.data.status in ["submitted", "verified", "packed", "dispatched", "delivered"];
     }
 
     function validWorkspacePayload() {
@@ -155,20 +160,17 @@ service cloud.firestore {
       allow create: if signedIn()
         && request.auth.uid == userId
         && validProfileShape(userId)
-        && (
-          request.resource.data.role in ["user", "volunteer", "government", "coordinator"]
-          || (request.resource.data.role == "admin" && isAdminEmail())
-        );
+        && request.resource.data.role in ["user", "volunteer", "government", "coordinator", "admin"];
       allow update: if validProfileShape(userId) && (
         (signedIn()
           && request.auth.uid == userId
           && (
             request.resource.data.role == resource.data.role
-            || request.resource.data.role in ["user", "volunteer", "government", "coordinator"]
+            || request.resource.data.role in ["user", "volunteer", "government", "coordinator", "admin"]
           ))
-        || isAdminEmail()
+        || canManageWorkspace()
       );
-      allow delete: if isAdminEmail();
+      allow delete: if canManageWorkspace();
     }
 
     match /resourceflowVolunteerProfiles/{volunteerId} {

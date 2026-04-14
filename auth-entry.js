@@ -12,7 +12,7 @@
   const FIREBASE_FIRESTORE_SCRIPT = "https://www.gstatic.com/firebasejs/" + FIREBASE_SDK_VERSION + "/firebase-firestore-compat.js";
 
   const PORTAL_ROUTES = {
-    user: "./overview.html",
+    user: "./community.html",
     volunteer: "./volunteer.html",
     government: "./operations.html",
     admin: "./admin.html"
@@ -957,7 +957,7 @@
 
   function portalRouteWithSelection(role) {
     const nextRole = normalizePortal(role) || "user";
-    const route = PORTAL_ROUTES[nextRole] || "./overview.html";
+    const route = PORTAL_ROUTES[nextRole] || "./community.html";
     return route + (route.indexOf("?") >= 0 ? "&" : "?") + "portal=" + encodeURIComponent(nextRole);
   }
 

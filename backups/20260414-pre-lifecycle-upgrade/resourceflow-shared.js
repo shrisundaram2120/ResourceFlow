@@ -9,7 +9,7 @@
   const DONATION_COLLECTION = "resourceflowDonations";
   const ADMIN_ROLES = ["admin", "coordinator"];
   const VOLUNTEER_ACTIVITY_OPTIONS = ["available", "on call", "active", "inactive"];
-  const DONATION_STATUS_OPTIONS = ["submitted", "verified", "packed", "dispatched", "delivered"];
+  const DONATION_STATUS_OPTIONS = ["submitted", "reviewing", "scheduled", "received", "completed"];
 
   const state = {
     auth: null,
@@ -254,30 +254,6 @@
         setAdminMessage("Donation status update failed. Check your permissions and Firestore rules.", "error");
       });
     }
-    if (action === "toggle-volunteer-verified") {
-      toggleVolunteerVerified(trigger.dataset.recordId || "").catch(function (error) {
-        console.warn("Volunteer verification update failed.", error);
-        setAdminMessage("Volunteer verification update failed.", "error");
-      });
-    }
-    if (action === "toggle-volunteer-visibility") {
-      toggleVolunteerVisibility(trigger.dataset.recordId || "").catch(function (error) {
-        console.warn("Volunteer visibility update failed.", error);
-        setAdminMessage("Volunteer visibility update failed.", "error");
-      });
-    }
-    if (action === "toggle-donation-verified") {
-      toggleDonationVerified(trigger.dataset.recordId || "").catch(function (error) {
-        console.warn("Donation verification update failed.", error);
-        setAdminMessage("Donation verification update failed.", "error");
-      });
-    }
-    if (action === "toggle-donation-archive") {
-      toggleDonationArchive(trigger.dataset.recordId || "").catch(function (error) {
-        console.warn("Donation archive update failed.", error);
-        setAdminMessage("Donation archive update failed.", "error");
-      });
-    }
   }
 
   function watchVolunteers() {
@@ -414,71 +390,6 @@
     setAdminMessage("Donation workflow status updated.", "success");
   }
 
-  async function toggleVolunteerVerified(recordId) {
-    requireManager();
-    const profile = state.volunteers.find(function (item) {
-      return item.id === recordId;
-    });
-    if (!profile) {
-      return;
-    }
-    await state.db.collection(VOLUNTEER_COLLECTION).doc(recordId).set({
-      verified: !profile.verified,
-      updatedAt: new Date().toISOString(),
-      updatedBy: currentActor()
-    }, { merge: true });
-    setAdminMessage(profile.verified ? "Volunteer verification removed." : "Volunteer verified successfully.", "success");
-  }
-
-  async function toggleVolunteerVisibility(recordId) {
-    requireManager();
-    const profile = state.volunteers.find(function (item) {
-      return item.id === recordId;
-    });
-    if (!profile) {
-      return;
-    }
-    await state.db.collection(VOLUNTEER_COLLECTION).doc(recordId).set({
-      visible: profile.visible === false ? true : false,
-      updatedAt: new Date().toISOString(),
-      updatedBy: currentActor()
-    }, { merge: true });
-    setAdminMessage(profile.visible === false ? "Volunteer restored to the shared directory." : "Volunteer hidden from the shared directory.", "success");
-  }
-
-  async function toggleDonationVerified(recordId) {
-    requireManager();
-    const record = state.donations.find(function (item) {
-      return item.id === recordId;
-    });
-    if (!record) {
-      return;
-    }
-    await state.db.collection(DONATION_COLLECTION).doc(recordId).set({
-      verified: !record.verified,
-      status: !record.verified && record.status === "submitted" ? "verified" : record.status,
-      updatedAt: new Date().toISOString(),
-      updatedBy: currentActor()
-    }, { merge: true });
-    setAdminMessage(record.verified ? "Donation verification removed." : "Donation verified successfully.", "success");
-  }
-
-  async function toggleDonationArchive(recordId) {
-    requireManager();
-    const record = state.donations.find(function (item) {
-      return item.id === recordId;
-    });
-    if (!record) {
-      return;
-    }
-    await state.db.collection(DONATION_COLLECTION).doc(recordId).set({
-      archived: record.archived === true ? false : true,
-      updatedAt: new Date().toISOString(),
-      updatedBy: currentActor()
-    }, { merge: true });
-    setAdminMessage(record.archived ? "Donation record restored." : "Donation record archived from the active queue.", "success");
-  }
-
   function renderHomeDonationViews() {
     renderHomeDonationSummary();
     renderHomeDonationHistory();
@@ -569,10 +480,10 @@
       return sum + (item.kind === "money" ? item.amount : 0);
     }, 0);
     const activeVolunteers = state.volunteers.filter(function (item) {
-      return item.visible !== false && (item.activityStatus === "active" || item.activityStatus === "available" || item.activityStatus === "on call");
+      return item.activityStatus === "active" || item.activityStatus === "available" || item.activityStatus === "on call";
     }).length;
     const pendingDonations = state.donations.filter(function (item) {
-      return item.archived !== true && item.status !== "delivered";
+      return item.status === "submitted" || item.status === "reviewing" || item.status === "scheduled";
     }).length;
 
     refs.adminSharedSummary.innerHTML = [
@@ -581,7 +492,7 @@
       metricCard("Donation Records", String(state.donations.length), "Money and item donations in the admin queue."),
       metricCard("Money Logged", formatCurrency(moneyTotal), "Total money donation value currently recorded."),
       metricCard("Item Offers", String(state.donations.filter(function (item) { return item.kind === "item"; }).length), "Item donation entries available for coordination."),
-        metricCard("Needs Review", String(pendingDonations), "Donation records still moving through verification, packing, or dispatch.")
+      metricCard("Needs Review", String(pendingDonations), "Donation records still moving through review or scheduling.")
     ].join("");
 
     setAdminMessage(
@@ -722,9 +633,7 @@
       renderDetailItem("Skills", item.skills.length ? item.skills.map(titleCase).join(", ") : "Not shared"),
       renderDetailItem("Availability", item.availability || "Not shared"),
       renderDetailItem("Contact", [item.email, item.phone].filter(Boolean).join(" | ") || "Not shared"),
-      renderDetailItem("Status", titleCase(item.activityStatus || "available")),
-      renderDetailItem("Verification", item.verified ? "Verified" : "Pending review"),
-      renderDetailItem("Directory Visibility", item.visible === false ? "Hidden" : "Visible")
+      renderDetailItem("Status", titleCase(item.activityStatus || "available"))
     ];
     if (item.location) {
       details.push(renderDetailItem("Location", item.location));
@@ -740,8 +649,6 @@
       "</select>",
       "</label>",
       '<button class="ghost-button" type="button" data-shared-admin-action="save-volunteer-status" data-record-id="' + escapeHtml(item.id) + '">Save Status</button>',
-      '<button class="ghost-button" type="button" data-shared-admin-action="toggle-volunteer-verified" data-record-id="' + escapeHtml(item.id) + '">' + escapeHtml(item.verified ? "Remove Verification" : "Verify Volunteer") + "</button>",
-      '<button class="ghost-button" type="button" data-shared-admin-action="toggle-volunteer-visibility" data-record-id="' + escapeHtml(item.id) + '">' + escapeHtml(item.visible === false ? "Show Profile" : "Hide Profile") + "</button>",
       "</div>"
     ].join("") : "";
 
@@ -754,7 +661,7 @@
       '<p class="card-meta shared-subtitle">Volunteer profile' + (item.ngoGroup ? " - " + escapeHtml(item.ngoGroup) : "") + "</p>",
       '<div class="shared-detail-grid">' + details.join("") + "</div>",
       '<div class="shared-divider"></div>',
-      '<div class="chip-row">' + skills + (item.location ? renderChip(item.location) : "") + renderChip(item.verified ? "Verified" : "Pending") + renderChip(item.visible === false ? "Hidden" : "Visible") + "</div>",
+      '<div class="chip-row">' + skills + (item.location ? renderChip(item.location) : "") + "</div>",
       controls,
       "</div>"
     ].join("");
@@ -773,17 +680,13 @@
           renderDetailItem("Amount", formatCurrency(item.amount)),
           renderDetailItem("Payment", item.paymentMethod || "Manual"),
           renderDetailItem("Contact", item.ownerEmail || "Not shared"),
-          renderDetailItem("Status", titleCase(item.status || "submitted")),
-          renderDetailItem("Verification", item.verified ? "Verified" : "Pending review"),
-          renderDetailItem("Queue State", item.archived ? "Archived" : "Active queue")
+          renderDetailItem("Status", titleCase(item.status || "submitted"))
         ]
       : [
           renderDetailItem("Donation Type", titleCase(item.itemType || "Item")),
           renderDetailItem("Quantity", String(item.quantity || 0)),
           renderDetailItem("Contact", item.contactDetails || item.ownerEmail || "Not shared"),
-          renderDetailItem("Status", titleCase(item.status)),
-          renderDetailItem("Verification", item.verified ? "Verified" : "Pending review"),
-          renderDetailItem("Queue State", item.archived ? "Archived" : "Active queue")
+          renderDetailItem("Status", titleCase(item.status))
         ];
     const controls = includeAdminControls ? [
       '<div class="button-row compact-controls shared-admin-controls">',
@@ -796,8 +699,6 @@
       "</select>",
       "</label>",
       '<button class="ghost-button" type="button" data-shared-admin-action="save-donation-status" data-record-id="' + escapeHtml(item.id) + '">Save Status</button>',
-      '<button class="ghost-button" type="button" data-shared-admin-action="toggle-donation-verified" data-record-id="' + escapeHtml(item.id) + '">' + escapeHtml(item.verified ? "Remove Verification" : "Verify Donation") + "</button>",
-      '<button class="ghost-button" type="button" data-shared-admin-action="toggle-donation-archive" data-record-id="' + escapeHtml(item.id) + '">' + escapeHtml(item.archived ? "Restore Record" : "Archive Record") + "</button>",
       "</div>"
     ].join("") : "";
 
@@ -810,7 +711,7 @@
       '<p class="card-meta shared-subtitle">' + escapeHtml(headline) + "</p>",
       '<div class="shared-detail-grid">' + details.join("") + "</div>",
       '<div class="shared-divider"></div>',
-      '<div class="chip-row">' + renderChip(titleCase(item.kind)) + renderChip(formatShortDate(item.createdAt)) + renderChip(item.verified ? "Verified" : "Pending") + renderChip(item.archived ? "Archived" : "Active") + "</div>",
+      '<div class="chip-row">' + renderChip(titleCase(item.kind)) + renderChip(formatShortDate(item.createdAt)) + "</div>",
       '<p class="card-meta">' + escapeHtml(description) + "</p>",
       controls,
       "</div>"
@@ -828,20 +729,17 @@
 
   function renderRecordStatusPill(status, type) {
     const normalized = normalizeText(status || "tracked");
-    const tone = /(active|available|approved|delivered|closed|completed|verified)/.test(normalized)
+    const tone = /(active|available|approved|delivered|closed|completed)/.test(normalized)
       ? "success"
-      : /(submitted|reviewing|pending|scheduled|on call|queued|draft|packed|dispatched)/.test(normalized)
+      : /(submitted|reviewing|pending|scheduled|on call|queued|draft)/.test(normalized)
         ? "pending"
-        : /(rejected|archived|cancelled|unavailable|inactive|hidden)/.test(normalized)
+        : /(rejected|archived|cancelled|unavailable|inactive)/.test(normalized)
           ? "muted"
           : (type === "volunteer" ? "success" : "pending");
     return '<span class="record-status-pill record-status-pill-' + tone + '">' + escapeHtml(titleCase(status || "tracked")) + "</span>";
   }
 
   function syncVolunteerTopStats() {
-    const visibleVolunteers = state.volunteers.filter(function (item) {
-      return item.visible !== false;
-    });
     const countNode = document.getElementById("volunteerStatCount");
     const countTextNode = document.getElementById("volunteerStatCountText");
     const focusNode = document.getElementById("volunteerStatFocus");
@@ -850,7 +748,7 @@
     const readinessTextNode = document.getElementById("volunteerStatReadinessText");
 
     if (countNode) {
-      countNode.textContent = String(visibleVolunteers.length);
+      countNode.textContent = String(state.volunteers.length);
     }
     if (countTextNode) {
       countTextNode.textContent = state.user
@@ -858,7 +756,7 @@
         : "Sign in to load the shared Firestore volunteer directory.";
     }
     if (focusNode) {
-      focusNode.textContent = titleCase(topSkill(visibleVolunteers) || "balanced");
+      focusNode.textContent = titleCase(topSkill(state.volunteers) || "balanced");
     }
     if (focusTextNode) {
       focusTextNode.textContent = state.volunteers.length
@@ -888,8 +786,6 @@
       availability: safeText(next.availability || "Flexible", 60),
       location: safeText(next.location || "", 140),
       activityStatus: normalizeActivityStatus(next.activityStatus || "available"),
-      verified: Boolean(next.verified),
-      visible: next.visible === false ? false : true,
       createdAt: safeIso(next.createdAt),
       updatedAt: safeIso(next.updatedAt),
       updatedBy: safeText(next.updatedBy || "", 140)
@@ -910,8 +806,6 @@
       availability: safeText(next.availability, 60),
       location: safeText(next.location, 140),
       activityStatus: normalizeActivityStatus(next.activityStatus || "available"),
-      verified: Boolean(next.verified),
-      visible: next.visible === false ? false : true,
       createdAt: safeIso(next.createdAt || now),
       updatedAt: now,
       updatedBy: currentActor()
@@ -934,8 +828,6 @@
       description: safeText(next.description || "", 280),
       contactDetails: safeText(next.contactDetails || next.ownerEmail || "", 180),
       status: normalizeDonationStatus(next.status || "submitted"),
-      verified: Boolean(next.verified),
-      archived: next.archived === true,
       createdAt: safeIso(next.createdAt),
       updatedAt: safeIso(next.updatedAt),
       updatedBy: safeText(next.updatedBy || "", 140)
@@ -959,8 +851,6 @@
       description: normalizedKind === "item" ? safeText(next.description, 280) : "",
       contactDetails: normalizedKind === "item" ? safeText(next.contactDetails || currentContactEmail(), 180) : currentContactEmail(),
       status: "submitted",
-      verified: false,
-      archived: false,
       createdAt: now,
       updatedAt: now,
       updatedBy: currentActor()
@@ -974,9 +864,6 @@
     const location = normalizeText(valueOf(refs.sharedVolunteerLocationFilter));
 
     return items.filter(function (item) {
-      if (item.visible === false) {
-        return false;
-      }
       const haystack = normalizeText([
         item.fullName,
         item.ngoGroup,
@@ -1022,15 +909,8 @@
   }
 
   function isManager() {
-    if (!state.user) {
-      return false;
-    }
     const role = normalizeRole(state.profile && (state.profile.role || state.profile.requestedRole || ""));
-    const selectedPortal = normalizeRole(localStorage.getItem("resourceflow-portal-selection-v2") || "");
-    return ADMIN_ROLES.indexOf(role) >= 0
-      || selectedPortal === "admin"
-      || refs.page === "admin"
-      || isConfiguredAdminEmail(currentContactEmail());
+    return ADMIN_ROLES.indexOf(role) >= 0 || isConfiguredAdminEmail(currentContactEmail());
   }
 
   function isConfiguredAdminEmail(email) {
@@ -1239,22 +1119,7 @@ function metricCard(label, value, text) {
 
   function normalizeDonationStatus(value) {
     const normalized = normalizeText(value);
-    if (DONATION_STATUS_OPTIONS.indexOf(normalized) >= 0) {
-      return normalized;
-    }
-    if (normalized === "reviewing") {
-      return "verified";
-    }
-    if (normalized === "scheduled") {
-      return "packed";
-    }
-    if (normalized === "received") {
-      return "dispatched";
-    }
-    if (normalized === "completed") {
-      return "delivered";
-    }
-    return "submitted";
+    return DONATION_STATUS_OPTIONS.indexOf(normalized) >= 0 ? normalized : "submitted";
   }
 
   function safeText(value, limit) {
