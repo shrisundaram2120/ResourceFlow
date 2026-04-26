@@ -284,9 +284,27 @@
     systemNotice: "Choose a scenario to populate the workspace."
   };
 
-  const REQUEST_STAGES = ["Requested", "Reviewed", "Assigned", "In Progress", "Delivered", "Closed"];
+  const REQUEST_STAGES = ["Pending", "Reviewed", "Assigned", "In Progress", "Delivered", "Closed"];
   const DONATION_STAGES = ["Submitted", "Verified", "Packed", "Dispatched", "Delivered"];
-  const ASSIGNMENT_STAGES = ["Assigned", "In Progress", "Delivered", "Closed"];
+  const ASSIGNMENT_STAGES = ["Accepted", "In Progress", "Completed"];
+  const DEMO_REFRESH_MS = 10 * 60 * 1000;
+  const AUTOMATION_TICK_MS = 20 * 1000;
+  const LIVE_PRIORITY_RANK = 200;
+  const DISASTER_PRIORITY_RANK = 160;
+  const STANDARD_PRIORITY_RANK = 90;
+  const DEMO_VOLUNTEER_NAMES = ["Arjun Das", "Meera Joseph", "Kavin Raj", "Nila Bose", "Farhan Ali", "Sowmya Devi", "Pranav Sen", "Ishita Paul"];
+  const DEMO_DONOR_NAMES = ["Harbor Traders Forum", "Relief Supplies Hub", "CareLink Trust", "Rapid Aid Circle", "District Women Collective", "Health Basket Network"];
+  const DEMO_LOCATION_HINTS = {
+    Chennai: ["Velachery", "Saidapet", "Adyar", "Perungudi", "Tambaram"],
+    Nagapattinam: ["Nagapattinam Collectorate", "Akkaraipettai Harbor", "Nagore", "Keelaiyur"],
+    Cuddalore: ["Cuddalore District Hospital", "Panruti", "Kurinjipadi"],
+    Kolkata: ["Tangra Community Hall", "Salt Lake", "Park Circus", "Beliaghata"],
+    Default: ["Town Hall", "Community School", "Primary Health Center", "Ward Relief Point"]
+  };
+  const WORKSPACE_AUTOMATION_RUNTIME = {
+    intervalId: 0,
+    storageBound: false
+  };
 
   function init() {
     const root = document.getElementById("portalApp");
@@ -295,8 +313,72 @@
     }
     clearLegacyCachesOnce();
     applyTheme(loadTheme());
+    bindWorkspaceAutomation(root);
     renderApp(root);
     observeInteractiveTestIds();
+  }
+
+  function bindWorkspaceAutomation(root) {
+    if (!WORKSPACE_AUTOMATION_RUNTIME.storageBound) {
+      window.addEventListener("storage", function (event) {
+        if (!event || [WORKSPACE_KEY, THEME_KEY, LANGUAGE_KEY, DISMISSED_ALERTS_KEY].indexOf(event.key) === -1) {
+          return;
+        }
+        if (event.key === THEME_KEY) {
+          applyTheme(loadTheme());
+        }
+        renderApp(root);
+      });
+      WORKSPACE_AUTOMATION_RUNTIME.storageBound = true;
+    }
+    if (!WORKSPACE_AUTOMATION_RUNTIME.intervalId) {
+      WORKSPACE_AUTOMATION_RUNTIME.intervalId = window.setInterval(function () {
+        const result = runWorkspaceAutomation({ reason: "interval" });
+        if (result.changed) {
+          renderApp(root);
+        }
+      }, AUTOMATION_TICK_MS);
+    }
+  }
+
+  function nowIso() {
+    return new Date().toISOString();
+  }
+
+  function nowMs() {
+    return Date.now();
+  }
+
+  function parseTimestamp(value) {
+    const stamp = safeText(value, 80);
+    if (!stamp) {
+      return 0;
+    }
+    const parsed = Date.parse(stamp);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  function elapsedMinutes(since) {
+    const start = parseTimestamp(since);
+    if (!start) {
+      return 0;
+    }
+    return (nowMs() - start) / 60000;
+  }
+
+  function randomFrom(list) {
+    return Array.isArray(list) && list.length
+      ? list[Math.floor(Math.random() * list.length)]
+      : "";
+  }
+
+  function slugify(value) {
+    return safeText(value, 80).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  }
+
+  function capitalizeWord(value) {
+    const text = safeText(value, 120);
+    return text ? text.charAt(0).toUpperCase() + text.slice(1) : "";
   }
 
   function clearLegacyCachesOnce() {
@@ -443,17 +525,137 @@
     }) : [];
   }
 
+  function requestPriorityRank(request) {
+    const source = safeText(request && request.source, 40).toLowerCase();
+    const base = source === "live"
+      ? LIVE_PRIORITY_RANK
+      : source === "disaster-demo"
+        ? DISASTER_PRIORITY_RANK
+        : STANDARD_PRIORITY_RANK;
+    return base + Math.round(priorityScore(request && request.priority) * 100) + Math.min(40, Number(request && request.beneficiaries || 0) / 10);
+  }
+
+  function sortRequestsForLifecycle(items) {
+    return items.slice().sort(function (left, right) {
+      return requestPriorityRank(right) - requestPriorityRank(left)
+        || parseTimestamp(right.createdAt || right.requestedAt) - parseTimestamp(left.createdAt || left.requestedAt)
+        || priorityScore(right.priority) - priorityScore(left.priority);
+    });
+  }
+
+  function sortAssignmentsForLifecycle(items) {
+    return items.slice().sort(function (left, right) {
+      const leftActive = isAssignmentActiveStage(left.status) ? 1 : 0;
+      const rightActive = isAssignmentActiveStage(right.status) ? 1 : 0;
+      return rightActive - leftActive
+        || parseTimestamp(right.updatedAt || right.startedAt || right.acceptedAt) - parseTimestamp(left.updatedAt || left.startedAt || left.acceptedAt)
+        || Number(right.points || 0) - Number(left.points || 0);
+    });
+  }
+
+  function sortDonationsForLifecycle(items) {
+    return items.slice().sort(function (left, right) {
+      return parseTimestamp(right.createdAt || right.updatedAt) - parseTimestamp(left.createdAt || left.updatedAt);
+    });
+  }
+
+  function isRequestCompleteStage(stage) {
+    const normalized = normalizeRequestStatus(stage);
+    return normalized === "Delivered" || normalized === "Closed";
+  }
+
+  function isRequestPendingStage(stage) {
+    const normalized = normalizeRequestStatus(stage);
+    return normalized === "Pending" || normalized === "Reviewed";
+  }
+
+  function isAssignmentCompleteStage(stage) {
+    return normalizeAssignmentStatus(stage) === "Completed";
+  }
+
+  function isAssignmentActiveStage(stage) {
+    const normalized = normalizeAssignmentStatus(stage);
+    return normalized === "Accepted" || normalized === "In Progress";
+  }
+
+  function normalizedAvailability(value) {
+    const availability = safeText(value, 40).toLowerCase();
+    if (!availability) return "available";
+    if (availability.indexOf("inactive") !== -1) return "inactive";
+    if (availability.indexOf("weekend") !== -1) return "weekend";
+    if (availability.indexOf("evening") !== -1) return "evening";
+    if (availability.indexOf("half") !== -1) return "half day";
+    if (availability.indexOf("full") !== -1) return "full day";
+    if (availability.indexOf("active") !== -1) return "active";
+    if (availability.indexOf("call") !== -1) return "on call";
+    return "available";
+  }
+
+  function isVolunteerAvailable(volunteer) {
+    return /available|active|on call|full day|half day|evening|weekend/.test(normalizedAvailability(volunteer && volunteer.availability));
+  }
+
+  function inferTaskComplexity(priority) {
+    const normalized = safeText(priority, 40).toLowerCase();
+    if (normalized.indexOf("critical") !== -1 || normalized.indexOf("high") !== -1) return "High";
+    if (normalized.indexOf("medium") !== -1) return "Medium";
+    return "Low";
+  }
+
+  function estimatedDurationMinutes(priority, source) {
+    const complexity = inferTaskComplexity(priority);
+    if (complexity === "High") {
+      return safeText(source, 40).toLowerCase() === "live" ? 16 : 12;
+    }
+    if (complexity === "Medium") {
+      return safeText(source, 40).toLowerCase() === "live" ? 20 : 15;
+    }
+    return safeText(source, 40).toLowerCase() === "live" ? 24 : 18;
+  }
+
+  function computeTaskPoints(priority, shiftCount) {
+    const complexity = inferTaskComplexity(priority);
+    const base = complexity === "High" ? 32 : complexity === "Medium" ? 22 : 14;
+    return Math.max(8, base - Math.min(8, Number(shiftCount || 0) * 2));
+  }
+
+  function demoCycleId() {
+    return "demo-" + String(nowMs());
+  }
+
+  function randomizeLocationLabel(district, fallbackLocation) {
+    const options = DEMO_LOCATION_HINTS[safeText(district, 80)] || DEMO_LOCATION_HINTS.Default;
+    const label = randomFrom(options) || fallbackLocation || district || "Relief Point";
+    return district && label.toLowerCase().indexOf(String(district).toLowerCase()) === -1
+      ? label + ", " + district
+      : label;
+  }
+
+  function buildShiftAuditLine(assignment, nextVolunteer, request) {
+    return "AI shifted " + assignment.title + " to " + nextVolunteer.name + " because " + request.title + " crossed 50% of its estimated duration without completion.";
+  }
+
   function enrichWorkspace(workspace) {
     const next = workspace && typeof workspace === "object" ? workspace : {};
     const requests = cloneScenarioItems(next.requests || []).map(function (item, index) {
-      const status = normalizeRequestStatus(item.status || item.priority || "Requested");
+      const source = safeText(item.source || item.origin || (next.scenario && next.scenario !== "none" ? "disaster-demo" : "live"), 40).toLowerCase();
+      const status = normalizeRequestStatus(item.status || item.priority || "Pending");
+      const createdAt = safeText(item.createdAt || item.requestedAt || item.date || nowIso(), 80);
       return Object.assign({}, item, {
         id: safeText(item.id || ("REQ-" + String(index + 100)), 80),
         status: status,
         priority: safeText(item.priority || "Medium", 40),
-        requestedAt: safeText(item.requestedAt || item.date || ("2026-04-" + String(10 + (index % 9)) + "T08:30:00.000Z"), 40),
+        requestedAt: safeText(item.requestedAt || createdAt, 80),
+        createdAt: createdAt,
+        updatedAt: safeText(item.updatedAt || createdAt, 80),
         requester: safeText(item.requester || "Community Network", 120),
-        blocked: Boolean(item.blocked)
+        blocked: Boolean(item.blocked),
+        source: source === "demo" ? "disaster-demo" : source,
+        origin: safeText(item.origin || (source === "live" ? "live" : "demo"), 20).toLowerCase() || "demo",
+        priorityLane: safeText(item.priorityLane || (source === "live" ? "Live" : source === "disaster-demo" ? "Disaster Demo" : "Standard"), 40),
+        broadcastTo: Array.isArray(item.broadcastTo) && item.broadcastTo.length ? item.broadcastTo.slice() : ["admin", "government"],
+        complexity: inferTaskComplexity(item.priority || "Medium"),
+        estimatedDurationMinutes: Number(item.estimatedDurationMinutes || estimatedDurationMinutes(item.priority || "Medium", source))
       });
     });
     const assignments = cloneScenarioItems(next.assignments || []).map(function (item, index) {
@@ -462,46 +664,74 @@
           || (safeText(request.district, 80).toLowerCase() === safeText(item.district, 80).toLowerCase()
             && safeText(request.title, 140).toLowerCase().indexOf(safeText(item.title, 140).toLowerCase().slice(0, 12)) >= 0);
       });
+      const createdAt = safeText(item.createdAt || item.assignedAt || item.updatedAt || nowIso(), 80);
+      const normalizedStatus = normalizeAssignmentStatus(item.status || "Accepted");
       return Object.assign({}, item, {
         id: safeText(item.id || ("ASG-" + String(index + 300)), 80),
         requestId: safeText(item.requestId || (inferredRequest && inferredRequest.id) || "", 80),
-        status: normalizeAssignmentStatus(item.status || "Assigned")
+        status: normalizedStatus,
+        createdAt: createdAt,
+        updatedAt: safeText(item.updatedAt || createdAt, 80),
+        acceptedAt: safeText(item.acceptedAt || createdAt, 80),
+        startedAt: safeText(item.startedAt || (normalizedStatus === "In Progress" || normalizedStatus === "Completed" ? createdAt : ""), 80),
+        completedAt: safeText(item.completedAt || (normalizedStatus === "Completed" ? createdAt : ""), 80),
+        origin: safeText(item.origin || (inferredRequest && inferredRequest.origin) || "demo", 20).toLowerCase() || "demo",
+        volunteerOrigin: safeText(item.volunteerOrigin || "demo", 20).toLowerCase() || "demo",
+        estimatedDurationMinutes: Number(item.estimatedDurationMinutes || ((inferredRequest && inferredRequest.estimatedDurationMinutes) || estimatedDurationMinutes(inferredRequest && inferredRequest.priority, inferredRequest && inferredRequest.source))),
+        shiftCount: Number(item.shiftCount || 0),
+        shifted: Boolean(item.shifted),
+        pointsAwarded: Boolean(item.pointsAwarded || normalizedStatus === "Completed")
       });
     });
     const volunteers = cloneScenarioItems(next.volunteers || []).map(function (item, index) {
+      const completedTasks = Number(item.completedTasks || 0);
+      const pointsEarned = Number(item.pointsEarned || 0);
       return Object.assign({}, item, {
         id: safeText(item.id || ("VOL-" + String(index + 1)), 80),
         ngo: safeText(item.ngo || item.ngoGroup || "Relief Network", 120),
-        reliability: Number(item.reliability || computeVolunteerReliability(item, assignments))
+        reliability: Number(item.reliability || computeVolunteerReliability(item, assignments)),
+        completedTasks: completedTasks,
+        pointsEarned: pointsEarned,
+        attendanceDays: Number(item.attendanceDays || completedTasks || 0),
+        origin: safeText(item.origin || "demo", 20).toLowerCase() || "demo",
+        activityStatus: safeText(item.activityStatus || normalizedAvailability(item.availability || "available"), 40),
+        availability: safeText(item.availability || capitalizeWord(normalizedAvailability(item.activityStatus || "available")), 40)
       });
     });
     const donations = cloneScenarioItems(next.donations || []).map(function (item, index) {
       return Object.assign({}, item, {
         id: safeText(item.id || ("DON-" + String(index + 1)), 80),
-        status: normalizeDonationLifecycle(item.status || "Submitted")
+        status: normalizeDonationLifecycle(item.status || "Submitted"),
+        createdAt: safeText(item.createdAt || item.updatedAt || nowIso(), 80),
+        updatedAt: safeText(item.updatedAt || item.createdAt || nowIso(), 80),
+        origin: safeText(item.origin || (next.scenario && next.scenario !== "none" ? "demo" : "live"), 20).toLowerCase() || "demo"
       });
     });
     return {
       scenario: safeText(next.scenario || "none", 40).toLowerCase(),
       label: safeText(next.label || EMPTY_WORKSPACE.label, 120),
       summary: safeText(next.summary || EMPTY_WORKSPACE.summary, 280),
-      requests: requests,
-      assignments: assignments,
+      requests: sortRequestsForLifecycle(requests),
+      assignments: sortAssignmentsForLifecycle(assignments),
       volunteers: volunteers,
-      donations: donations,
+      donations: sortDonationsForLifecycle(donations),
       audit: cloneScenarioItems(next.audit || []),
       outreach: cloneScenarioItems(next.outreach || []),
-      systemNotice: safeText(next.systemNotice || EMPTY_WORKSPACE.systemNotice, 280)
+      systemNotice: safeText(next.systemNotice || EMPTY_WORKSPACE.systemNotice, 280),
+      generatedAt: safeText(next.generatedAt || nowIso(), 80),
+      lastRefreshedAt: safeText(next.lastRefreshedAt || next.generatedAt || nowIso(), 80),
+      lastAutomationAt: safeText(next.lastAutomationAt || "", 80),
+      demoCycleId: safeText(next.demoCycleId || "", 80)
     };
   }
 
   function normalizeAssignmentStatus(status) {
     const normalized = safeText(status, 40).toLowerCase();
-    if (!normalized) return "Assigned";
-    if (normalized.indexOf("closed") !== -1) return "Closed";
-    if (normalized.indexOf("deliver") !== -1 || normalized.indexOf("complete") !== -1) return "Delivered";
+    if (!normalized) return "Accepted";
+    if (normalized.indexOf("complete") !== -1 || normalized.indexOf("deliver") !== -1 || normalized.indexOf("closed") !== -1) return "Completed";
     if (normalized.indexOf("progress") !== -1 || normalized.indexOf("active") !== -1) return "In Progress";
-    return "Assigned";
+    if (normalized.indexOf("accept") !== -1 || normalized.indexOf("assign") !== -1 || normalized.indexOf("queue") !== -1) return "Accepted";
+    return "Accepted";
   }
 
   function normalizeDonationLifecycle(status) {
@@ -523,20 +753,21 @@
       return 72;
     }
     const delivered = related.filter(function (item) {
-      return normalizeAssignmentStatus(item.status) === "Delivered";
+      return normalizeAssignmentStatus(item.status) === "Completed";
     }).length;
     return Math.max(68, Math.min(98, 70 + delivered * 9 + Math.max(0, related.length - delivered) * 3));
   }
 
   function normalizeRequestStatus(status) {
     const normalized = safeText(status, 40).toLowerCase();
-    if (!normalized || normalized === "tracked" || normalized === "submitted" || normalized === "queued") return "Requested";
-    if (normalized.indexOf("review") !== -1 || normalized.indexOf("pending") !== -1) return "Reviewed";
+    if (!normalized || normalized === "tracked" || normalized === "submitted" || normalized === "queued" || normalized === "requested") return "Pending";
+    if (normalized.indexOf("pending") !== -1) return "Pending";
+    if (normalized.indexOf("review") !== -1) return "Reviewed";
     if (normalized.indexOf("assigned") !== -1) return "Assigned";
     if (normalized.indexOf("progress") !== -1 || normalized.indexOf("active") !== -1) return "In Progress";
     if (normalized.indexOf("deliver") !== -1 || normalized.indexOf("complete") !== -1) return "Delivered";
     if (normalized.indexOf("closed") !== -1 || normalized.indexOf("archive") !== -1) return "Closed";
-    return "Requested";
+    return "Pending";
   }
 
   function renderHeader(page, session, workspace) {
@@ -1947,6 +2178,7 @@
     return {
       summary: assignments.length ? "You currently have " + activeTasks.length + " active task(s) and " + archive.length + " completed task(s) in the demo workspace." : "No personal assignments are linked yet, so the portal is showing the live volunteer opportunities from the current scenario.",
       district: topDistrict(workspace) || "No district yet",
+      personalAssignments: assignments.length,
       points: points,
       completed: archive.length,
       attendance: Math.max(archive.length + (activeTasks.length ? 1 : 0), assignments.length ? 4 : 0),
@@ -3344,16 +3576,25 @@
       const workspace = getWorkspace();
       const history = getAiChatHistory(session.role);
       const result = await requestAiCopilot(message, session, workspace, history);
-      appendAiChatMessage(session.role, "assistant", result.text, result.sourceLabel);
+      const execution = executeAiActionPlan(result.actions || [], session, workspace, message);
+      if (execution.changed) {
+        saveWorkspace(workspace);
+      }
+      appendAiChatMessage(session.role, "assistant", mergeCopilotReplyWithExecution(result.text, execution), result.sourceLabel);
       AI_RUNTIME.engine = result.engine;
-      AI_RUNTIME.status = result.notice;
-      AI_RUNTIME.tone = result.engine === "local-boosted" ? "" : "success";
+      AI_RUNTIME.status = execution.notice || result.notice;
+      AI_RUNTIME.tone = execution.changed ? "success" : (result.engine === "local-boosted" ? "" : "success");
     } catch (error) {
-      const fallback = buildLocalCopilotResponse(message, getWorkspace(), session);
-      appendAiChatMessage(session.role, "assistant", fallback.text, "Local boosted engine");
+      const fallback = buildLocalCopilotResponse(message, getWorkspace(), session, getAiChatHistory(session.role));
+      const fallbackWorkspace = getWorkspace();
+      const execution = executeAiActionPlan(fallback.actions || [], session, fallbackWorkspace, message);
+      if (execution.changed) {
+        saveWorkspace(fallbackWorkspace);
+      }
+      appendAiChatMessage(session.role, "assistant", mergeCopilotReplyWithExecution(fallback.text, execution), "Local boosted engine");
       AI_RUNTIME.engine = "local-boosted";
-      AI_RUNTIME.status = "Live AI was unavailable, so the local boosted engine answered instead.";
-      AI_RUNTIME.tone = "error";
+      AI_RUNTIME.status = execution.notice || "Live AI was unavailable, so the local boosted engine answered instead.";
+      AI_RUNTIME.tone = execution.changed ? "success" : "error";
     } finally {
       AI_RUNTIME.busy = false;
       renderApp(document.getElementById("portalApp"));
@@ -3376,11 +3617,13 @@
         console.warn("Direct Gemini request failed, falling back to local response.", error);
       }
     }
+    const localFallback = buildLocalCopilotResponse(message, workspace, session, history);
     return {
       engine: "local-boosted",
       sourceLabel: "Local boosted engine",
       notice: "Gemini is not configured yet, so the local boosted engine is answering from the visible workspace.",
-      text: buildLocalCopilotResponse(message, workspace, session).text
+      text: localFallback.text,
+      actions: localFallback.actions || []
     };
   }
 
@@ -3407,7 +3650,8 @@
       engine: "gemini-secure",
       sourceLabel: "Gemini secure backend",
       notice: "Secure Gemini backend responded with a live coordination recommendation.",
-      text: text
+      text: text,
+      actions: normalizeAiActionPlan(result && result.data && result.data.actions)
     };
   }
 
@@ -3430,7 +3674,9 @@
           ],
           generationConfig: {
             temperature: 0.3,
-            maxOutputTokens: 700
+            topP: 0.92,
+            maxOutputTokens: 1200,
+            responseMimeType: "application/json"
           }
         })
       }
@@ -3439,62 +3685,1093 @@
       throw new Error("Gemini direct request failed.");
     }
     const payload = await response.json();
-    const text = extractGeminiTextClient(payload);
-    if (!text) {
+    const structured = extractGeminiStructuredPayload(payload);
+    if (!structured || !structured.text) {
       throw new Error("Gemini returned an empty response.");
     }
     return {
       engine: "gemini-direct",
       sourceLabel: "Gemini direct",
       notice: "Gemini answered directly from the configured browser key.",
-      text: text
+      text: structured.text,
+      actions: structured.actions
     };
   }
 
-  function buildLocalCopilotResponse(message, workspace, session) {
-    const prompt = safeText(message, 900).toLowerCase();
+  function extractGeminiStructuredPayload(payload) {
+    const rawText = extractGeminiTextClient(payload);
+    if (!rawText) {
+      return null;
+    }
+    const parsed = parseJsonLikeResponse(rawText);
+    if (!parsed || typeof parsed !== "object") {
+      return {
+        text: safeText(rawText, 6000),
+        actions: []
+      };
+    }
+    return {
+      text: formatStructuredCopilotAnswer(parsed.answer || parsed),
+      actions: normalizeAiActionPlan(parsed.actions)
+    };
+  }
+
+  function parseJsonLikeResponse(text) {
+    const raw = safeText(text, 12000).trim();
+    if (!raw) {
+      return null;
+    }
+    const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+    try {
+      return JSON.parse(cleaned);
+    } catch (error) {
+      const start = cleaned.indexOf("{");
+      const end = cleaned.lastIndexOf("}");
+      if (start === -1 || end <= start) {
+        return null;
+      }
+      try {
+        return JSON.parse(cleaned.slice(start, end + 1));
+      } catch (nestedError) {
+        return null;
+      }
+    }
+  }
+
+  function formatStructuredCopilotAnswer(answer) {
+    if (!answer) {
+      return "";
+    }
+    if (typeof answer === "string") {
+      return safeText(answer, 6000);
+    }
+    return formatCopilotSections(
+      safeText(answer.recommendation || answer.summary || answer.recommend || "", 1200),
+      safeText(answer.whyNow || answer.why_now || answer.context || answer.why || "", 1800),
+      safeText(answer.nextAction || answer.next_action || answer.action || "", 1400),
+      Array.isArray(answer.visibleSignals || answer.visible_signals) ? (answer.visibleSignals || answer.visible_signals) : []
+    ) || safeText(answer.text || "", 6000);
+  }
+
+  function normalizeAiActionPlan(actions) {
+    const list = Array.isArray(actions) ? actions : actions ? [actions] : [];
+    return list.map(normalizeAiAction).filter(function (item) {
+      return item && item.type;
+    }).slice(0, 6);
+  }
+
+  function normalizeAiAction(action) {
+    if (!action || typeof action !== "object") {
+      return null;
+    }
+    const type = normalizeAiActionType(action.type || action.action || action.name);
+    if (!type) {
+      return null;
+    }
+    return {
+      type: type,
+      requestId: safeText(action.requestId || action.request_id, 80),
+      requestTitle: safeText(action.requestTitle || action.request_title || action.request, 180),
+      assignmentId: safeText(action.assignmentId || action.assignment_id, 80),
+      assignmentTitle: safeText(action.assignmentTitle || action.assignment_title || action.assignment, 180),
+      volunteerName: safeText(action.volunteerName || action.volunteer_name || action.volunteer, 140),
+      donationDonor: safeText(action.donationDonor || action.donation_donor || action.donor, 140),
+      donationKind: safeText(action.donationKind || action.donation_kind || action.kind, 80),
+      district: safeText(action.district, 80),
+      targetStatus: safeText(action.targetStatus || action.target_status || action.status, 80),
+      recipients: safeText(action.recipients, 180),
+      message: safeText(action.message || action.draft || action.note, 600),
+      reason: safeText(action.reason || action.why || "", 320)
+    };
+  }
+
+  function normalizeAiActionType(value) {
+    const type = safeText(value, 80).toLowerCase().replace(/[^a-z]+/g, "_").replace(/^_+|_+$/g, "");
+    if (!type) {
+      return "";
+    }
+    if (type === "assign" || type === "assign_request" || type === "assign_volunteer" || type === "match_volunteer" || type === "dispatch_task") return "assign_task";
+    if (type === "update_request" || type === "advance_request" || type === "review_request") return "update_request_status";
+    if (type === "update_assignment" || type === "advance_assignment" || type === "start_assignment" || type === "complete_assignment") return "update_assignment_status";
+    if (type === "recommend_donation" || type === "route_donation" || type === "use_donation") return "recommend_donation_use";
+    if (type === "draft_outreach" || type === "generate_outreach" || type === "send_outreach" || type === "message_outreach") return "generate_outreach_draft";
+    if (["assign_task", "update_request_status", "update_assignment_status", "recommend_donation_use", "generate_outreach_draft"].indexOf(type) !== -1) {
+      return type;
+    }
+    return "";
+  }
+
+  function mergeCopilotReplyWithExecution(text, execution) {
+    const reply = safeText(text, 7000);
+    if (!execution || !execution.summary) {
+      return reply;
+    }
+    return [reply, execution.summary].filter(Boolean).join("\n\n");
+  }
+
+  function executeAiActionPlan(actions, session, workspace, message) {
+    const plan = normalizeAiActionPlan(actions);
+    if (!plan.length) {
+      return { changed: false, executedCount: 0, skippedCount: 0, summary: "", notice: "" };
+    }
+    const results = [];
+    const allowed = allowedAiActionTypesForRole(session.role);
+    plan.forEach(function (action) {
+      if (allowed.indexOf(action.type) === -1) {
+        results.push({
+          ok: false,
+          summary: "Skipped " + describeAiAction(action) + " because " + (ROLE_CONFIG[session.role] || ROLE_CONFIG.user).label + " cannot run that action.",
+          blocked: true
+        });
+        return;
+      }
+      const result = executeAiAction(action, session, workspace, message);
+      results.push(result);
+    });
+    const executed = results.filter(function (item) { return item && item.ok; });
+    const skipped = results.filter(function (item) { return !item || !item.ok; });
+    return {
+      changed: executed.length > 0,
+      executedCount: executed.length,
+      skippedCount: skipped.length,
+      summary: buildAiExecutionSummary(results),
+      notice: buildAiExecutionNotice(executed.length, skipped.length)
+    };
+  }
+
+  function allowedAiActionTypesForRole(role) {
+    if (role === "admin") {
+      return ["assign_task", "update_request_status", "update_assignment_status", "recommend_donation_use", "generate_outreach_draft"];
+    }
+    if (role === "government") {
+      return ["assign_task", "update_request_status", "update_assignment_status", "recommend_donation_use", "generate_outreach_draft"];
+    }
+    if (role === "volunteer") {
+      return ["update_assignment_status"];
+    }
+    return [];
+  }
+
+  function executeAiAction(action, session, workspace, message) {
+    if (action.type === "assign_task") {
+      return executeAssignTaskAction(action, session, workspace);
+    }
+    if (action.type === "update_request_status") {
+      return executeUpdateRequestStatusAction(action, session, workspace);
+    }
+    if (action.type === "update_assignment_status") {
+      return executeUpdateAssignmentStatusAction(action, session, workspace);
+    }
+    if (action.type === "recommend_donation_use") {
+      return executeRecommendDonationUseAction(action, session, workspace);
+    }
+    if (action.type === "generate_outreach_draft") {
+      return executeGenerateOutreachDraftAction(action, session, workspace, message);
+    }
+    return {
+      ok: false,
+      summary: "Skipped an unsupported AI action."
+    };
+  }
+
+  function executeAssignTaskAction(action, session, workspace) {
+    const request = findRequestForAiAction(action, workspace);
+    if (!request) {
+      return { ok: false, summary: "Could not find the request to assign." };
+    }
+    const volunteer = findVolunteerForAiAction(action, workspace, request);
+    let assignment = workspace.assignments.find(function (item) {
+      return item.requestId === request.id;
+    }) || null;
+    if (!assignment) {
+      assignment = createAssignmentFromRequest(request, workspace);
+      assignment.requestId = request.id;
+      workspace.assignments.unshift(assignment);
+    }
+    if (volunteer) {
+      assignment.volunteer = volunteer.name;
+    }
+    assignment.district = request.district;
+    assignment.location = request.location;
+    assignment.status = normalizeAssignmentStatus(action.targetStatus || assignment.status || "Assigned");
+    assignment.updatedAt = new Date().toISOString();
+    request.status = normalizeRequestStatus(request.status) === "Requested" ? "Assigned" : normalizeRequestStatus(request.status);
+    request.updatedAt = new Date().toISOString();
+    syncAssignmentsForRequest(request, workspace, assignment.status === "In Progress" ? "In Progress" : request.status);
+    workspace.audit.unshift("AI assigned " + assignment.title + " to " + assignment.volunteer + ".");
+    workspace.systemNotice = "AI assigned " + request.title + " to " + assignment.volunteer + ".";
+    return {
+      ok: true,
+      summary: "Assigned " + request.title + " to " + assignment.volunteer + " in " + safeText(request.district || "the active district", 120) + "."
+    };
+  }
+
+  function executeUpdateRequestStatusAction(action, session, workspace) {
+    const request = findRequestForAiAction(action, workspace);
+    if (!request) {
+      return { ok: false, summary: "Could not find the request to update." };
+    }
+    const current = normalizeRequestStatus(request.status);
+    const target = normalizeAiTargetStatus("request", action.targetStatus, current);
+    if (current === target) {
+      return { ok: false, summary: request.title + " is already in the " + target + " stage." };
+    }
+    request.status = target;
+    request.updatedAt = new Date().toISOString();
+    if (target === "Assigned" && !workspace.assignments.some(function (item) { return item.requestId === request.id; })) {
+      workspace.assignments.unshift(createAssignmentFromRequest(request, workspace));
+    }
+    syncAssignmentsForRequest(request, workspace, target);
+    workspace.audit.unshift("AI moved " + request.title + " to " + target + ".");
+    workspace.systemNotice = request.title + " is now in the " + target + " stage.";
+    return {
+      ok: true,
+      summary: "Moved " + request.title + " to " + target + "."
+    };
+  }
+
+  function executeUpdateAssignmentStatusAction(action, session, workspace) {
+    const assignment = findAssignmentForAiAction(action, workspace, session);
+    if (!assignment) {
+      return { ok: false, summary: "Could not find the assignment to update." };
+    }
+    if (session.role === "volunteer" && normalizeSearchQuery(assignment.volunteer) !== normalizeSearchQuery(session.name || session.profile && session.profile.fullName || "")) {
+      return { ok: false, summary: "Volunteer AI can only update assignments linked to the signed-in volunteer." };
+    }
+    const current = normalizeAssignmentStatus(assignment.status);
+    const target = normalizeAiTargetStatus("assignment", action.targetStatus, current);
+    if (current === target) {
+      return { ok: false, summary: assignment.title + " is already marked " + target + "." };
+    }
+    assignment.status = target;
+    assignment.updatedAt = new Date().toISOString();
+    if (assignment.requestId) {
+      const request = workspace.requests.find(function (item) { return item.id === assignment.requestId; });
+      if (request) {
+        if (target === "In Progress") request.status = "In Progress";
+        if (target === "Delivered") request.status = "Delivered";
+        if (target === "Closed") request.status = "Closed";
+        request.updatedAt = new Date().toISOString();
+      }
+    }
+    workspace.audit.unshift("AI moved " + assignment.title + " to " + target + ".");
+    workspace.systemNotice = assignment.title + " updated to " + target + ".";
+    return {
+      ok: true,
+      summary: "Updated " + assignment.title + " to " + target + "."
+    };
+  }
+
+  function executeRecommendDonationUseAction(action, session, workspace) {
+    const request = findRequestForAiAction(action, workspace) || (buildBoostedPredictionRows(workspace)[0] || {}).request || null;
+    const donation = findDonationForAiAction(action, workspace) || workspace.donations[0] || null;
+    if (!request || !donation) {
+      return { ok: false, summary: "The AI could not find both a visible donation and a visible request to connect." };
+    }
+    const recommendation = buildDonationUseRecommendation(request, donation);
+    donation.recommendedRequestId = request.id;
+    donation.recommendedUse = recommendation;
+    donation.lastRecommendedAt = new Date().toISOString();
+    workspace.audit.unshift("AI recommended using " + donation.donor + "'s donation for " + request.title + ".");
+    workspace.systemNotice = "AI mapped donation support to " + request.title + ".";
+    return {
+      ok: true,
+      summary: "Recommended " + donation.donor + "'s donation for " + request.title + "."
+    };
+  }
+
+  function executeGenerateOutreachDraftAction(action, session, workspace, message) {
+    const request = findRequestForAiAction(action, workspace) || (buildBoostedPredictionRows(workspace)[0] || {}).request || workspace.requests[0] || null;
+    const recipients = safeText(action.recipients, 180) || defaultOutreachRecipients(session.role, request);
+    const draft = buildOutreachDraftMessage(request, recipients, message);
+    workspace.outreach.unshift(draft);
+    workspace.audit.unshift("AI drafted outreach for " + recipients + ".");
+    workspace.systemNotice = "AI prepared a new outreach draft for " + recipients + ".";
+    return {
+      ok: true,
+      summary: "Created an outreach draft for " + recipients + "."
+    };
+  }
+
+  function findRequestForAiAction(action, workspace) {
+    if (!action) {
+      return null;
+    }
+    if (action.requestId) {
+      const byId = workspace.requests.find(function (item) { return item.id === action.requestId; });
+      if (byId) {
+        return byId;
+      }
+    }
+    const query = normalizeSearchQuery([action.requestTitle, action.district].filter(Boolean).join(" "));
+    if (!query) {
+      return (buildBoostedPredictionRows(workspace)[0] || {}).request || workspace.requests[0] || null;
+    }
+    return workspace.requests.slice().sort(function (left, right) {
+      return scoreSearchFields(query, [right.title, right.id, right.district, right.location, right.summary]) -
+        scoreSearchFields(query, [left.title, left.id, left.district, left.location, left.summary]);
+    })[0] || null;
+  }
+
+  function findAssignmentForAiAction(action, workspace, session) {
+    if (!action) {
+      return null;
+    }
+    if (action.assignmentId) {
+      const byId = workspace.assignments.find(function (item) { return item.id === action.assignmentId; });
+      if (byId) {
+        return byId;
+      }
+    }
+    const query = normalizeSearchQuery([action.assignmentTitle, action.requestTitle, action.volunteerName, action.district].filter(Boolean).join(" "));
+    if (query) {
+      return workspace.assignments.slice().sort(function (left, right) {
+        return scoreSearchFields(query, [right.title, right.id, right.volunteer, right.district, right.location]) -
+          scoreSearchFields(query, [left.title, left.id, left.volunteer, left.district, left.location]);
+      })[0] || null;
+    }
+    if (session && session.role === "volunteer") {
+      const selfName = normalizeSearchQuery(session.name || session.profile && session.profile.fullName || "");
+      return workspace.assignments.find(function (item) {
+        return normalizeSearchQuery(item.volunteer) === selfName;
+      }) || null;
+    }
+    return workspace.assignments[0] || null;
+  }
+
+  function findVolunteerForAiAction(action, workspace, request) {
+    if (action && action.volunteerName) {
+      const query = normalizeSearchQuery(action.volunteerName);
+      const direct = workspace.volunteers.slice().sort(function (left, right) {
+        return scoreSearchFields(query, [right.name, right.ngo, right.location, joinSkills(right.skills)]) -
+          scoreSearchFields(query, [left.name, left.ngo, left.location, joinSkills(left.skills)]);
+      })[0] || null;
+      if (direct) {
+        return direct;
+      }
+    }
+    if (request) {
+      return pickBestVolunteerForRequest(request, workspace);
+    }
+    return workspace.volunteers[0] || null;
+  }
+
+  function findDonationForAiAction(action, workspace) {
+    if (!action) {
+      return null;
+    }
+    const query = normalizeSearchQuery([action.donationDonor, action.donationKind].filter(Boolean).join(" "));
+    if (!query) {
+      return workspace.donations[0] || null;
+    }
+    return workspace.donations.slice().sort(function (left, right) {
+      return scoreSearchFields(query, [right.donor, right.kind, right.itemType, right.paymentMethod, right.note, right.description]) -
+        scoreSearchFields(query, [left.donor, left.kind, left.itemType, left.paymentMethod, left.note, left.description]);
+    })[0] || null;
+  }
+
+  function normalizeAiTargetStatus(kind, targetStatus, current) {
+    const cleaned = safeText(targetStatus, 80);
+    if (kind === "request") {
+      const normalized = cleaned ? normalizeRequestStatus(cleaned) : "";
+      return normalized || REQUEST_STAGES[Math.min(REQUEST_STAGES.indexOf(normalizeRequestStatus(current)) + 1, REQUEST_STAGES.length - 1)];
+    }
+    if (kind === "assignment") {
+      const normalizedAssignment = cleaned ? normalizeAssignmentStatus(cleaned) : "";
+      return normalizedAssignment || ASSIGNMENT_STAGES[Math.min(ASSIGNMENT_STAGES.indexOf(normalizeAssignmentStatus(current)) + 1, ASSIGNMENT_STAGES.length - 1)];
+    }
+    return cleaned;
+  }
+
+  function buildDonationUseRecommendation(request, donation) {
+    return "Use " + donation.donor + "'s " + formatDonationLine(donation) + " to support " + request.title + " in " + safeText(request.district || "the visible district", 120) + ".";
+  }
+
+  function defaultOutreachRecipients(role, request) {
+    if (role === "user") {
+      return "Community support desk";
+    }
+    if (role === "volunteer") {
+      return "Volunteer response team";
+    }
+    if (request && normalizeSearchQuery(request.category) === "community alert") {
+      return "Community, Volunteer, Government";
+    }
+    return "Community, Volunteer, Donations";
+  }
+
+  function buildOutreachDraftMessage(request, recipients, originalMessage) {
+    if (!request) {
+      return "AI outreach draft - " + recipients;
+    }
+    return safeText(
+      request.district + " response draft - " + recipients + " - Focus on " + request.title + ". " +
+      "Reason: " + safeText(request.summary || request.ai || originalMessage || "Active coordination is needed now.", 240),
+      420
+    );
+  }
+
+  function buildAiExecutionSummary(results) {
+    const lines = (results || []).filter(function (item) {
+      return item && item.summary;
+    }).map(function (item) {
+      return "- " + item.summary;
+    });
+    if (!lines.length) {
+      return "";
+    }
+    return "AI actions:\n" + lines.join("\n");
+  }
+
+  function buildAiExecutionNotice(executedCount, skippedCount) {
+    if (executedCount && skippedCount) {
+      return "AI executed " + String(executedCount) + " action(s) and skipped " + String(skippedCount) + ".";
+    }
+    if (executedCount) {
+      return "AI executed " + String(executedCount) + " workspace action(s).";
+    }
+    if (skippedCount) {
+      return "AI reviewed the workspace, but no safe action could be completed.";
+    }
+    return "";
+  }
+
+  function describeAiAction(action) {
+    if (!action || !action.type) {
+      return "the requested change";
+    }
+    if (action.type === "assign_task") return "task assignment";
+    if (action.type === "update_request_status") return "request status update";
+    if (action.type === "update_assignment_status") return "assignment status update";
+    if (action.type === "recommend_donation_use") return "donation recommendation";
+    if (action.type === "generate_outreach_draft") return "outreach drafting";
+    return action.type;
+  }
+
+  function buildLocalCopilotResponse(message, workspace, session, history) {
+    const prompt = buildEffectiveCopilotQuery(message, history);
     const topPrediction = buildBoostedPredictionRows(workspace)[0] || null;
     const topAssignment = workspace.assignments[0] || null;
     const topDonation = workspace.donations[0] || null;
-    const topDistrictName = topDistrict(workspace) || "the active district";
-    let text = "The local boosted engine needs active workspace data to answer clearly. Load a scenario first.";
+    const districtRows = buildDistrictSummary(workspace);
+    const volunteerSnapshot = buildVolunteerSnapshot(session, workspace);
+    const entityMatch = findLocalCopilotEntityMatch(prompt, workspace);
+    const specificTerms = extractCopilotSpecificTerms(prompt);
+    const workspaceLoaded = workspace.requests.length || workspace.assignments.length || workspace.volunteers.length || workspace.donations.length;
+    const actionPlan = planLocalCopilotActions(prompt, session, workspace, topPrediction, topAssignment, topDonation, volunteerSnapshot, entityMatch);
 
-    if (topPrediction) {
-      if (prompt.indexOf("district") !== -1 || prompt.indexOf("where") !== -1 || prompt.indexOf("priority") !== -1) {
-        text = topPrediction.request.district + " is the highest-priority district right now. " + topPrediction.explanation + " Next move: " + topPrediction.recommendation;
-      } else if (prompt.indexOf("volunteer") !== -1 || prompt.indexOf("assign") !== -1 || prompt.indexOf("match") !== -1) {
-        text = "The best current volunteer match is explained by the request itself: " + topPrediction.request.ai + " The boosted score is " + String(topPrediction.score) + "/100 because coverage and progress are still limited.";
-      } else if (prompt.indexOf("donation") !== -1 || prompt.indexOf("money") !== -1 || prompt.indexOf("item") !== -1) {
-        text = topDonation
-          ? ("The latest visible donation is from " + topDonation.donor + " - " + formatDonationLine(topDonation) + ". The boosted engine still recommends surfacing more " + safeText(topPrediction.request.category, 60).toLowerCase() + " support for " + topPrediction.request.district + ".")
-          : ("No donation records are visible yet. The model recommends surfacing donations for " + topPrediction.request.title + " first.");
-      } else if (prompt.indexOf("summary") !== -1 || prompt.indexOf("plan") !== -1 || prompt.indexOf("next") !== -1) {
-        text = "For the next 2 hours, focus on " + topPrediction.request.title + " in " + topPrediction.request.district + ". " + topPrediction.recommendation + " Current visible operations also show " + workspace.assignments.length + " assignment(s) and " + workspace.donations.length + " donation record(s).";
-      } else {
-        text = "ResourceFlow's local boosted engine recommends focusing on " + topPrediction.request.title + " in " + topPrediction.request.district + ". The request carries a " + String(topPrediction.score) + "/100 risk score. " + topPrediction.explanation;
-      }
-    } else if (workspace.requests.length) {
-      text = "The visible workspace has requests, but the boosted ranking engine does not yet have enough context to rank them strongly. Load or refresh a demo scenario.";
+    function respond(text) {
+      return {
+        text: text,
+        actions: actionPlan
+      };
     }
+
+    if (!workspaceLoaded) {
+      return respond(formatCopilotSections(
+          "Load a scenario first so the assistant can reason from visible requests, volunteers, donations, and assignments.",
+          "The current workspace does not have enough live data to rank needs or explain the next move clearly.",
+          "Use the demo loader, then ask about a district, a volunteer, a donor, or the next response step."
+        ));
+    }
+
+    if (entityMatch) {
+      return respond(buildLocalEntityResponse(entityMatch, workspace, session, volunteerSnapshot, topPrediction));
+    }
+
+    if (!entityMatch && specificTerms.length && matchesAiIntent(prompt, ["find", "show", "lookup", "look up", "who is", "details", "profile"])) {
+      return respond(formatCopilotSections(
+          'I could not find "' + specificTerms.join(" ") + '" in the visible workspace.',
+          "The assistant only answers from the volunteers, districts, requests, assignments, and donations that are currently loaded.",
+          "Try the exact volunteer name, donor name, request title, or load a different demo scenario first."
+        ));
+    }
+
+    if (matchesAiIntent(prompt, ["my task", "my tasks", "my assignment", "my assignments", "my points", "my badge", "my badges", "my reliability", "my attendance", "my profile"])) {
+      return respond(buildVolunteerSelfResponse(volunteerSnapshot, workspace, session));
+    }
+
+    if (matchesAiIntent(prompt, ["why", "explain", "recommended", "recommend", "reason"])) {
+      return respond(buildLocalExplanationResponse(workspace, topPrediction));
+    }
+
+    if (matchesAiIntent(prompt, ["donation", "donations", "money", "item", "items", "fund", "funding", "donor"])) {
+      return respond(buildLocalDonationGapResponse(workspace, topPrediction, topDonation));
+    }
+
+    if (matchesAiIntent(prompt, ["volunteer", "assign", "assignment", "match", "responder", "team"])) {
+      return respond(buildLocalVolunteerMatchResponse(workspace, topPrediction));
+    }
+
+    if (matchesAiIntent(prompt, ["district", "highest risk", "high risk", "top district", "priority district", "where should", "where do we focus", "where to focus", "location"])) {
+      return respond(buildLocalDistrictPriorityResponse(workspace, districtRows, topPrediction));
+    }
+
+    if (matchesAiIntent(prompt, ["summary", "status", "overview", "what's happening", "whats happening", "what is happening", "update"])) {
+      return respond(buildLocalWorkspaceSummary(workspace, session, topPrediction, topDonation));
+    }
+
+    if (actionPlan.length || matchesAiIntent(prompt, ["plan", "next step", "next steps", "next action", "next actions", "next 2 hours", "what should"])) {
+      return respond(buildLocalActionPlan(workspace, session, topPrediction, topAssignment, topDonation));
+    }
+
+    return respond(buildLocalWorkspaceSummary(workspace, session, topPrediction, topDonation));
+  }
+
+  function planLocalCopilotActions(prompt, session, workspace, topPrediction, topAssignment, topDonation, volunteerSnapshot, entityMatch) {
+    if (!shouldGenerateAiActions(prompt, session.role)) {
+      return [];
+    }
+    const actions = [];
+    const targetRequest = entityMatch && entityMatch.type === "request" ? entityMatch.item : (topPrediction && topPrediction.request) || workspace.requests[0] || null;
+    const targetAssignment = entityMatch && entityMatch.type === "assignment" ? entityMatch.item : topAssignment;
+    const targetDonation = entityMatch && entityMatch.type === "donation" ? entityMatch.item : topDonation;
+    const targetVolunteer = entityMatch && entityMatch.type === "volunteer" ? entityMatch.item : (targetRequest ? pickBestVolunteerForRequest(targetRequest, workspace) : null);
 
     if (session.role === "volunteer") {
-      text += " In the volunteer lane, keep the answer focused on assignments, travel, and safe completion.";
-    } else if (session.role === "government") {
-      text += " In the government lane, focus on district pressure, sequencing, and deployment.";
-    } else if (session.role === "admin") {
-      text += " In the admin lane, combine this with donations, audit trail, and outreach drafts.";
+      const ownTask = volunteerSnapshot && volunteerSnapshot.activeTasks && volunteerSnapshot.activeTasks[0] || targetAssignment;
+      if (!ownTask) {
+        return [];
+      }
+      actions.push({
+        type: "update_assignment_status",
+        assignmentId: ownTask.id,
+        targetStatus: extractLocalTargetStatus(prompt, "assignment") || "In Progress"
+      });
+      return actions;
     }
 
-    return { text: text };
+    if (matchesAiIntent(prompt, ["manage", "operate", "run", "control room", "take action", "do it", "start now", "stabilize"])) {
+      if (targetRequest && normalizeRequestStatus(targetRequest.status) === "Requested") {
+        actions.push({ type: "update_request_status", requestId: targetRequest.id, targetStatus: "Reviewed" });
+      }
+      if (targetRequest) {
+        actions.push({
+          type: "assign_task",
+          requestId: targetRequest.id,
+          volunteerName: targetVolunteer && targetVolunteer.name || ""
+        });
+      }
+      if (targetAssignment && normalizeAssignmentStatus(targetAssignment.status) === "Assigned") {
+        actions.push({ type: "update_assignment_status", assignmentId: targetAssignment.id, targetStatus: "In Progress" });
+      }
+      if (targetDonation && targetRequest) {
+        actions.push({ type: "recommend_donation_use", donationDonor: targetDonation.donor, requestId: targetRequest.id });
+      }
+      if (targetRequest) {
+        actions.push({ type: "generate_outreach_draft", requestId: targetRequest.id });
+      }
+      return normalizeAiActionPlan(actions);
+    }
+
+    if (matchesAiIntent(prompt, ["assign", "match", "allocate", "route", "dispatch"])) {
+      actions.push({
+        type: "assign_task",
+        requestId: targetRequest && targetRequest.id || "",
+        volunteerName: targetVolunteer && targetVolunteer.name || ""
+      });
+    }
+    if (matchesAiIntent(prompt, ["review", "approve request", "advance request", "move request", "update request", "request status", "close request"])) {
+      actions.push({
+        type: "update_request_status",
+        requestId: targetRequest && targetRequest.id || "",
+        targetStatus: extractLocalTargetStatus(prompt, "request")
+      });
+    }
+    if (matchesAiIntent(prompt, ["update assignment", "assignment status", "start task", "mark delivered", "complete task", "close assignment"])) {
+      actions.push({
+        type: "update_assignment_status",
+        assignmentId: targetAssignment && targetAssignment.id || "",
+        targetStatus: extractLocalTargetStatus(prompt, "assignment")
+      });
+    }
+    if (matchesAiIntent(prompt, ["donation use", "use donation", "fund this", "recommend donation", "route donation"])) {
+      actions.push({
+        type: "recommend_donation_use",
+        donationDonor: targetDonation && targetDonation.donor || "",
+        requestId: targetRequest && targetRequest.id || ""
+      });
+    }
+    if (matchesAiIntent(prompt, ["outreach", "draft", "alert", "message", "notify"])) {
+      actions.push({
+        type: "generate_outreach_draft",
+        requestId: targetRequest && targetRequest.id || ""
+      });
+    }
+    return normalizeAiActionPlan(actions);
+  }
+
+  function shouldGenerateAiActions(prompt, role) {
+    if (role === "user" || !prompt) {
+      return false;
+    }
+    return /(assign|allocate|dispatch|route|match|update|change|mark|close|deliver|review|approve|manage|operate|run|take action|do it|draft|alert|notify|outreach|fund this|use donation|recommend donation|start task|complete task)/.test(prompt);
+  }
+
+  function extractLocalTargetStatus(prompt, kind) {
+    if (/close|closed/.test(prompt)) {
+      return "Closed";
+    }
+    if (/deliver|delivered|complete|completed/.test(prompt)) {
+      return "Delivered";
+    }
+    if (/progress|start|started|active/.test(prompt)) {
+      return "In Progress";
+    }
+    if (kind === "request" && /(review|reviewed|approve|approved)/.test(prompt)) {
+      return "Reviewed";
+    }
+    if (/(assign|assigned|dispatch|allocate|match)/.test(prompt)) {
+      return "Assigned";
+    }
+    return "";
+  }
+
+  function buildEffectiveCopilotQuery(message, history) {
+    const prompt = normalizeSearchQuery(message);
+    if (!prompt) {
+      return "";
+    }
+    if (!Array.isArray(history) || !history.length) {
+      return prompt;
+    }
+    if (!/^(why|how|then|next|what about|and|also|okay|ok|now what|what next|which one)$/i.test(prompt)) {
+      return prompt;
+    }
+    const lastUserMessage = history.slice().reverse().find(function (entry) {
+      return entry && entry.speaker !== "assistant" && safeText(entry.text, 1000);
+    });
+    return lastUserMessage ? normalizeSearchQuery(lastUserMessage.text + " " + prompt) : prompt;
+  }
+
+  function matchesAiIntent(query, phrases) {
+    return (phrases || []).some(function (phrase) {
+      return query.indexOf(normalizeSearchQuery(phrase)) !== -1;
+    });
+  }
+
+  function extractCopilotSpecificTerms(query) {
+    const stopWords = {
+      a: true, about: true, active: true, alert: true, all: true, and: true, are: true, around: true, assignment: true,
+      assignments: true, best: true, district: true, districts: true, donation: true, donations: true, donor: true,
+      donors: true, explain: true, find: true, for: true, from: true, fund: true, funding: true, give: true,
+      help: true, highest: true, how: true, in: true, into: true, is: true, item: true, items: true, latest: true,
+      location: true, match: true, me: true, money: true, my: true, next: true, of: true, on: true, plan: true,
+      priority: true, request: true, requests: true, responder: true, responders: true, result: true, risk: true,
+      search: true, show: true, status: true, summary: true, support: true, tell: true, the: true, there: true,
+      today: true, top: true, track: true, update: true, updates: true, volunteer: true, volunteers: true, what: true,
+      where: true, which: true, who: true, why: true
+    };
+    return query.split(" ").map(function (term) {
+      return safeText(term, 40).toLowerCase();
+    }).filter(function (term) {
+      return term && !stopWords[term] && (term.length > 2 || /\d/.test(term));
+    });
+  }
+
+  function countCopilotTermHits(terms, fields) {
+    const blob = normalizeSearchQuery((fields || []).join(" "));
+    return terms.filter(function (term) {
+      return blob.indexOf(term) !== -1;
+    }).length;
+  }
+
+  function findLocalCopilotEntityMatch(query, workspace) {
+    const specificTerms = extractCopilotSpecificTerms(query);
+    const candidates = [];
+    if (!specificTerms.length) {
+      return null;
+    }
+
+    function pushCandidate(type, item, fields) {
+      const score = scoreSearchFields(query, fields);
+      const hits = countCopilotTermHits(specificTerms, fields);
+      if (!score || !hits) {
+        return;
+      }
+      candidates.push({
+        type: type,
+        item: item,
+        score: score + hits * 8,
+        hits: hits
+      });
+    }
+
+    workspace.volunteers.forEach(function (volunteer) {
+      pushCandidate("volunteer", volunteer, [
+        volunteer.name,
+        volunteer.ngo,
+        volunteer.location,
+        volunteer.contact,
+        volunteer.email,
+        volunteer.phone,
+        joinSkills(volunteer.skills)
+      ]);
+    });
+
+    workspace.requests.forEach(function (request) {
+      pushCandidate("request", request, [
+        request.title,
+        request.id,
+        request.category,
+        request.district,
+        request.location,
+        request.summary,
+        request.ai
+      ]);
+    });
+
+    workspace.assignments.forEach(function (assignment) {
+      pushCandidate("assignment", assignment, [
+        assignment.title,
+        assignment.id,
+        assignment.volunteer,
+        assignment.district,
+        assignment.location,
+        assignment.status
+      ]);
+    });
+
+    workspace.donations.forEach(function (donation) {
+      pushCandidate("donation", donation, [
+        donation.donor,
+        donation.id,
+        donation.kind,
+        donation.itemType,
+        donation.paymentMethod,
+        donation.note,
+        donation.description
+      ]);
+    });
+
+    buildDistrictSummary(workspace).forEach(function (district) {
+      pushCandidate("district", district, [
+        district.district,
+        district.status,
+        district.meta,
+        district.copy
+      ]);
+    });
+
+    candidates.sort(function (left, right) {
+      return right.score - left.score || right.hits - left.hits;
+    });
+    if (!candidates.length) {
+      return null;
+    }
+    const top = candidates[0];
+    if (top.score < 88 && top.hits < Math.min(2, specificTerms.length)) {
+      return null;
+    }
+    return top;
+  }
+
+  function buildLocalEntityResponse(match, workspace, session, volunteerSnapshot, topPrediction) {
+    if (match.type === "volunteer") {
+      return buildLocalVolunteerResponse(match.item, workspace);
+    }
+    if (match.type === "request") {
+      return buildLocalRequestResponse(match.item, workspace);
+    }
+    if (match.type === "assignment") {
+      return buildLocalAssignmentResponse(match.item, workspace);
+    }
+    if (match.type === "donation") {
+      return buildLocalDonationResponse(match.item, workspace, topPrediction);
+    }
+    if (match.type === "district") {
+      return buildLocalDistrictResponse(match.item, workspace, topPrediction);
+    }
+    return buildLocalWorkspaceSummary(workspace, session, topPrediction, workspace.donations[0] || null, volunteerSnapshot);
+  }
+
+  function buildLocalVolunteerResponse(volunteer, workspace) {
+    const relatedAssignments = workspace.assignments.filter(function (assignment) {
+      return normalizeSearchQuery(assignment.volunteer) === normalizeSearchQuery(volunteer.name);
+    });
+    const completed = relatedAssignments.filter(function (assignment) {
+      const stage = normalizeAssignmentStatus(assignment.status);
+      return stage === "Delivered" || stage === "Closed";
+    }).length;
+    const active = relatedAssignments.length - completed;
+    const reliability = Math.max(Number(volunteer.reliability || 0), computeVolunteerReliability(volunteer, workspace.assignments));
+    const availability = safeText(volunteer.availability || "Availability not visible", 80);
+    const location = safeText(volunteer.location || "Location not visible", 120);
+    const skills = joinSkills(volunteer.skills) || "General response support";
+    const ngo = safeText(volunteer.ngo || "Independent responder", 120);
+    const contact = safeText(volunteer.contact || volunteer.email || volunteer.phone || "Contact not visible", 180);
+    return formatCopilotSections(
+      volunteer.name + " is visible in the workspace as part of " + ngo + ". Skills: " + skills + ".",
+      "Availability is " + availability + ", location is " + location + ", and the reliability signal is " + String(reliability) + "%. There are " + String(active) + " active assignment(s) and " + String(completed) + " completed assignment(s) linked to this volunteer.",
+      relatedAssignments.length
+        ? "Use the Volunteer Directory or assignment board to route the next task. Contact: " + contact + "."
+        : "This volunteer is visible but not yet linked to a current assignment. Review district fit before assigning. Contact: " + contact + "."
+    );
+  }
+
+  function buildLocalRequestResponse(request, workspace) {
+    const prediction = buildBoostedPredictionRows(workspace).find(function (item) {
+      return item.request && item.request.id === request.id;
+    }) || null;
+    const relatedAssignments = workspace.assignments.filter(function (assignment) {
+      return normalizeSearchQuery(assignment.district) === normalizeSearchQuery(request.district) ||
+        normalizeSearchQuery(assignment.location).indexOf(normalizeSearchQuery(request.location || request.district)) !== -1;
+    });
+    const recommendation = request.title + " in " + safeText(request.district || "the visible district", 120) + " is currently " + normalizeRequestStatus(request.status) + " with " + String(request.beneficiaries || 0) + " people affected.";
+    const whyNow = prediction
+      ? prediction.explanation
+      : (safeText(request.ai || request.summary || "This visible request still needs coordination support.", 320));
+    const nextAction = prediction
+      ? prediction.recommendation
+      : "Advance this request through review and assignment, then connect matching volunteers and donations.";
+    const extras = [
+      "Priority: " + safeText(request.priority || "Tracked", 40),
+      "Location: " + safeText(request.location || request.district || "Not visible", 160),
+      relatedAssignments.length ? (String(relatedAssignments.length) + " visible assignment(s) are nearby or already linked.") : "No clearly linked assignments are visible yet."
+    ];
+    return formatCopilotSections(recommendation, whyNow, nextAction, extras);
+  }
+
+  function buildLocalAssignmentResponse(assignment, workspace) {
+    const status = normalizeAssignmentStatus(assignment.status);
+    const volunteer = workspace.volunteers.find(function (item) {
+      return normalizeSearchQuery(item.name) === normalizeSearchQuery(assignment.volunteer);
+    }) || null;
+    const volunteerSummary = volunteer
+      ? ("Volunteer fit: " + volunteer.name + " from " + safeText(volunteer.ngo || "the visible network", 120) + " with " + (joinSkills(volunteer.skills) || "general response support") + ".")
+      : "The volunteer profile is not visible in the shared directory snapshot.";
+    return formatCopilotSections(
+      assignment.title + " is currently " + status + " for " + safeText(assignment.volunteer || "the assigned volunteer", 140) + " in " + safeText(assignment.district || "the visible district", 120) + ".",
+      volunteerSummary + " The task location is " + safeText(assignment.location || "not visible", 180) + " and the visible reward value is " + String(assignment.points || 0) + " point(s).",
+      status === "Delivered" || status === "Closed"
+        ? "Keep the task in the archive and use it as proof for attendance, impact, and reporting."
+        : "Advance the assignment status after field confirmation and capture proof once the work is completed."
+    );
+  }
+
+  function buildLocalDonationResponse(donation, workspace, topPrediction) {
+    const stage = normalizeDonationLifecycle(donation.status);
+    const donationLine = formatDonationLine(donation);
+    const nextNeed = topPrediction
+      ? (safeText(topPrediction.request.category || "support", 80).toLowerCase() + " support for " + safeText(topPrediction.request.district || "the active district", 120))
+      : "the highest visible request";
+    return formatCopilotSections(
+      donation.donor + " has a visible donation record for " + donationLine + ". Current stage: " + stage + ".",
+      topPrediction
+        ? ("The current top gap is " + topPrediction.request.title + " in " + topPrediction.request.district + ", so this donation should be checked against that need if it fits.")
+        : "This donation is visible in the shared workspace and can be reviewed, verified, and connected to active needs.",
+      stage === "Delivered"
+        ? "Keep the record archived and use it as proof in exports and impact reports."
+        : "Verify the donation, confirm the queue state, and connect it to " + nextNeed + "."
+    );
+  }
+
+  function buildLocalDistrictResponse(districtRow, workspace, topPrediction) {
+    const topRequest = workspace.requests.find(function (request) {
+      return normalizeSearchQuery(request.district) === normalizeSearchQuery(districtRow.district);
+    }) || null;
+    const recommendation = districtRow.district + " currently shows " + String(districtRow.requests) + " visible request(s), " + String(districtRow.assignments) + " assignment(s), and " + String(districtRow.beneficiaries) + " projected beneficiaries.";
+    const whyNow = districtRow.copy + (topPrediction && normalizeSearchQuery(topPrediction.request.district) === normalizeSearchQuery(districtRow.district)
+      ? (" The boosted score for " + topPrediction.request.title + " is " + String(topPrediction.score) + "/100.")
+      : "");
+    const nextAction = topPrediction && normalizeSearchQuery(topPrediction.request.district) === normalizeSearchQuery(districtRow.district)
+      ? topPrediction.recommendation
+      : "Review the district feed, move waiting requests into assignment, and keep volunteer coverage ahead of demand.";
+    const extras = topRequest ? ["Top visible request: " + topRequest.title + " (" + normalizeRequestStatus(topRequest.status) + ")"] : [];
+    return formatCopilotSections(recommendation, whyNow, nextAction, extras);
+  }
+
+  function buildVolunteerSelfResponse(snapshot, workspace, session) {
+    const badgeLine = (snapshot.badges || []).join(", ");
+    const currentTask = snapshot.activeTasks && snapshot.activeTasks.length ? snapshot.activeTasks[0] : null;
+    return formatCopilotSections(
+      snapshot.personalAssignments
+        ? ("You currently have " + String(snapshot.activeTasks.length) + " active task(s), " + String(snapshot.completed) + " completed task(s), and " + String(snapshot.points) + " visible point(s).")
+        : snapshot.summary,
+      "Your reliability is " + String(snapshot.reliability) + "%, your current streak is " + String(snapshot.streak) + " day(s), and your visible badges are " + (badgeLine || "Ready To Respond") + ".",
+      currentTask
+        ? ("Focus next on " + currentTask.title + " in " + safeText(currentTask.district || currentTask.location || "the visible district", 140) + ".")
+        : (session.role === "volunteer"
+            ? "Open the Volunteer Directory or load a demo scenario to connect your profile to active assignments."
+            : "Use the volunteer lane only when you want personal task, points, and badge details.")
+    );
+  }
+
+  function buildLocalVolunteerMatchResponse(workspace, topPrediction) {
+    const bestVolunteer = topPrediction ? bestVolunteerForRequest(topPrediction.request, workspace) : null;
+    const recommendation = topPrediction
+      ? ("The current best visible match is " + (bestVolunteer ? bestVolunteer.name : "the volunteer already suggested by the request") + " for " + topPrediction.request.title + ".")
+      : "The workspace needs more visible request pressure before it can explain the best volunteer match clearly.";
+    const whyNow = topPrediction
+      ? (bestVolunteer
+          ? (bestVolunteer.name + " fits because of district proximity, relevant skills, and current availability. " + topPrediction.explanation)
+          : (topPrediction.request.ai || topPrediction.explanation))
+      : "Load or refresh a scenario so the assistant can compare skills, district fit, and assignment pressure.";
+    const nextAction = topPrediction
+      ? (topPrediction.recommendation + (bestVolunteer ? (" Recommended responder: " + bestVolunteer.name + ".") : ""))
+      : "Load demo data, then ask again about the best volunteer fit.";
+    return formatCopilotSections(recommendation, whyNow, nextAction);
+  }
+
+  function buildLocalDonationGapResponse(workspace, topPrediction, topDonation) {
+    const category = topPrediction ? safeText(topPrediction.request.category || "support", 80).toLowerCase() : "support";
+    const recommendation = topPrediction
+      ? ("Surface more " + category + " support for " + topPrediction.request.district + ".")
+      : "Donation guidance becomes more precise once a visible request scenario is loaded.";
+    const whyNow = topPrediction
+      ? (topPrediction.explanation + (topDonation ? (" The latest visible donation is from " + topDonation.donor + " - " + formatDonationLine(topDonation) + ".") : " No donation records are visible yet."))
+      : "The assistant needs a live scenario to identify the biggest donation gap.";
+    const nextAction = topPrediction
+      ? (topDonation
+          ? "Review the latest donation and connect it to " + topPrediction.request.title + " if it matches."
+          : "Use the Donation Portal to surface money or item support for the top request first.")
+      : "Load a scenario, then ask again about money gaps, item shortages, or donor needs.";
+    return formatCopilotSections(recommendation, whyNow, nextAction);
+  }
+
+  function buildLocalDistrictPriorityResponse(workspace, districtRows, topPrediction) {
+    const topRow = districtRows[0] || null;
+    if (!topRow && !topPrediction) {
+      return formatCopilotSections(
+        "District priority is not visible yet.",
+        "The assistant needs request and beneficiary data before it can rank district pressure.",
+        "Load a demo scenario or add requests first."
+      );
+    }
+    return buildLocalDistrictResponse(topRow || { district: topPrediction.request.district, requests: 1, assignments: workspace.assignments.length, beneficiaries: topPrediction.request.beneficiaries, copy: topPrediction.explanation }, workspace, topPrediction);
+  }
+
+  function buildLocalExplanationResponse(workspace, topPrediction) {
+    if (!topPrediction) {
+      return formatCopilotSections(
+        "The AI explanation becomes stronger once the workspace has an active ranked request.",
+        "Right now there is not enough boosted ranking context to explain the next move clearly.",
+        "Load a scenario or ask about a specific volunteer, request, district, or donation."
+      );
+    }
+    return formatCopilotSections(
+      topPrediction.request.title + " is being prioritized in " + topPrediction.request.district + " with a boosted score of " + String(topPrediction.score) + "/100.",
+      topPrediction.explanation,
+      topPrediction.recommendation,
+      topPrediction.factors.slice(0, 4)
+    );
+  }
+
+  function buildLocalActionPlan(workspace, session, topPrediction, topAssignment, topDonation) {
+    const bestVolunteer = topPrediction ? bestVolunteerForRequest(topPrediction.request, workspace) : null;
+    const actions = [];
+    if (topPrediction) {
+      actions.push("Move " + topPrediction.request.title + " in " + topPrediction.request.district + " first.");
+    }
+    if (bestVolunteer) {
+      actions.push("Confirm " + bestVolunteer.name + " as the visible responder fit.");
+    } else if (topAssignment) {
+      actions.push("Advance " + topAssignment.title + " after field confirmation.");
+    }
+    if (topDonation) {
+      actions.push("Review " + topDonation.donor + "'s donation and connect it to the highest-pressure need.");
+    }
+    return formatCopilotSections(
+      topPrediction
+        ? ("For the next 2 hours, focus on " + topPrediction.request.title + " in " + topPrediction.request.district + ".")
+        : "For the next 2 hours, focus on refreshing the active workspace and validating the top visible need.",
+      "The workspace currently shows " + String(workspace.requests.length) + " request(s), " + String(workspace.assignments.length) + " assignment(s), " + String(workspace.volunteers.length) + " volunteer profile(s), and " + String(workspace.donations.length) + " donation record(s).",
+      actions.length ? actions.join(" ") : "Load a scenario or open the active portal feed to surface the next action clearly."
+    );
+  }
+
+  function buildLocalWorkspaceSummary(workspace, session, topPrediction, topDonation) {
+    const roleLabel = (ROLE_CONFIG[session.role] || ROLE_CONFIG.user).label;
+    const district = topDistrict(workspace) || "the active district";
+    const nextMove = topPrediction ? topPrediction.recommendation : "Load a scenario to activate the boosted ranking engine.";
+    return formatCopilotSections(
+      roleLabel + " view: " + String(workspace.requests.length) + " request(s), " + String(workspace.assignments.length) + " assignment(s), " + String(workspace.volunteers.length) + " volunteer profile(s), and " + String(workspace.donations.length) + " donation record(s) are visible.",
+      topPrediction
+        ? ("The current pressure leader is " + district + ". " + topPrediction.explanation)
+        : ("The workspace has visible records, but a ranked top request is not active yet for " + district + "."),
+      nextMove,
+      topDonation ? ["Latest donation: " + topDonation.donor + " - " + formatDonationLine(topDonation)] : []
+    );
+  }
+
+  function bestVolunteerForRequest(request, workspace) {
+    const district = normalizeSearchQuery(request.district);
+    const skills = CATEGORY_SKILLS[safeText(request.category, 60).toLowerCase()] || ["coordination", "support"];
+    return (workspace.volunteers || []).map(function (volunteer) {
+      const location = normalizeSearchQuery(volunteer.location);
+      const skillText = normalizeSearchQuery(joinSkills(volunteer.skills));
+      let score = 0;
+      if (district && location.indexOf(district) !== -1) {
+        score += 4;
+      }
+      skills.forEach(function (skill) {
+        if (skillText.indexOf(normalizeSearchQuery(skill)) !== -1) {
+          score += 3;
+        }
+      });
+      const availability = normalizeSearchQuery(volunteer.availability);
+      if (availability.indexOf("available") !== -1 || availability.indexOf("active") !== -1) {
+        score += 2;
+      }
+      score += Math.round(computeVolunteerReliability(volunteer, workspace.assignments) / 20);
+      return {
+        volunteer: volunteer,
+        score: score
+      };
+    }).sort(function (left, right) {
+      return right.score - left.score;
+    }).map(function (item) {
+      return item.volunteer;
+    })[0] || null;
+  }
+
+  function formatCopilotSections(recommendation, whyNow, nextAction, extras) {
+    const parts = [];
+    if (recommendation) {
+      parts.push("Recommendation: " + safeText(recommendation, 600));
+    }
+    if (whyNow) {
+      parts.push("Why it matters now: " + safeText(whyNow, 900));
+    }
+    if (nextAction) {
+      parts.push("Next action: " + safeText(nextAction, 700));
+    }
+    const visibleSignals = Array.isArray(extras) ? extras.filter(Boolean).slice(0, 4) : [];
+    if (visibleSignals.length) {
+      parts.push("Visible signals:\n- " + visibleSignals.map(function (item) {
+        return safeText(item, 180);
+      }).join("\n- "));
+    }
+    return parts.join("\n\n");
   }
 
   function buildCopilotPrompt(workspace, session, message, history) {
+    const volunteerSnapshot = buildVolunteerSnapshot(session, workspace);
+    const districtSummary = buildDistrictSummary(workspace).slice(0, 4).map(function (item) {
+      return {
+        district: item.district,
+        requests: item.requests,
+        assignments: item.assignments,
+        beneficiaries: item.beneficiaries,
+        status: item.status
+      };
+    });
     const snapshot = {
       scenario: workspace.label,
       summary: workspace.summary,
       role: (ROLE_CONFIG[session.role] || ROLE_CONFIG.user).label,
+      metrics: {
+        requests: workspace.requests.length,
+        assignments: workspace.assignments.length,
+        volunteers: workspace.volunteers.length,
+        donations: workspace.donations.length,
+        beneficiaries: totalBeneficiaries(workspace),
+        topDistrict: topDistrict(workspace) || ""
+      },
+      districtSummary: districtSummary,
       topRequests: workspace.requests.slice(0, 5).map(function (item) {
         return {
+          id: item.id,
           title: item.title,
           district: item.district,
           location: item.location,
@@ -3507,12 +4784,24 @@
       assignments: workspace.assignments.slice(0, 5),
       volunteers: workspace.volunteers.slice(0, 5),
       donations: workspace.donations.slice(0, 5),
+      insightItems: buildInsightItems(workspace),
+      matchingSteps: buildMatchingSteps(workspace),
+      volunteerSnapshot: session.role === "volunteer" ? {
+        summary: volunteerSnapshot.summary,
+        district: volunteerSnapshot.district,
+        points: volunteerSnapshot.points,
+        completed: volunteerSnapshot.completed,
+        reliability: volunteerSnapshot.reliability,
+        badges: volunteerSnapshot.badges
+      } : null,
       boostedSignals: buildBoostedPredictionRows(workspace).slice(0, 3).map(function (item) {
         return {
           title: item.request.title,
           district: item.request.district,
           score: item.score,
-          recommendation: item.recommendation
+          explanation: item.explanation,
+          recommendation: item.recommendation,
+          factors: item.factors
         };
       })
     };
@@ -3520,15 +4809,42 @@
       return (item.speaker === "assistant" ? "Assistant" : "User") + ": " + item.text;
     }).join("\n");
     return [
-      "You are ResourceFlow Copilot, an NGO disaster-response chatbot inside a coordination platform.",
-      "Answer briefly, clearly, and operationally. Prefer short paragraphs or compact bullets.",
-      "Use only the workspace data provided. Mention exact districts, volunteers, donations, and statuses when relevant.",
-      "If data is missing, say so directly instead of inventing details.",
+      "You are ResourceFlow Copilot, a calm operations analyst inside an NGO coordination and disaster-response platform.",
+      "Answer like a real operational assistant: specific, grounded, and decisive without sounding robotic.",
+      "Use only the workspace data provided. If a person, district, request, assignment, or donation is not visible in the snapshot, say it is not found.",
+      "Mention exact names, districts, counts, statuses, and risk scores when relevant.",
+      "Do not invent hidden data, unseen volunteers, extra donors, or completed work that is not in the snapshot.",
       "The active portal role is: " + (ROLE_CONFIG[session.role] || ROLE_CONFIG.user).label + ". Tailor the answer to that role.",
+      "Return strict JSON only with this exact shape:",
+      '{',
+      '  "answer": {',
+      '    "recommendation": "short operational recommendation",',
+      '    "whyNow": "why this matters right now using visible data",',
+      '    "nextAction": "the next best action",',
+      '    "visibleSignals": ["optional signal 1", "optional signal 2"]',
+      '  },',
+      '  "actions": [',
+      '    {',
+      '      "type": "assign_task | update_request_status | update_assignment_status | recommend_donation_use | generate_outreach_draft",',
+      '      "requestId": "optional visible request id",',
+      '      "requestTitle": "optional visible request title",',
+      '      "assignmentId": "optional visible assignment id",',
+      '      "assignmentTitle": "optional visible assignment title",',
+      '      "volunteerName": "optional visible volunteer name",',
+      '      "donationDonor": "optional visible donor name",',
+      '      "targetStatus": "optional explicit stage",',
+      '      "recipients": "optional outreach recipients",',
+      '      "reason": "short why for this action"',
+      '    }',
+      '  ]',
+      '}',
+      "Only include actions when the user explicitly asks you to change, assign, manage, update, route, draft, or operate the workspace. Otherwise return an empty actions array.",
+      "Community User cannot mutate the workspace. Volunteer can only update their own assignments. Government and Admin can use all listed action types.",
+      "Keep actions conservative and safe. Never create fake people or fake records. Use only the currently visible scenario.",
       transcript ? "Recent conversation:\n" + transcript : "",
       "Workspace snapshot:\n" + JSON.stringify(snapshot, null, 2),
       "User question: " + message
-    ].join("\n\n");
+    ].filter(Boolean).join("\n\n");
   }
 
   function extractGeminiTextClient(payload) {
@@ -3699,24 +5015,25 @@
     return enrichWorkspace(stored && stored.requests && stored.assignments && stored.volunteers ? stored : Object.assign({}, EMPTY_WORKSPACE));
   }
 
+  function getManagedWorkspace(options) {
+    return runWorkspaceAutomation(options).workspace;
+  }
+
   function seedWorkspace(scenario) {
-    const preset = SCENARIO_PRESETS[scenario] || SCENARIO_PRESETS.flood;
-    saveWorkspace(enrichWorkspace({
-      scenario: preset.key,
-      label: preset.label,
-      summary: preset.summary,
-      requests: preset.requests.slice(),
-      assignments: preset.assignments.slice(),
-      volunteers: preset.volunteers.slice(),
-      donations: preset.donations.slice(),
-      audit: preset.audit.slice(),
-      outreach: preset.outreach.slice(),
-      systemNotice: preset.label + " loaded. Review the tracker, AI story, and map links."
-    }));
+    const nextWorkspace = buildScenarioWorkspace(scenario, getWorkspace());
+    saveWorkspace(nextWorkspace);
   }
 
   function resetWorkspace() {
-    saveWorkspace(enrichWorkspace(Object.assign({}, EMPTY_WORKSPACE)));
+    const workspace = getWorkspace();
+    const preservedVolunteers = (workspace.volunteers || []).filter(function (item) {
+      return safeText(item.origin, 20).toLowerCase() !== "demo";
+    });
+    saveWorkspace(enrichWorkspace(Object.assign({}, EMPTY_WORKSPACE, {
+      volunteers: preservedVolunteers,
+      generatedAt: nowIso(),
+      lastRefreshedAt: nowIso()
+    })));
   }
 
   function loadDismissedAlerts() {
@@ -3753,6 +5070,448 @@
 
   function saveWorkspace(workspace) {
     localStorage.setItem(WORKSPACE_KEY, JSON.stringify(enrichWorkspace(workspace)));
+  }
+
+  function buildScenarioWorkspace(scenario, existingWorkspace) {
+    const preset = SCENARIO_PRESETS[scenario] || SCENARIO_PRESETS.flood;
+    const cycleId = demoCycleId();
+    const generated = generateDemoScenarioState(preset, cycleId);
+    const workspace = mergeGeneratedScenarioWithLiveData(generated, existingWorkspace);
+    workspace.systemNotice = preset.label + " loaded. Admin and Government queues were refreshed with new pending entries.";
+    workspace.audit.unshift("AI refreshed the " + preset.label + " scenario and reprioritized the live queue.");
+    return enrichWorkspace(workspace);
+  }
+
+  function generateDemoScenarioState(preset, cycleId) {
+    const generatedAt = nowIso();
+    const requests = cloneScenarioItems(preset.requests || []).map(function (item, index) {
+      const district = safeText(item.district || "District", 80);
+      const location = randomizeLocationLabel(district, item.location);
+      const createdAt = new Date(nowMs() - index * 4 * 60000).toISOString();
+      return {
+        id: "REQ-" + slugify(preset.key) + "-" + String(index + 1) + "-" + cycleId.slice(-4),
+        title: randomizeRequestTitle(item.title, item.category, district),
+        category: safeText(item.category || "Logistics", 60),
+        district: district,
+        location: location,
+        lat: Number(item.lat || 0),
+        lng: Number(item.lng || 0),
+        beneficiaries: Number(item.beneficiaries || 0),
+        priority: safeText(item.priority || "Medium", 40),
+        status: normalizeRequestStatus(item.status || "Pending"),
+        summary: safeText(item.summary || "Visible request generated from the active disaster story.", 280),
+        ai: safeText(item.ai || "AI will match skills, district fit, and donation support for this request.", 320),
+        requester: "Disaster Demo Engine",
+        requestedAt: createdAt,
+        createdAt: createdAt,
+        updatedAt: createdAt,
+        source: "disaster-demo",
+        origin: "demo",
+        priorityLane: "Disaster Demo",
+        broadcastTo: ["admin", "government"],
+        complexity: inferTaskComplexity(item.priority || "Medium"),
+        estimatedDurationMinutes: estimatedDurationMinutes(item.priority || "Medium", "disaster-demo"),
+        demoCycleId: cycleId,
+        blocked: Boolean(item.blocked)
+      };
+    });
+
+    const volunteers = cloneScenarioItems(preset.volunteers || []).map(function (item, index) {
+      const anchor = requests[index % Math.max(1, requests.length)] || {};
+      const offset = (Math.random() - 0.5) * 0.06;
+      const lat = Number(anchor.lat || 0) + offset;
+      const lng = Number(anchor.lng || 0) - offset;
+      return {
+        id: "VOL-" + slugify(preset.key) + "-" + String(index + 1) + "-" + cycleId.slice(-4),
+        name: DEMO_VOLUNTEER_NAMES[(index + Math.floor(Math.random() * DEMO_VOLUNTEER_NAMES.length)) % DEMO_VOLUNTEER_NAMES.length],
+        ngo: safeText(item.ngo || item.ngoGroup || "Relief Network", 120),
+        skills: Array.isArray(item.skills) ? item.skills.slice() : String(item.skills || "").split(",").map(function (skill) { return safeText(skill, 40); }).filter(Boolean),
+        location: randomizeLocationLabel(anchor.district || item.location, item.location),
+        district: safeText(anchor.district || item.location || "District", 80),
+        availability: safeText(item.availability || "Available", 40),
+        activityStatus: safeText(item.activityStatus || normalizedAvailability(item.availability || "available"), 40),
+        contact: safeText(item.contact || ("demo." + slugify(item.ngo || item.name || "volunteer") + "@resourceflow.demo"), 180),
+        lat: Number.isFinite(lat) ? lat : 0,
+        lng: Number.isFinite(lng) ? lng : 0,
+        reliability: Number(item.reliability || 72 + index * 3),
+        pointsEarned: 0,
+        completedTasks: 0,
+        attendanceDays: 1,
+        origin: "demo",
+        demoCycleId: cycleId
+      };
+    });
+
+    const assignments = cloneScenarioItems(preset.assignments || []).map(function (item, index) {
+      const request = requests[index % Math.max(1, requests.length)] || {};
+      const volunteer = volunteers[index % Math.max(1, volunteers.length)] || {};
+      const normalizedStatus = normalizeAssignmentStatus(item.status || "Accepted");
+      const createdAt = new Date(nowMs() - (index + 1) * 3 * 60000).toISOString();
+      return {
+        id: "ASG-" + slugify(preset.key) + "-" + String(index + 1) + "-" + cycleId.slice(-4),
+        requestId: safeText(request.id || "", 80),
+        title: safeText(item.title || ("Respond to " + safeText(request.title, 140)), 180),
+        volunteer: safeText(volunteer.name || item.volunteer || "Volunteer pending", 140),
+        district: safeText(request.district || item.district || "", 80),
+        location: safeText(request.location || item.location || "", 140),
+        status: normalizedStatus,
+        date: safeText(item.date || "Today " + new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }), 40),
+        points: Number(item.points || computeTaskPoints(request.priority || "Medium", 0)),
+        createdAt: createdAt,
+        updatedAt: createdAt,
+        acceptedAt: createdAt,
+        startedAt: normalizedStatus === "In Progress" || normalizedStatus === "Completed" ? createdAt : "",
+        completedAt: normalizedStatus === "Completed" ? createdAt : "",
+        estimatedDurationMinutes: estimatedDurationMinutes(request.priority || "Medium", "disaster-demo"),
+        shiftCount: 0,
+        shifted: false,
+        pointsAwarded: normalizedStatus === "Completed",
+        origin: "demo",
+        volunteerOrigin: "demo",
+        source: "disaster-demo",
+        demoCycleId: cycleId
+      };
+    });
+
+    const donations = cloneScenarioItems(preset.donations || []).map(function (item, index) {
+      const createdAt = new Date(nowMs() - (index + 1) * 5 * 60000).toISOString();
+      return Object.assign({}, item, {
+        id: "DON-" + slugify(preset.key) + "-" + String(index + 1) + "-" + cycleId.slice(-4),
+        donor: randomFrom(DEMO_DONOR_NAMES) || safeText(item.donor || "Demo donor", 120),
+        status: normalizeDonationLifecycle(item.status || "Submitted"),
+        createdAt: createdAt,
+        updatedAt: createdAt,
+        origin: "demo",
+        source: "disaster-demo",
+        demoCycleId: cycleId
+      });
+    });
+
+    return {
+      scenario: preset.key,
+      label: preset.label,
+      summary: preset.summary,
+      requests: requests,
+      assignments: assignments,
+      volunteers: volunteers,
+      donations: donations,
+      audit: ["Disaster demo generated new incoming requests, volunteer movement, and donation records."].concat(cloneScenarioItems(preset.audit || [])),
+      outreach: cloneScenarioItems(preset.outreach || []),
+      systemNotice: preset.label + " loaded. Review the tracker, AI story, and map links.",
+      generatedAt: generatedAt,
+      lastRefreshedAt: generatedAt,
+      demoCycleId: cycleId
+    };
+  }
+
+  function mergeGeneratedScenarioWithLiveData(generated, existingWorkspace) {
+    const existing = enrichWorkspace(existingWorkspace || EMPTY_WORKSPACE);
+    const liveRequests = (existing.requests || []).filter(function (item) { return safeText(item.origin, 20).toLowerCase() !== "demo"; });
+    const liveAssignments = (existing.assignments || []).filter(function (item) { return safeText(item.origin, 20).toLowerCase() !== "demo"; });
+    const liveVolunteers = (existing.volunteers || []).filter(function (item) { return safeText(item.origin, 20).toLowerCase() !== "demo"; });
+    const liveDonations = (existing.donations || []).filter(function (item) { return safeText(item.origin, 20).toLowerCase() !== "demo"; });
+
+    return enrichWorkspace({
+      scenario: generated.scenario,
+      label: generated.label,
+      summary: generated.summary,
+      requests: generated.requests.concat(liveRequests),
+      assignments: generated.assignments.concat(liveAssignments),
+      volunteers: mergeVolunteersByIdentity(liveVolunteers.concat(generated.volunteers)),
+      donations: generated.donations.concat(liveDonations),
+      audit: generated.audit.concat(existing.audit || []).slice(0, 18),
+      outreach: generated.outreach.concat(existing.outreach || []).slice(0, 12),
+      systemNotice: generated.systemNotice,
+      generatedAt: generated.generatedAt,
+      lastRefreshedAt: generated.lastRefreshedAt,
+      demoCycleId: generated.demoCycleId
+    });
+  }
+
+  function mergeVolunteersByIdentity(items) {
+    const seen = {};
+    return items.filter(function (item) {
+      const key = normalizeSearchQuery([item.id, item.name, item.contact, item.email].join(" "));
+      if (!key || seen[key]) {
+        return false;
+      }
+      seen[key] = true;
+      return true;
+    });
+  }
+
+  function randomizeRequestTitle(title, category, district) {
+    const categoryLabel = safeText(category || "Support", 60);
+    const suffix = randomFrom(["response", "support", "assist", "coverage", "follow-up", "handoff"]) || "support";
+    return safeText(title || (categoryLabel + " request"), 140) + " - " + suffix + " - " + safeText(district || "district", 80);
+  }
+
+  function hydrateVolunteerProfilesIntoWorkspace(workspace) {
+    const profiles = loadJson(PORTAL_PROFILE_KEY, {});
+    const entryProfile = loadJson(ENTRY_PROFILE_KEY, {});
+    const volunteerProfile = profiles && profiles.volunteer && typeof profiles.volunteer === "object" ? profiles.volunteer : null;
+    const name = safeText(volunteerProfile && (volunteerProfile.fullName || volunteerProfile.displayName) || entryProfile.displayName || "", 120);
+    const email = safeText(volunteerProfile && volunteerProfile.email || entryProfile.email || "", 180);
+    if (!name && !email) {
+      return false;
+    }
+    const key = normalizeSearchQuery(name || email);
+    const existingIndex = workspace.volunteers.findIndex(function (item) {
+      return normalizeSearchQuery(item.name || item.contact || "") === key || normalizeSearchQuery(item.contact || "") === normalizeSearchQuery(email);
+    });
+    const record = {
+      id: safeText((volunteerProfile && volunteerProfile.id) || ("VOL-LIVE-" + slugify(email || name)), 80),
+      name: name || "Live Volunteer",
+      ngo: safeText(volunteerProfile && volunteerProfile.ngoGroup || "ResourceFlow Team", 120),
+      skills: Array.isArray(volunteerProfile && volunteerProfile.skills)
+        ? volunteerProfile.skills.slice()
+        : String(volunteerProfile && volunteerProfile.skills || "coordination, support").split(",").map(function (skill) { return safeText(skill, 40); }).filter(Boolean),
+      location: safeText(volunteerProfile && volunteerProfile.location || "Unknown district", 140),
+      district: safeText(volunteerProfile && volunteerProfile.district || volunteerProfile && volunteerProfile.location || "Unknown district", 80),
+      availability: safeText(volunteerProfile && volunteerProfile.activityStatus || volunteerProfile && volunteerProfile.availability || "Available", 40),
+      activityStatus: safeText(volunteerProfile && volunteerProfile.activityStatus || "available", 40),
+      contact: email || safeText(volunteerProfile && volunteerProfile.phone || "", 180),
+      origin: "real"
+    };
+    if (existingIndex >= 0) {
+      workspace.volunteers[existingIndex] = Object.assign({}, workspace.volunteers[existingIndex], record);
+    } else {
+      workspace.volunteers.unshift(record);
+    }
+    return true;
+  }
+
+  function runWorkspaceAutomation(options) {
+    const workspace = getWorkspace();
+    let changed = hydrateVolunteerProfilesIntoWorkspace(workspace);
+    if (workspace.scenario !== "none") {
+      const refreshed = maybeRefreshDemoWorkspace(workspace, options);
+      if (refreshed.changed) {
+        changed = true;
+      }
+    }
+    if (applyRequestAutomation(workspace)) {
+      changed = true;
+    }
+    if (applyAssignmentAutomation(workspace)) {
+      changed = true;
+    }
+    if (recalculateVolunteerProfiles(workspace)) {
+      changed = true;
+    }
+    if (changed) {
+      workspace.requests = sortRequestsForLifecycle(workspace.requests || []);
+      workspace.assignments = sortAssignmentsForLifecycle(workspace.assignments || []);
+      workspace.donations = sortDonationsForLifecycle(workspace.donations || []);
+      workspace.lastAutomationAt = nowIso();
+      saveWorkspace(workspace);
+    }
+    return { changed: changed, workspace: enrichWorkspace(workspace) };
+  }
+
+  function maybeRefreshDemoWorkspace(workspace, options) {
+    const generatedAt = parseTimestamp(workspace.generatedAt || workspace.lastRefreshedAt);
+    if (!generatedAt || nowMs() - generatedAt < DEMO_REFRESH_MS) {
+      return { changed: false };
+    }
+    const refreshed = buildScenarioWorkspace(workspace.scenario, workspace);
+    workspace.scenario = refreshed.scenario;
+    workspace.label = refreshed.label;
+    workspace.summary = refreshed.summary;
+    workspace.requests = refreshed.requests;
+    workspace.assignments = refreshed.assignments;
+    workspace.volunteers = refreshed.volunteers;
+    workspace.donations = refreshed.donations;
+    workspace.audit = refreshed.audit;
+    workspace.outreach = refreshed.outreach;
+    workspace.systemNotice = refreshed.label + " auto-refreshed with a new 10-minute demo cycle.";
+    workspace.generatedAt = refreshed.generatedAt;
+    workspace.lastRefreshedAt = refreshed.lastRefreshedAt;
+    workspace.demoCycleId = refreshed.demoCycleId;
+    workspace.audit.unshift("AI cleared the old demo cycle and loaded a fresh randomized " + refreshed.label + " workspace.");
+    return { changed: true };
+  }
+
+  function applyRequestAutomation(workspace) {
+    let changed = false;
+    const sorted = sortRequestsForLifecycle(workspace.requests || []);
+    sorted.forEach(function (request) {
+      const stage = normalizeRequestStatus(request.status);
+      if (request.broadcastedAt == null && (request.source === "live" || request.source === "disaster-demo")) {
+        request.status = "Pending";
+        request.broadcastedAt = nowIso();
+        workspace.audit.unshift("AI logged " + request.title + " and broadcasted a Pending status to Admin and Government.");
+        workspace.systemNotice = request.title + " is Pending and visible in Admin and Government review queues.";
+        changed = true;
+      }
+      if ((stage === "Pending" || stage === "Reviewed") && !workspace.assignments.some(function (assignment) { return assignment.requestId === request.id && isAssignmentActiveStage(assignment.status); })) {
+        const createdAssignments = createLifecycleAssignmentsForRequest(request, workspace);
+        if (createdAssignments.length) {
+          Array.prototype.unshift.apply(workspace.assignments, createdAssignments);
+          request.status = "Assigned";
+          request.updatedAt = nowIso();
+          workspace.audit.unshift("AI matched " + createdAssignments.map(function (item) { return item.volunteer; }).join(", ") + " to " + request.title + ".");
+          workspace.systemNotice = request.title + " was assigned through the AI operations queue.";
+          changed = true;
+        }
+      }
+    });
+    return changed;
+  }
+
+  function applyAssignmentAutomation(workspace) {
+    let changed = false;
+    (workspace.assignments || []).forEach(function (assignment) {
+      const stage = normalizeAssignmentStatus(assignment.status);
+      const request = workspace.requests.find(function (item) { return item.id === assignment.requestId; }) || null;
+      const elapsed = elapsedMinutes(assignment.startedAt || assignment.acceptedAt || assignment.createdAt);
+      const duration = Math.max(6, Number(assignment.estimatedDurationMinutes || (request && request.estimatedDurationMinutes) || 12));
+
+      if (stage === "Accepted" && elapsed >= Math.max(1, duration * 0.2)) {
+        assignment.status = "In Progress";
+        assignment.startedAt = assignment.startedAt || nowIso();
+        assignment.updatedAt = nowIso();
+        if (request) {
+          request.status = "In Progress";
+          request.updatedAt = nowIso();
+        }
+        workspace.audit.unshift("Volunteer " + assignment.volunteer + " is currently In Progress on " + assignment.title + ".");
+        workspace.systemNotice = assignment.volunteer + " is now In Progress on " + assignment.title + ".";
+        changed = true;
+      }
+
+      if (!assignment.shifted && !isAssignmentCompleteStage(assignment.status) && elapsed >= duration * 0.5) {
+        const shifted = shiftAssignmentToNextVolunteer(assignment, request, workspace);
+        if (shifted) {
+          changed = true;
+        }
+      }
+
+      if (!isAssignmentCompleteStage(assignment.status) && safeText(assignment.volunteerOrigin || "", 20).toLowerCase() === "demo" && elapsed >= duration * 0.85) {
+        completeAssignment(assignment, request, workspace, "AI auto-completed the demo volunteer task after route progress was confirmed.");
+        changed = true;
+      }
+    });
+    return changed;
+  }
+
+  function recalculateVolunteerProfiles(workspace) {
+    let changed = false;
+    (workspace.volunteers || []).forEach(function (volunteer) {
+      const related = (workspace.assignments || []).filter(function (assignment) {
+        return normalizeSearchQuery(assignment.volunteer) === normalizeSearchQuery(volunteer.name);
+      });
+      const completed = related.filter(function (assignment) { return isAssignmentCompleteStage(assignment.status); }).length;
+      const points = related.reduce(function (sum, assignment) {
+        return sum + Number(assignment.points || 0);
+      }, 0);
+      const reliability = computeVolunteerReliability(volunteer, workspace.assignments || []);
+      if (volunteer.completedTasks !== completed || volunteer.pointsEarned !== points || volunteer.reliability !== reliability) {
+        volunteer.completedTasks = completed;
+        volunteer.pointsEarned = points;
+        volunteer.reliability = reliability;
+        volunteer.attendanceDays = Math.max(Number(volunteer.attendanceDays || 0), completed);
+        changed = true;
+      }
+    });
+    return changed;
+  }
+
+  function createLifecycleAssignmentsForRequest(request, workspace) {
+    const assignments = [];
+    const realVolunteer = pickBestVolunteerForRequest(request, workspace, { origin: "real" });
+    const demoVolunteer = pickBestVolunteerForRequest(request, workspace, {
+      origin: "demo",
+      excludeVolunteerNames: realVolunteer ? [realVolunteer.name] : []
+    });
+    if (request.source === "live") {
+      if (realVolunteer) {
+        assignments.push(createAssignmentFromRequest(request, workspace, {
+          volunteer: realVolunteer,
+          origin: "live",
+          volunteerOrigin: "real",
+          status: "Accepted",
+          autoManaged: false
+        }));
+      }
+      if (demoVolunteer) {
+        assignments.push(createAssignmentFromRequest(request, workspace, {
+          volunteer: demoVolunteer,
+          origin: "live-support",
+          volunteerOrigin: "demo",
+          status: "Accepted",
+          autoManaged: true,
+          supportLane: true
+        }));
+      }
+    } else {
+      const nearest = pickBestVolunteerForRequest(request, workspace, { origin: "demo" }) || pickBestVolunteerForRequest(request, workspace);
+      if (nearest) {
+        assignments.push(createAssignmentFromRequest(request, workspace, {
+          volunteer: nearest,
+          origin: "demo",
+          volunteerOrigin: safeText(nearest.origin || "demo", 20).toLowerCase() || "demo",
+          status: "Accepted",
+          autoManaged: safeText(nearest.origin || "demo", 20).toLowerCase() === "demo"
+        }));
+      }
+    }
+    return assignments;
+  }
+
+  function shiftAssignmentToNextVolunteer(assignment, request, workspace) {
+    const nextVolunteer = pickBestVolunteerForRequest(request || assignment, workspace, {
+      excludeVolunteerNames: [assignment.volunteer]
+    });
+    if (!nextVolunteer) {
+      return false;
+    }
+    assignment.shiftCount = Number(assignment.shiftCount || 0) + 1;
+    assignment.shifted = true;
+    assignment.volunteer = nextVolunteer.name;
+    assignment.volunteerOrigin = safeText(nextVolunteer.origin || "demo", 20).toLowerCase() || "demo";
+    assignment.status = "Accepted";
+    assignment.acceptedAt = nowIso();
+    assignment.startedAt = "";
+    assignment.updatedAt = nowIso();
+    assignment.points = computeTaskPoints(request && request.priority || "Medium", assignment.shiftCount);
+    if (request) {
+      request.status = "Assigned";
+      request.updatedAt = nowIso();
+    }
+    workspace.audit.unshift(buildShiftAuditLine(assignment, nextVolunteer, request || { title: assignment.title }));
+    workspace.systemNotice = "AI shifted " + assignment.title + " to " + nextVolunteer.name + " after a stalled assignment window.";
+    return true;
+  }
+
+  function completeAssignment(assignment, request, workspace, reason) {
+    assignment.status = "Completed";
+    assignment.completedAt = nowIso();
+    assignment.updatedAt = nowIso();
+    assignment.points = computeTaskPoints(request && request.priority || "Medium", assignment.shiftCount);
+    awardVolunteerPoints(workspace, assignment);
+    if (request) {
+      request.status = "Delivered";
+      request.updatedAt = nowIso();
+    }
+    workspace.audit.unshift(reason || ("Volunteer " + assignment.volunteer + " completed " + assignment.title + "."));
+    workspace.systemNotice = assignment.volunteer + " completed " + assignment.title + ".";
+  }
+
+  function awardVolunteerPoints(workspace, assignment) {
+    if (assignment.pointsAwarded) {
+      return;
+    }
+    const volunteer = (workspace.volunteers || []).find(function (item) {
+      return normalizeSearchQuery(item.name) === normalizeSearchQuery(assignment.volunteer);
+    });
+    if (volunteer) {
+      volunteer.pointsEarned = Number(volunteer.pointsEarned || 0) + Number(assignment.points || 0);
+      volunteer.completedTasks = Number(volunteer.completedTasks || 0) + 1;
+      volunteer.lastStatus = "Completed";
+      volunteer.attendanceDays = Math.max(Number(volunteer.attendanceDays || 0), Number(volunteer.completedTasks || 0));
+    }
+    assignment.pointsAwarded = true;
   }
 
   function isPageAllowed(role, page) {

@@ -14,7 +14,7 @@ window.RESOURCEFLOW_FIREBASE_CONFIG = {
   // Shared portal features now use Firebase Auth + Firestore instead of browser-only storage.
   forceLocalWorkspace: false,
   googleMapsApiKey: "",
-  geminiApiKey: "",
+  geminiApiKey: "AIzaSyC2TwO2FAyccXfG0mBFOy1NHaS_MpJIZpw",
   geminiModel: "gemini-2.5-flash",
   enableAuth: true,
   enableAppCheck: false,
