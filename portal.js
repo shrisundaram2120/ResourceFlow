@@ -102,6 +102,10 @@
   const DEMO_RUNTIME = {
     drawerOpen: false
   };
+  const SEARCH_RUNTIME = {
+    query: "",
+    searched: false
+  };
 
   const PAGE_TITLES = {
     community: "Community Portal",
@@ -353,7 +357,7 @@
     }
 
     try {
-      headerMarkup = renderHeader(page, session);
+      headerMarkup = renderHeader(page, session, workspace);
     } catch (error) {
       console.error("Header render failed:", error);
     }
@@ -535,8 +539,12 @@
     return "Requested";
   }
 
-  function renderHeader(page, session) {
+  function renderHeader(page, session, workspace) {
     const roleData = ROLE_CONFIG[session.role] || ROLE_CONFIG.user;
+    const searchQuery = safeText(SEARCH_RUNTIME.query, 160);
+    const searchResults = SEARCH_RUNTIME.searched && searchQuery
+      ? buildWorkspaceSearchResults(searchQuery, session, workspace)
+      : [];
     return [
       '<header class="rf-header">',
       '<div class="rf-header-main">',
@@ -547,7 +555,16 @@
       renderPortalLauncher(session, page),
       "</div>",
       '<div class="rf-header-actions">',
-      '<label class="rf-search-shell"><span class="rf-symbol" aria-hidden="true">search</span><input class="rf-search-input" type="search" placeholder="' + escapeHtml(copy("searchPlaceholder", "Search requests, volunteers, donations...")) + '" aria-label="Search workspace" data-testid="header-search"></label>',
+      '<div class="rf-search-stack">',
+      '<form class="rf-search-shell" data-search-form role="search" autocomplete="off">',
+      '<span class="rf-symbol" aria-hidden="true">search</span>',
+      '<input class="rf-search-input" type="search" name="search" value="' + escapeHtml(searchQuery) + '" placeholder="' + escapeHtml(copy("searchPlaceholder", "Search requests, volunteers, donations...")) + '" aria-label="Search workspace" data-testid="header-search">',
+      (searchQuery
+        ? '<button class="search-clear-button" type="button" data-action="clear-search" data-testid="clear-header-search" aria-label="Clear search"><span class="rf-symbol" aria-hidden="true">close</span></button>'
+        : ""),
+      "</form>",
+      renderHeaderSearchResults(searchQuery, searchResults),
+      "</div>",
       '<div class="rf-header-toolset">',
       '<div class="rf-header-chip">' + escapeHtml(roleData.label) + '</div>',
       renderLanguageSelect(),
@@ -558,6 +575,237 @@
       "</div>",
       "</header>"
     ].join("");
+  }
+
+  function renderHeaderSearchResults(query, results) {
+    if (!SEARCH_RUNTIME.searched || !query) {
+      return "";
+    }
+    if (!results.length) {
+      return [
+        '<div class="rf-search-results is-empty" data-testid="header-search-results">',
+        '<p class="section-label">Search Results</p>',
+        '<div class="rf-search-empty-state">',
+        '<strong>Not found</strong>',
+        '<p>No matches for "' + escapeHtml(query) + '". Try a volunteer name, request title, donor, district, or category.</p>',
+        "</div>",
+        "</div>"
+      ].join("");
+    }
+    return [
+      '<div class="rf-search-results" data-testid="header-search-results">',
+      '<div class="rf-search-results-copy">',
+      '<p class="section-label">Search Results</p>',
+      '<p class="section-copy">Showing ' + escapeHtml(String(results.length)) + ' match(es) for "' + escapeHtml(query) + '".</p>',
+      "</div>",
+      '<div class="rf-search-results-list">',
+      results.map(function (result, index) {
+        return [
+          '<a class="rf-search-result" href="' + escapeHtml(result.href) + '" data-testid="header-search-result-' + escapeHtml(String(index)) + '">',
+          '<span class="chip">' + escapeHtml(result.kind) + "</span>",
+          '<strong>' + escapeHtml(result.title) + "</strong>",
+          result.meta ? '<small>' + escapeHtml(result.meta) + "</small>" : "",
+          result.summary ? '<span class="rf-search-result-summary">' + escapeHtml(result.summary) + "</span>" : "",
+          '<span class="rf-search-result-action">' + escapeHtml(result.actionLabel) + "</span>",
+          "</a>"
+        ].join("");
+      }).join(""),
+      "</div>",
+      "</div>"
+    ].join("");
+  }
+
+  function buildWorkspaceSearchResults(query, session, workspace) {
+    const normalizedQuery = normalizeSearchQuery(query);
+    const results = [];
+    if (!normalizedQuery) {
+      return results;
+    }
+
+    const profiles = loadJson(PORTAL_PROFILE_KEY, {});
+    const portalProfile = profiles && typeof profiles === "object" ? profiles : {};
+
+    function pushResult(result, fields) {
+      const score = scoreSearchFields(normalizedQuery, fields);
+      if (!score) {
+        return;
+      }
+      results.push(Object.assign({ score: score }, result));
+    }
+
+    pushResult({
+      kind: "Profile",
+      title: session.name || "Signed-in user",
+      meta: session.email || (ROLE_CONFIG[session.role] || ROLE_CONFIG.user).label,
+      summary: "Open your current portal workspace.",
+      actionLabel: "Open current portal",
+      href: homeRouteForRole(session.role)
+    }, [
+      session.name,
+      session.email,
+      session.profile && session.profile.fullName,
+      session.profile && session.profile.displayName,
+      session.profile && session.profile.primarySummary,
+      session.profile && session.profile.ngoGroup
+    ]);
+
+    Object.keys(portalProfile).forEach(function (roleKey) {
+      const profile = portalProfile[roleKey];
+      if (!profile || typeof profile !== "object") {
+        return;
+      }
+      pushResult({
+        kind: "Volunteer",
+        title: safeText(profile.fullName || profile.displayName || "Volunteer profile", 120),
+        meta: safeText(profile.ngoGroup || profile.location || ROLE_CONFIG[roleKey] && ROLE_CONFIG[roleKey].label || "Profile", 160),
+        summary: safeText(joinSkills(profile.skills) || profile.email || profile.phone || "Shared volunteer profile", 220),
+        actionLabel: "Open Volunteer Directory",
+        href: "./directory.html"
+      }, [
+        profile.fullName,
+        profile.displayName,
+        profile.ngoGroup,
+        joinSkills(profile.skills),
+        profile.location,
+        profile.email,
+        profile.phone
+      ]);
+    });
+
+    workspace.volunteers.forEach(function (volunteer) {
+      pushResult({
+        kind: "Volunteer",
+        title: safeText(volunteer.name, 120),
+        meta: safeText([volunteer.ngo, volunteer.location].filter(Boolean).join(" · "), 160),
+        summary: safeText(joinSkills(volunteer.skills) + (volunteer.contact ? " · " + volunteer.contact : ""), 220),
+        actionLabel: "Open Volunteer Directory",
+        href: "./directory.html"
+      }, [
+        volunteer.name,
+        volunteer.ngo,
+        joinSkills(volunteer.skills),
+        volunteer.location,
+        volunteer.contact,
+        volunteer.availability
+      ]);
+    });
+
+    workspace.requests.forEach(function (request) {
+      pushResult({
+        kind: "Request",
+        title: safeText(request.title, 140),
+        meta: safeText([request.category, request.district, normalizeRequestStatus(request.status)].filter(Boolean).join(" · "), 180),
+        summary: safeText(request.summary || request.location || "Open the request tracker", 220),
+        actionLabel: "Open Community Portal",
+        href: "./community.html"
+      }, [
+        request.title,
+        request.category,
+        request.district,
+        request.location,
+        request.summary,
+        request.requester,
+        request.priority,
+        request.status
+      ]);
+    });
+
+    workspace.assignments.forEach(function (assignment) {
+      pushResult({
+        kind: "Assignment",
+        title: safeText(assignment.title, 140),
+        meta: safeText([assignment.volunteer, assignment.district, normalizeAssignmentStatus(assignment.status)].filter(Boolean).join(" · "), 180),
+        summary: safeText(assignment.location || assignment.date || "Open the assignment board", 220),
+        actionLabel: "Open Volunteer Portal",
+        href: "./volunteer.html"
+      }, [
+        assignment.title,
+        assignment.volunteer,
+        assignment.district,
+        assignment.location,
+        assignment.status,
+        assignment.date
+      ]);
+    });
+
+    workspace.donations.forEach(function (donation) {
+      pushResult({
+        kind: "Donation",
+        title: safeText(donation.donor || "Donation record", 120),
+        meta: safeText([donation.kind === "money" ? "Money" : donation.itemType || "Item", formatDonationLine(donation), normalizeDonationLifecycle(donation.status)].filter(Boolean).join(" · "), 180),
+        summary: safeText(donation.note || donation.description || donation.contactDetails || "Open the donation portal", 220),
+        actionLabel: "Open Donation Portal",
+        href: "./donations.html"
+      }, [
+        donation.donor,
+        donation.kind,
+        donation.itemType,
+        donation.paymentMethod,
+        donation.description,
+        donation.note,
+        donation.contactDetails,
+        donation.status
+      ]);
+    });
+
+    SIDEBAR_ITEMS.forEach(function (item) {
+      pushResult({
+        kind: "Portal",
+        title: item.label,
+        meta: item.caption,
+        summary: "Open the " + item.shortLabel + " workspace.",
+        actionLabel: "Open portal",
+        href: item.href
+      }, [
+        item.label,
+        item.shortLabel,
+        item.caption,
+        item.key
+      ]);
+    });
+
+    return results
+      .sort(function (left, right) {
+        if (right.score !== left.score) {
+          return right.score - left.score;
+        }
+        return safeText(left.title, 160).localeCompare(safeText(right.title, 160));
+      })
+      .filter(function (result, index, list) {
+        return list.findIndex(function (item) {
+          return item.kind === result.kind && item.title === result.title && item.href === result.href;
+        }) === index;
+      })
+      .slice(0, 8);
+  }
+
+  function normalizeSearchQuery(value) {
+    return safeText(value, 160).toLowerCase().replace(/\s+/g, " ").trim();
+  }
+
+  function scoreSearchFields(query, fields) {
+    const terms = query.split(" ").filter(Boolean);
+    let bestScore = 0;
+    (fields || []).forEach(function (field, index) {
+      const text = normalizeSearchQuery(field);
+      if (!text) {
+        return;
+      }
+      if (text === query) {
+        bestScore = Math.max(bestScore, 140 - index);
+      } else if (text.indexOf(query) === 0) {
+        bestScore = Math.max(bestScore, 112 - index);
+      } else if (text.indexOf(query) !== -1) {
+        bestScore = Math.max(bestScore, 92 - index);
+      }
+      const matchedTerms = terms.filter(function (term) {
+        return text.indexOf(term) !== -1;
+      }).length;
+      if (matchedTerms === terms.length) {
+        bestScore = Math.max(bestScore, 72 + matchedTerms * 4 - index);
+      }
+    });
+    return bestScore;
   }
 
   function renderPortalLauncher(session, page) {
@@ -2445,6 +2693,40 @@
       });
     });
 
+    const headerSearchForm = root.querySelector("[data-search-form]");
+    if (headerSearchForm) {
+      const headerSearchInput = headerSearchForm.querySelector(".rf-search-input");
+      if (headerSearchInput) {
+        headerSearchInput.addEventListener("input", function () {
+          SEARCH_RUNTIME.query = safeText(headerSearchInput.value, 160);
+          if (!SEARCH_RUNTIME.query && SEARCH_RUNTIME.searched) {
+            SEARCH_RUNTIME.searched = false;
+            renderApp(document.getElementById("portalApp"));
+          }
+        });
+      }
+      headerSearchForm.addEventListener("submit", function (event) {
+        event.preventDefault();
+        SEARCH_RUNTIME.query = safeText(headerSearchInput && headerSearchInput.value, 160);
+        SEARCH_RUNTIME.searched = Boolean(SEARCH_RUNTIME.query);
+        renderApp(document.getElementById("portalApp"));
+        if (!SEARCH_RUNTIME.searched) {
+          announce("Enter a volunteer name, request title, donor, or district to search.");
+          return;
+        }
+        const results = buildWorkspaceSearchResults(SEARCH_RUNTIME.query, session, getWorkspace());
+        announce(results.length ? (String(results.length) + " result(s) found.") : "Not found.");
+      });
+    }
+
+    root.querySelectorAll("[data-action='clear-search']").forEach(function (button) {
+      button.addEventListener("click", function () {
+        SEARCH_RUNTIME.query = "";
+        SEARCH_RUNTIME.searched = false;
+        renderApp(document.getElementById("portalApp"));
+      });
+    });
+
     root.querySelectorAll("[data-action='toggle-menu']").forEach(function (button) {
       button.addEventListener("click", function () {
         document.body.classList.toggle("rf-sidebar-open");
@@ -2687,6 +2969,11 @@
     document.onkeydown = function (event) {
       if (event && event.key === "Escape") {
         let changed = false;
+        if (SEARCH_RUNTIME.searched || SEARCH_RUNTIME.query) {
+          SEARCH_RUNTIME.query = "";
+          SEARCH_RUNTIME.searched = false;
+          changed = true;
+        }
         if (document.body.classList.contains("rf-sidebar-open")) {
           document.body.classList.remove("rf-sidebar-open");
           changed = true;
