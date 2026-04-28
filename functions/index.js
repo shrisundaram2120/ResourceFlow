@@ -23,6 +23,7 @@ const auth = admin.auth();
 const region = process.env.FUNCTIONS_REGION || "us-central1";
 const workspaceCollection = process.env.DEFAULT_WORKSPACE_COLLECTION || "resourceflow";
 const workspaceId = process.env.DEFAULT_WORKSPACE_ID || "resourceflow-demo";
+const DEMO_REFRESH_MS = 10 * 60 * 1000;
 
 exports.bootstrapAdmin = onCall({ region: region }, async (request) => {
   ensureSignedIn(request);
@@ -119,6 +120,25 @@ exports.saveWorkspaceState = onCall({ region: region }, async (request) => {
   return {
     ok: true,
     revision: next.meta.revision
+  };
+});
+
+exports.processWorkspaceLifecycle = onCall({ region: region }, async (request) => {
+  ensureSignedIn(request);
+  const actor = safeText(request.auth.token.email || request.auth.uid, 140);
+  const incoming = normalizeWorkspaceState(request.data && (request.data.workspace || request.data.state));
+  const base = incoming.requests.length || incoming.assignments.length || incoming.volunteers.length || incoming.donations.length
+    ? incoming
+    : await loadWorkspaceState();
+  const result = processWorkspaceLifecycleState(base, {
+    actor: actor,
+    reason: safeText(request.data && request.data.reason, 80)
+  });
+  await saveWorkspaceState(result.state, actor);
+  return {
+    ok: true,
+    changed: result.changed,
+    state: result.state
   };
 });
 
@@ -491,11 +511,22 @@ async function loadWorkspaceState() {
   const snapshot = await getWorkspaceRef().get();
   if (!snapshot.exists || !snapshot.data() || !snapshot.data().state) {
     return {
+      scenario: "none",
+      label: "No demo loaded",
+      summary: "Load demo data to see requests, assignments, donations, and AI matching in action.",
       requests: [],
       volunteers: [],
       assignments: [],
+      donations: [],
       artifacts: [],
       activityLog: [],
+      audit: [],
+      outreach: [],
+      systemNotice: "Choose a scenario to populate the workspace.",
+      generatedAt: new Date().toISOString(),
+      lastRefreshedAt: new Date().toISOString(),
+      lastAutomationAt: "",
+      demoCycleId: "",
       history: [],
       meta: {
         revision: 0,
@@ -511,12 +542,22 @@ async function loadWorkspaceState() {
 function normalizeWorkspaceState(input) {
   const next = input && typeof input === "object" ? input : {};
   return {
+    scenario: safeText(next.scenario || "none", 40).toLowerCase(),
+    label: safeText(next.label || "No demo loaded", 120),
+    summary: safeText(next.summary || "Load demo data to see requests, assignments, donations, and AI matching in action.", 280),
     requests: Array.isArray(next.requests) ? next.requests : [],
     volunteers: Array.isArray(next.volunteers) ? next.volunteers : [],
     assignments: Array.isArray(next.assignments) ? next.assignments : [],
     donations: Array.isArray(next.donations) ? next.donations : [],
     artifacts: Array.isArray(next.artifacts) ? next.artifacts : [],
     activityLog: Array.isArray(next.activityLog) ? next.activityLog.slice(0, 60) : [],
+    audit: Array.isArray(next.audit) ? next.audit.slice(0, 120) : [],
+    outreach: Array.isArray(next.outreach) ? next.outreach.slice(0, 40) : [],
+    systemNotice: safeText(next.systemNotice || "Choose a scenario to populate the workspace.", 280),
+    generatedAt: safeIso(next.generatedAt || new Date().toISOString()),
+    lastRefreshedAt: safeIso(next.lastRefreshedAt || next.generatedAt || new Date().toISOString()),
+    lastAutomationAt: safeText(next.lastAutomationAt || "", 80),
+    demoCycleId: safeText(next.demoCycleId || "", 80),
     history: Array.isArray(next.history) ? next.history.slice(0, 30) : [],
     meta: next.meta && typeof next.meta === "object"
       ? {
@@ -573,6 +614,602 @@ function buildNextActivity(items, type, message, actor) {
       message: safeText(message, 240)
     }
   ].concat(current);
+}
+
+function processWorkspaceLifecycleState(state, options) {
+  const workspace = normalizeLifecycleWorkspace(state);
+  const actor = safeText(options && options.actor || "system", 140);
+  let changed = false;
+
+  if (maybeRefreshDemoCycle(workspace, actor)) {
+    changed = true;
+  }
+  if (applyLifecycleRequestAutomation(workspace, actor)) {
+    changed = true;
+  }
+  if (applyLifecycleAssignmentAutomation(workspace, actor)) {
+    changed = true;
+  }
+  if (recalculateLifecycleVolunteerProfiles(workspace)) {
+    changed = true;
+  }
+  if (changed) {
+    workspace.requests = sortLifecycleRequests(workspace.requests);
+    workspace.assignments = sortLifecycleAssignments(workspace.assignments);
+    workspace.donations = sortLifecycleDonations(workspace.donations);
+    workspace.lastAutomationAt = new Date().toISOString();
+  }
+  return {
+    changed: changed,
+    state: workspace
+  };
+}
+
+function normalizeLifecycleWorkspace(state) {
+  const workspace = normalizeWorkspaceState(state);
+  workspace.requests = (workspace.requests || []).map(function (item, index) {
+    const source = safeText(item.source || item.origin || (workspace.scenario !== "none" ? "disaster-demo" : "live"), 40).toLowerCase();
+    const priority = safeText(item.priority || "Medium", 40);
+    const createdAt = safeIso(item.createdAt || item.requestedAt || new Date().toISOString());
+    return Object.assign({}, item, {
+      id: safeText(item.id || ("REQ-" + (index + 100)), 80),
+      title: safeText(item.title || "Support request", 180),
+      district: safeText(item.district || item.zone || "Unknown district", 80),
+      location: safeText(item.location || item.address || item.district || "Response hub", 180),
+      priority: priority,
+      status: normalizeLifecycleRequestStatus(item.status || "Pending"),
+      source: source === "demo" ? "disaster-demo" : source,
+      origin: safeText(item.origin || (source === "live" ? "live" : "demo"), 20).toLowerCase() || "demo",
+      requester: safeText(item.requester || "Community Network", 140),
+      beneficiaries: Number(item.beneficiaries || 0),
+      complexity: inferLifecycleComplexity(priority),
+      estimatedDurationMinutes: Number(item.estimatedDurationMinutes || estimateLifecycleDuration(priority, source)),
+      createdAt: createdAt,
+      requestedAt: safeIso(item.requestedAt || createdAt),
+      updatedAt: safeIso(item.updatedAt || createdAt),
+      broadcastTo: Array.isArray(item.broadcastTo) && item.broadcastTo.length ? item.broadcastTo.slice(0, 4) : ["admin", "government"]
+    });
+  });
+  workspace.volunteers = (workspace.volunteers || []).map(function (item, index) {
+    return Object.assign({}, item, {
+      id: safeText(item.id || ("VOL-" + (index + 1)), 80),
+      name: safeText(item.name || "Volunteer", 140),
+      district: safeText(item.district || item.zone || item.location || "Unknown district", 80),
+      location: safeText(item.location || item.district || "Response hub", 180),
+      skills: normalizeLifecycleSkills(item.skills),
+      availability: safeText(item.availability || item.activityStatus || "Available", 40),
+      activityStatus: safeText(item.activityStatus || item.availability || "available", 40),
+      ngo: safeText(item.ngo || item.ngoGroup || "Relief Network", 120),
+      contact: safeText(item.contact || item.email || item.phone || "", 180),
+      origin: safeText(item.origin || "demo", 20).toLowerCase() || "demo",
+      pointsEarned: Number(item.pointsEarned || 0),
+      completedTasks: Number(item.completedTasks || 0),
+      reliability: Number(item.reliability || 72),
+      attendanceDays: Number(item.attendanceDays || 0)
+    });
+  });
+  workspace.assignments = (workspace.assignments || []).map(function (item, index) {
+    const createdAt = safeIso(item.createdAt || item.assignedAt || new Date().toISOString());
+    return Object.assign({}, item, {
+      id: safeText(item.id || ("ASG-" + (index + 300)), 80),
+      requestId: safeText(item.requestId, 80),
+      title: safeText(item.title || "Assignment", 180),
+      volunteer: safeText(item.volunteer, 140),
+      district: safeText(item.district || "Unknown district", 80),
+      location: safeText(item.location || item.district || "Response hub", 180),
+      status: normalizeLifecycleAssignmentStatus(item.status || "Accepted"),
+      createdAt: createdAt,
+      updatedAt: safeIso(item.updatedAt || createdAt),
+      acceptedAt: safeText(item.acceptedAt || createdAt, 80),
+      startedAt: safeText(item.startedAt || "", 80),
+      completedAt: safeText(item.completedAt || "", 80),
+      estimatedDurationMinutes: Number(item.estimatedDurationMinutes || 15),
+      shiftCount: Number(item.shiftCount || 0),
+      shifted: Boolean(item.shifted),
+      autoManaged: Boolean(item.autoManaged),
+      points: Number(item.points || 0),
+      pointsAwarded: Boolean(item.pointsAwarded),
+      origin: safeText(item.origin || "demo", 20).toLowerCase() || "demo",
+      volunteerOrigin: safeText(item.volunteerOrigin || "demo", 20).toLowerCase() || "demo"
+    });
+  });
+  workspace.donations = (workspace.donations || []).map(function (item, index) {
+    return Object.assign({}, item, {
+      id: safeText(item.id || ("DON-" + (index + 1)), 80),
+      donor: safeText(item.donor || item.name || "Donation source", 140),
+      kind: safeText(item.kind || item.itemType || "money", 40),
+      status: safeText(item.status || "Submitted", 40),
+      createdAt: safeIso(item.createdAt || new Date().toISOString()),
+      updatedAt: safeIso(item.updatedAt || item.createdAt || new Date().toISOString()),
+      origin: safeText(item.origin || (workspace.scenario !== "none" ? "demo" : "live"), 20).toLowerCase() || "demo"
+    });
+  });
+  workspace.audit = Array.isArray(workspace.audit) ? workspace.audit.slice(0, 120).map(function (item) { return safeText(item, 240); }) : [];
+  workspace.systemNotice = safeText(workspace.systemNotice || "Choose a scenario to populate the workspace.", 280);
+  return workspace;
+}
+
+function maybeRefreshDemoCycle(workspace, actor) {
+  if (safeText(workspace.scenario, 40).toLowerCase() === "none") {
+    return false;
+  }
+  const generatedAt = Date.parse(workspace.generatedAt || workspace.lastRefreshedAt || 0);
+  if (!generatedAt || (Date.now() - generatedAt) < DEMO_REFRESH_MS) {
+    return false;
+  }
+  const cycleStamp = new Date().toISOString();
+  workspace.demoCycleId = "demo-" + Date.now();
+  workspace.generatedAt = cycleStamp;
+  workspace.lastRefreshedAt = cycleStamp;
+  workspace.requests = workspace.requests
+    .filter(function (item) { return safeText(item.origin, 20).toLowerCase() !== "demo"; })
+    .concat(randomizeDemoRequests(workspace.scenario, workspace.demoCycleId));
+  workspace.assignments = workspace.assignments.filter(function (item) {
+    return safeText(item.origin, 20).toLowerCase() !== "demo" && safeText(item.origin, 20).toLowerCase() !== "live-support";
+  });
+  workspace.donations = workspace.donations
+    .filter(function (item) { return safeText(item.origin, 20).toLowerCase() !== "demo"; })
+    .concat(randomizeDemoDonations(workspace.scenario, workspace.demoCycleId));
+  workspace.systemNotice = safeText(workspace.label || "Demo workspace", 120) + " auto-refreshed with a new 10-minute demo cycle.";
+  workspace.audit.unshift("AI refreshed the demo workspace for " + safeText(workspace.label || workspace.scenario, 120) + ".");
+  workspace.activityLog = buildNextActivity(workspace.activityLog, "automation", "AI refreshed the demo workspace with new randomized entries.", actor);
+  return true;
+}
+
+function applyLifecycleRequestAutomation(workspace, actor) {
+  let changed = false;
+  workspace.requests = sortLifecycleRequests(workspace.requests || []);
+  workspace.requests.forEach(function (request) {
+    if (!request.broadcastedAt && (request.source === "live" || request.source === "disaster-demo")) {
+      request.status = "Pending";
+      request.broadcastedAt = new Date().toISOString();
+      request.updatedAt = request.broadcastedAt;
+      workspace.audit.unshift("AI logged " + request.title + " and broadcasted a Pending status to Admin and Government.");
+      workspace.activityLog = buildNextActivity(workspace.activityLog, "request", request.title + " broadcasted as Pending to Admin and Government.", actor);
+      workspace.systemNotice = request.title + " is Pending and visible in Admin and Government review queues.";
+      changed = true;
+    }
+    const hasActiveAssignment = workspace.assignments.some(function (assignment) {
+      return assignment.requestId === request.id && isLifecycleAssignmentActive(assignment.status);
+    });
+    if ((request.status === "Pending" || request.status === "Reviewed") && !hasActiveAssignment) {
+      const createdAssignments = createLifecycleAssignments(request, workspace);
+      if (createdAssignments.length) {
+        workspace.assignments = createdAssignments.concat(workspace.assignments);
+        request.status = "Assigned";
+        request.updatedAt = new Date().toISOString();
+        workspace.audit.unshift("AI matched " + createdAssignments.map(function (item) { return item.volunteer; }).join(", ") + " to " + request.title + ".");
+        workspace.activityLog = buildNextActivity(workspace.activityLog, "assignment", "AI assigned " + request.title + " to " + createdAssignments.map(function (item) { return item.volunteer; }).join(", ") + ".", actor);
+        workspace.systemNotice = request.title + " was assigned through the AI operations queue.";
+        changed = true;
+      }
+    }
+  });
+  return changed;
+}
+
+function applyLifecycleAssignmentAutomation(workspace, actor) {
+  let changed = false;
+  (workspace.assignments || []).forEach(function (assignment) {
+    const request = (workspace.requests || []).find(function (item) { return item.id === assignment.requestId; }) || null;
+    const elapsed = elapsedLifecycleMinutes(assignment.startedAt || assignment.acceptedAt || assignment.createdAt);
+    const duration = Math.max(6, Number(assignment.estimatedDurationMinutes || (request && request.estimatedDurationMinutes) || 15));
+    const autoManaged = Boolean(assignment.autoManaged || assignment.volunteerOrigin === "demo");
+
+    if (autoManaged && assignment.status === "Accepted" && elapsed >= Math.max(1, duration * 0.2)) {
+      assignment.status = "In Progress";
+      assignment.startedAt = assignment.startedAt || new Date().toISOString();
+      assignment.updatedAt = new Date().toISOString();
+      if (request) {
+        request.status = "In Progress";
+        request.updatedAt = assignment.updatedAt;
+      }
+      workspace.audit.unshift(buildLifecycleVolunteerStatusLine(assignment, "In Progress"));
+      workspace.activityLog = buildNextActivity(workspace.activityLog, "volunteer", buildLifecycleVolunteerStatusLine(assignment, "In Progress"), actor);
+      workspace.systemNotice = buildLifecycleVolunteerStatusLine(assignment, "In Progress");
+      changed = true;
+    }
+
+    if (!assignment.shifted && !isLifecycleAssignmentComplete(assignment.status) && elapsed >= duration * 0.5) {
+      if (shiftLifecycleAssignment(assignment, request, workspace, actor)) {
+        changed = true;
+      }
+    }
+
+    if (autoManaged && !isLifecycleAssignmentComplete(assignment.status) && elapsed >= duration * 0.85) {
+      finishLifecycleAssignment(assignment, request, workspace, actor, "AI auto-completed the demo volunteer task after route progress was confirmed.");
+      changed = true;
+    }
+  });
+  return changed;
+}
+
+function recalculateLifecycleVolunteerProfiles(workspace) {
+  let changed = false;
+  (workspace.volunteers || []).forEach(function (volunteer) {
+    const related = (workspace.assignments || []).filter(function (assignment) {
+      return normalizeLifecycleSearch(assignment.volunteer) === normalizeLifecycleSearch(volunteer.name);
+    });
+    const completed = related.filter(function (assignment) {
+      return isLifecycleAssignmentComplete(assignment.status);
+    }).length;
+    const points = related.reduce(function (sum, assignment) {
+      return sum + Number(assignment.points || 0);
+    }, 0);
+    const reliability = computeLifecycleReliability(volunteer, workspace.assignments || []);
+    if (
+      volunteer.completedTasks !== completed ||
+      volunteer.pointsEarned !== points ||
+      volunteer.reliability !== reliability
+    ) {
+      volunteer.completedTasks = completed;
+      volunteer.pointsEarned = points;
+      volunteer.reliability = reliability;
+      volunteer.attendanceDays = Math.max(Number(volunteer.attendanceDays || 0), completed);
+      changed = true;
+    }
+  });
+  return changed;
+}
+
+function createLifecycleAssignments(request, workspace) {
+  const assignments = [];
+  const realVolunteer = pickLifecycleVolunteer(request, workspace, { origin: "real" });
+  const demoVolunteer = pickLifecycleVolunteer(request, workspace, {
+    origin: "demo",
+    excludeVolunteerNames: realVolunteer ? [realVolunteer.name] : []
+  });
+  if (request.source === "live") {
+    if (realVolunteer) {
+      assignments.push(buildLifecycleAssignment(request, realVolunteer, {
+        origin: "live",
+        volunteerOrigin: "real",
+        status: "Accepted",
+        autoManaged: false
+      }));
+    }
+    if (demoVolunteer) {
+      assignments.push(buildLifecycleAssignment(request, demoVolunteer, {
+        origin: "live-support",
+        volunteerOrigin: "demo",
+        status: "Accepted",
+        autoManaged: true,
+        supportLane: true
+      }));
+    }
+  } else {
+    const nearest = demoVolunteer || realVolunteer || pickLifecycleVolunteer(request, workspace, {});
+    if (nearest) {
+      assignments.push(buildLifecycleAssignment(request, nearest, {
+        origin: "demo",
+        volunteerOrigin: safeText(nearest.origin || "demo", 20).toLowerCase() || "demo",
+        status: "Accepted",
+        autoManaged: safeText(nearest.origin || "demo", 20).toLowerCase() === "demo"
+      }));
+    }
+  }
+  return assignments;
+}
+
+function pickLifecycleVolunteer(request, workspace, options) {
+  const filters = options && typeof options === "object" ? options : {};
+  const excluded = Array.isArray(filters.excludeVolunteerNames) ? filters.excludeVolunteerNames.map(normalizeLifecycleSearch) : [];
+  const targetOrigin = safeText(filters.origin || "", 20).toLowerCase();
+  const requestDistrict = normalizeLifecycleSearch(request && (request.district || request.zone || request.location));
+  const requestSkills = normalizeLifecycleSkills(request && request.category).concat(normalizeLifecycleSkills(request && request.title));
+  const candidates = (workspace.volunteers || []).filter(function (volunteer) {
+    if (!volunteer || !volunteer.name) {
+      return false;
+    }
+    if (targetOrigin && safeText(volunteer.origin, 20).toLowerCase() !== targetOrigin) {
+      return false;
+    }
+    if (excluded.indexOf(normalizeLifecycleSearch(volunteer.name)) >= 0) {
+      return false;
+    }
+    return isLifecycleVolunteerAvailable(volunteer);
+  }).map(function (volunteer) {
+    const volunteerDistrict = normalizeLifecycleSearch(volunteer.district || volunteer.location);
+    const districtMatch = requestDistrict && volunteerDistrict && requestDistrict.indexOf(volunteerDistrict) >= 0 || volunteerDistrict.indexOf(requestDistrict) >= 0;
+    const skillOverlap = normalizeLifecycleSkills(volunteer.skills).filter(function (skill) {
+      return requestSkills.indexOf(skill) >= 0;
+    }).length;
+    return {
+      volunteer: volunteer,
+      score: (districtMatch ? 150 : 0) + (skillOverlap * 40) + Number(volunteer.reliability || 72),
+      nearestKm: districtMatch ? 2 : 8
+    };
+  }).sort(function (left, right) {
+    return right.score - left.score || left.nearestKm - right.nearestKm;
+  });
+  return candidates.length ? candidates[0].volunteer : null;
+}
+
+function buildLifecycleAssignment(request, volunteer, options) {
+  const settings = options && typeof options === "object" ? options : {};
+  const createdAt = new Date().toISOString();
+  return {
+    id: "ASG-" + Date.now() + "-" + Math.random().toString(36).slice(2, 6),
+    requestId: request.id,
+    title: safeText(request.title || "Assignment", 180),
+    volunteer: safeText(volunteer && volunteer.name || "Volunteer pending", 140),
+    district: safeText(request.district || volunteer && volunteer.district || "Unknown district", 80),
+    location: safeText(request.location || volunteer && volunteer.location || "Response hub", 180),
+    status: normalizeLifecycleAssignmentStatus(settings.status || "Accepted"),
+    createdAt: createdAt,
+    updatedAt: createdAt,
+    acceptedAt: createdAt,
+    startedAt: "",
+    completedAt: "",
+    estimatedDurationMinutes: Number(request.estimatedDurationMinutes || estimateLifecycleDuration(request.priority, request.source)),
+    shiftCount: 0,
+    shifted: false,
+    autoManaged: Boolean(settings.autoManaged),
+    points: computeLifecycleTaskPoints(request.priority || "Medium", 0),
+    pointsAwarded: false,
+    origin: safeText(settings.origin || request.origin || "demo", 20).toLowerCase() || "demo",
+    volunteerOrigin: safeText(settings.volunteerOrigin || volunteer && volunteer.origin || "demo", 20).toLowerCase() || "demo"
+  };
+}
+
+function shiftLifecycleAssignment(assignment, request, workspace, actor) {
+  const nextVolunteer = pickLifecycleVolunteer(request || assignment, workspace, {
+    excludeVolunteerNames: [assignment.volunteer]
+  });
+  if (!nextVolunteer) {
+    return false;
+  }
+  assignment.shiftCount = Number(assignment.shiftCount || 0) + 1;
+  assignment.shifted = true;
+  assignment.volunteer = nextVolunteer.name;
+  assignment.volunteerOrigin = safeText(nextVolunteer.origin || "demo", 20).toLowerCase() || "demo";
+  assignment.autoManaged = assignment.volunteerOrigin === "demo";
+  assignment.status = "Accepted";
+  assignment.acceptedAt = new Date().toISOString();
+  assignment.startedAt = "";
+  assignment.updatedAt = assignment.acceptedAt;
+  assignment.points = computeLifecycleTaskPoints(request && request.priority || "Medium", assignment.shiftCount);
+  if (request) {
+    request.status = "Assigned";
+    request.updatedAt = assignment.updatedAt;
+  }
+  workspace.audit.unshift(buildLifecycleShiftLine(assignment, nextVolunteer, request || { title: assignment.title }));
+  workspace.activityLog = buildNextActivity(workspace.activityLog, "assignment", buildLifecycleShiftLine(assignment, nextVolunteer, request || { title: assignment.title }), actor);
+  workspace.systemNotice = buildLifecycleVolunteerStatusLine(assignment, "Accepted");
+  return true;
+}
+
+function finishLifecycleAssignment(assignment, request, workspace, actor, reason) {
+  assignment.status = "Completed";
+  assignment.completedAt = new Date().toISOString();
+  assignment.updatedAt = assignment.completedAt;
+  assignment.points = computeLifecycleTaskPoints(request && request.priority || "Medium", assignment.shiftCount);
+  awardLifecyclePoints(workspace, assignment);
+  if (request) {
+    request.status = "Delivered";
+    request.updatedAt = assignment.completedAt;
+  }
+  workspace.audit.unshift(buildLifecycleVolunteerStatusLine(assignment, "Completed"));
+  workspace.audit.unshift(safeText(reason || ("Volunteer " + assignment.volunteer + " completed " + assignment.title + "."), 240));
+  workspace.activityLog = buildNextActivity(workspace.activityLog, "volunteer", buildLifecycleVolunteerStatusLine(assignment, "Completed"), actor);
+  workspace.systemNotice = buildLifecycleVolunteerStatusLine(assignment, "Completed");
+}
+
+function awardLifecyclePoints(workspace, assignment) {
+  if (assignment.pointsAwarded) {
+    return;
+  }
+  const volunteer = (workspace.volunteers || []).find(function (item) {
+    return normalizeLifecycleSearch(item.name) === normalizeLifecycleSearch(assignment.volunteer);
+  });
+  if (volunteer) {
+    volunteer.pointsEarned = Number(volunteer.pointsEarned || 0) + Number(assignment.points || 0);
+    volunteer.completedTasks = Number(volunteer.completedTasks || 0) + 1;
+    volunteer.lastStatus = "Completed";
+    volunteer.attendanceDays = Math.max(Number(volunteer.attendanceDays || 0), Number(volunteer.completedTasks || 0));
+  }
+  assignment.pointsAwarded = true;
+}
+
+function normalizeLifecycleRequestStatus(status) {
+  const normalized = safeText(status, 40).toLowerCase();
+  if (!normalized || normalized === "tracked" || normalized === "submitted" || normalized === "queued" || normalized === "requested") return "Pending";
+  if (normalized.indexOf("pending") !== -1) return "Pending";
+  if (normalized.indexOf("review") !== -1) return "Reviewed";
+  if (normalized.indexOf("assigned") !== -1) return "Assigned";
+  if (normalized.indexOf("progress") !== -1 || normalized.indexOf("active") !== -1) return "In Progress";
+  if (normalized.indexOf("deliver") !== -1 || normalized.indexOf("complete") !== -1) return "Delivered";
+  if (normalized.indexOf("closed") !== -1 || normalized.indexOf("archive") !== -1) return "Closed";
+  return "Pending";
+}
+
+function normalizeLifecycleAssignmentStatus(status) {
+  const normalized = safeText(status, 40).toLowerCase();
+  if (!normalized) return "Accepted";
+  if (normalized.indexOf("complete") !== -1 || normalized.indexOf("deliver") !== -1 || normalized.indexOf("closed") !== -1) return "Completed";
+  if (normalized.indexOf("progress") !== -1 || normalized.indexOf("active") !== -1) return "In Progress";
+  return "Accepted";
+}
+
+function isLifecycleAssignmentComplete(status) {
+  return normalizeLifecycleAssignmentStatus(status) === "Completed";
+}
+
+function isLifecycleAssignmentActive(status) {
+  const normalized = normalizeLifecycleAssignmentStatus(status);
+  return normalized === "Accepted" || normalized === "In Progress";
+}
+
+function normalizeLifecycleSkills(input) {
+  const values = Array.isArray(input) ? input : String(input || "").split(",");
+  return values.map(function (item) {
+    return safeText(item, 48).toLowerCase();
+  }).filter(Boolean).slice(0, 12);
+}
+
+function normalizeLifecycleAvailability(value) {
+  const availability = safeText(value, 40).toLowerCase();
+  if (!availability) return "available";
+  if (availability.indexOf("inactive") !== -1) return "inactive";
+  if (availability.indexOf("weekend") !== -1) return "weekend";
+  if (availability.indexOf("evening") !== -1) return "evening";
+  if (availability.indexOf("half") !== -1) return "half day";
+  if (availability.indexOf("full") !== -1) return "full day";
+  if (availability.indexOf("active") !== -1) return "active";
+  if (availability.indexOf("call") !== -1) return "on call";
+  return "available";
+}
+
+function isLifecycleVolunteerAvailable(volunteer) {
+  return /available|active|on call|full day|half day|evening|weekend/.test(normalizeLifecycleAvailability(volunteer && (volunteer.availability || volunteer.activityStatus)));
+}
+
+function inferLifecycleComplexity(priority) {
+  const normalized = safeText(priority, 40).toLowerCase();
+  if (normalized.indexOf("critical") !== -1 || normalized.indexOf("high") !== -1) return "High";
+  if (normalized.indexOf("medium") !== -1) return "Medium";
+  return "Low";
+}
+
+function estimateLifecycleDuration(priority, source) {
+  const complexity = inferLifecycleComplexity(priority);
+  const normalizedSource = safeText(source, 40).toLowerCase();
+  if (complexity === "High") return normalizedSource === "live" ? 16 : 12;
+  if (complexity === "Medium") return normalizedSource === "live" ? 20 : 15;
+  return normalizedSource === "live" ? 24 : 18;
+}
+
+function computeLifecycleTaskPoints(priority, shiftCount) {
+  const complexity = inferLifecycleComplexity(priority);
+  const base = complexity === "High" ? 32 : complexity === "Medium" ? 22 : 14;
+  return Math.max(8, base - Math.min(8, Number(shiftCount || 0) * 2));
+}
+
+function lifecycleRequestPriorityRank(request) {
+  const source = safeText(request && request.source, 40).toLowerCase();
+  const base = source === "live" ? 180 : source === "disaster-demo" ? 240 : 90;
+  return base + Math.round(priorityScoreServer(request && request.priority) * 100) + Math.min(40, Number(request && request.beneficiaries || 0) / 10);
+}
+
+function sortLifecycleRequests(items) {
+  return (Array.isArray(items) ? items.slice() : []).sort(function (left, right) {
+    return lifecycleRequestPriorityRank(right) - lifecycleRequestPriorityRank(left)
+      || Date.parse(right.createdAt || right.requestedAt || 0) - Date.parse(left.createdAt || left.requestedAt || 0)
+      || priorityScoreServer(right.priority) - priorityScoreServer(left.priority);
+  });
+}
+
+function sortLifecycleAssignments(items) {
+  return (Array.isArray(items) ? items.slice() : []).sort(function (left, right) {
+    const leftActive = isLifecycleAssignmentActive(left.status) ? 1 : 0;
+    const rightActive = isLifecycleAssignmentActive(right.status) ? 1 : 0;
+    return rightActive - leftActive
+      || Date.parse(right.updatedAt || right.startedAt || right.acceptedAt || 0) - Date.parse(left.updatedAt || left.startedAt || left.acceptedAt || 0)
+      || Number(right.points || 0) - Number(left.points || 0);
+  });
+}
+
+function sortLifecycleDonations(items) {
+  return (Array.isArray(items) ? items.slice() : []).sort(function (left, right) {
+    return Date.parse(right.createdAt || right.updatedAt || 0) - Date.parse(left.createdAt || left.updatedAt || 0);
+  });
+}
+
+function priorityScoreServer(priority) {
+  const normalized = safeText(priority, 40).toLowerCase();
+  if (normalized.indexOf("critical") !== -1) return 1;
+  if (normalized.indexOf("high") !== -1) return 0.85;
+  if (normalized.indexOf("medium") !== -1) return 0.55;
+  return 0.25;
+}
+
+function elapsedLifecycleMinutes(value) {
+  const parsed = Date.parse(safeText(value, 80));
+  if (!parsed) {
+    return 0;
+  }
+  return (Date.now() - parsed) / 60000;
+}
+
+function normalizeLifecycleSearch(value) {
+  return safeText(value, 240).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function computeLifecycleReliability(volunteer, assignments) {
+  const related = (assignments || []).filter(function (item) {
+    return normalizeLifecycleSearch(item.volunteer) === normalizeLifecycleSearch(volunteer && volunteer.name);
+  });
+  if (!related.length) {
+    return Number(volunteer && volunteer.reliability || 72) || 72;
+  }
+  const delivered = related.filter(function (item) {
+    return normalizeLifecycleAssignmentStatus(item.status) === "Completed";
+  }).length;
+  return Math.max(68, Math.min(98, 70 + delivered * 9 + Math.max(0, related.length - delivered) * 3));
+}
+
+function buildLifecycleVolunteerStatusLine(assignment, status) {
+  return "Volunteer " + safeText(assignment && assignment.volunteer || "Assigned volunteer", 140) + " is currently " + safeText(status || assignment && assignment.status || "Accepted", 60) + " on " + safeText(assignment && assignment.title || "the active task", 180) + ".";
+}
+
+function buildLifecycleShiftLine(assignment, nextVolunteer, request) {
+  return "AI shifted " + safeText(assignment && assignment.title, 180) + " to " + safeText(nextVolunteer && nextVolunteer.name, 140) + " because " + safeText(request && request.title, 180) + " crossed 50% of its estimated duration without completion.";
+}
+
+function randomizeDemoRequests(scenario, cycleId) {
+  const districts = scenario === "cyclone" ? ["Nagapattinam", "Cuddalore"] : scenario === "medical" ? ["Chennai", "Kolkata"] : ["Chennai", "Nagapattinam"];
+  const categories = scenario === "cyclone"
+    ? ["Shelter", "Community Alert", "Medical"]
+    : scenario === "medical"
+      ? ["Medical", "Food", "Transport"]
+      : ["Food", "Shelter", "Medical"];
+  const titles = scenario === "cyclone"
+    ? ["Pre-position shelter kits", "Move shelter mattresses", "Harbor warning support"]
+    : scenario === "medical"
+      ? ["Triage desk support", "Medicine staging support", "Transport patient supplies"]
+      : ["Emergency food kits", "Harbor warning outreach", "Medicine staging support"];
+  return titles.map(function (title, index) {
+    const district = districts[index % districts.length];
+    const priority = index === 0 ? "High" : index === 1 ? "Medium" : "Critical";
+    const createdAt = new Date(Date.now() - (index + 1) * 4 * 60000).toISOString();
+    return {
+      id: "REQ-" + safeText(scenario, 24) + "-" + (index + 1) + "-" + cycleId.slice(-4),
+      title: title,
+      category: categories[index % categories.length],
+      district: district,
+      location: district + " response point",
+      beneficiaries: 80 + (index * 40),
+      priority: priority,
+      status: "Pending",
+      summary: title + " auto-generated for the new demo cycle.",
+      source: "disaster-demo",
+      origin: "demo",
+      priorityLane: "disaster-demo",
+      requester: "Disaster Demo",
+      complexity: inferLifecycleComplexity(priority),
+      estimatedDurationMinutes: estimateLifecycleDuration(priority, "disaster-demo"),
+      createdAt: createdAt,
+      requestedAt: createdAt,
+      updatedAt: createdAt,
+      broadcastTo: ["admin", "government"]
+    };
+  });
+}
+
+function randomizeDemoDonations(scenario, cycleId) {
+  const donors = ["Harbor Traders Forum", "Relief Supplies Hub", "CareLink Trust"];
+  return donors.map(function (donor, index) {
+    const createdAt = new Date(Date.now() - (index + 1) * 6 * 60000).toISOString();
+    return {
+      id: "DON-" + safeText(scenario, 24) + "-" + (index + 1) + "-" + cycleId.slice(-4),
+      donor: donor,
+      kind: index === 0 ? "money" : "item",
+      status: "Submitted",
+      createdAt: createdAt,
+      updatedAt: createdAt,
+      origin: "demo"
+    };
+  });
 }
 
 function buildWorkspacePrompt(workspace, requestedPrompt) {

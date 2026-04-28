@@ -10,6 +10,8 @@
   const ADMIN_ROLES = ["admin", "coordinator"];
   const VOLUNTEER_ACTIVITY_OPTIONS = ["available", "on call", "active", "inactive"];
   const DONATION_STATUS_OPTIONS = ["submitted", "verified", "packed", "dispatched", "delivered"];
+  const SHARED_DONATION_DRAFT_MONEY_KEY = "resourceflow-shared-donation-money-draft-v1";
+  const SHARED_DONATION_DRAFT_ITEM_KEY = "resourceflow-shared-donation-item-draft-v1";
 
   const state = {
     auth: null,
@@ -20,7 +22,9 @@
     donations: [],
     unsubscribeVolunteers: null,
     unsubscribeOwnDonations: null,
-    unsubscribeAdminDonations: null
+    unsubscribeAdminDonations: null,
+    refreshTimerId: null,
+    visibilityBound: false
   };
 
   const refs = {};
@@ -68,6 +72,165 @@
     );
   }
 
+  function getUsageGuard() {
+    return window.ResourceFlowUsageGuard || null;
+  }
+
+  function getGuardConfig() {
+    const config = getUsageGuard();
+    return config && config.config ? config.config : {
+      cacheTtlsMs: {},
+      queryLimits: {},
+      refreshIntervalMs: 300000
+    };
+  }
+
+  function getCacheTtl(name, fallbackMs) {
+    const config = getGuardConfig();
+    const value = config.cacheTtlsMs && config.cacheTtlsMs[name];
+    return Number.isFinite(value) && value > 0 ? value : fallbackMs;
+  }
+
+  function getQueryLimit(name, fallbackCount) {
+    const config = getGuardConfig();
+    const value = config.queryLimits && config.queryLimits[name];
+    return Number.isFinite(value) && value > 0 ? value : fallbackCount;
+  }
+
+  function previewGuard(metric, amount) {
+    const guard = getUsageGuard();
+    return guard && typeof guard.preview === "function"
+      ? guard.preview(metric, amount)
+      : { allowed: true, state: "ok", message: "", remaining: Infinity };
+  }
+
+  function recordGuard(metric, amount) {
+    const guard = getUsageGuard();
+    return guard && typeof guard.record === "function"
+      ? guard.record(metric, amount)
+      : { allowed: true, state: "ok", message: "", remaining: Infinity };
+  }
+
+  function readSharedCache(key, ttlMs) {
+    const guard = getUsageGuard();
+    return guard && typeof guard.readCache === "function"
+      ? guard.readCache(key, ttlMs)
+      : null;
+  }
+
+  function writeSharedCache(key, value) {
+    const guard = getUsageGuard();
+    if (guard && typeof guard.writeCache === "function") {
+      guard.writeCache(key, value);
+    }
+    return value;
+  }
+
+  function clearSharedCache(key) {
+    const guard = getUsageGuard();
+    if (guard && typeof guard.clearCache === "function") {
+      guard.clearCache(key);
+    }
+  }
+
+  function clearSharedCacheByPrefix(prefix) {
+    const guard = getUsageGuard();
+    if (guard && typeof guard.clearByPrefix === "function") {
+      guard.clearByPrefix(prefix);
+    }
+  }
+
+  function loadSharedDraft(key) {
+    try {
+      const raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function saveSharedDraft(key, payload) {
+    try {
+      localStorage.setItem(key, JSON.stringify(payload || {}));
+    } catch (error) {
+      // Ignore draft persistence failures.
+    }
+  }
+
+  function clearSharedDraft(key) {
+    try {
+      localStorage.removeItem(key);
+    } catch (error) {
+      // Ignore draft clear failures.
+    }
+  }
+
+  function sharedSlug(value) {
+    return safeText(value, 160)
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 72) || "item";
+  }
+
+  function recordAnchorId(prefix, value) {
+    return "rf-" + sharedSlug(prefix) + "-" + sharedSlug(value);
+  }
+
+  function syncSharedHashTarget() {
+    const rawHash = safeText(window.location.hash || "", 180).replace(/^#/, "");
+    if (!rawHash) {
+      return;
+    }
+    const targetId = decodeURIComponent(rawHash);
+    const target = document.getElementById(targetId);
+    if (!target) {
+      return;
+    }
+    window.setTimeout(function () {
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+      target.classList.add("is-search-hit");
+      window.setTimeout(function () {
+        target.classList.remove("is-search-hit");
+      }, 2200);
+    }, 80);
+  }
+
+  function applyUsageWarning(message) {
+    if (!message) {
+      return;
+    }
+    if (refs.moneyDonationForm || refs.itemDonationForm || refs.donationPortalStatus) {
+      setDonationMessage(message, "error");
+    }
+    if (refs.sharedVolunteerForm || refs.sharedVolunteerDirectoryList || refs.sharedVolunteerStatus) {
+      setVolunteerMessage(message, "error");
+    }
+    if (refs.adminSharedSummary || refs.adminVolunteerRecords || refs.adminDonationRecords || refs.sharedAdminStatus) {
+      setAdminMessage(message, "error");
+    }
+  }
+
+  function ensureReadBudget(estimatedReads, fallbackMessage) {
+    const result = previewGuard("reads", estimatedReads);
+    if (!result.allowed) {
+      applyUsageWarning(result.message || fallbackMessage || "ResourceFlow is pausing live refreshes to protect Firebase no-cost usage.");
+      return false;
+    }
+    if (result.state === "warning" && result.message) {
+      applyUsageWarning(result.message);
+    }
+    return true;
+  }
+
+  function ensureWriteBudget(estimatedWrites, fallbackMessage) {
+    const result = previewGuard("writes", estimatedWrites);
+    if (!result.allowed) {
+      throw new Error(result.message || fallbackMessage || "ResourceFlow is temporarily pausing new updates to stay inside the Firebase no-cost tier.");
+    }
+    return result;
+  }
+
   async function bootstrapSharedPortal() {
     const config = getFirebaseConfig();
     if (!config.enabled) {
@@ -102,7 +265,7 @@
 
     if (refs.moneyDonationForm || refs.itemDonationForm) {
       if (state.user) {
-        watchOwnDonations();
+        await fetchOwnDonations({ force: false });
         setDonationMessage("Donation portal connected. Your submissions are stored in Firestore and visible in admin review.", "success");
       } else {
         renderDonationGuestState();
@@ -111,7 +274,7 @@
 
     if (refs.sharedVolunteerForm || refs.sharedVolunteerDirectoryList) {
       if (state.user) {
-        watchVolunteers();
+        await fetchVolunteers({ force: false });
         setVolunteerMessage("Shared volunteer directory connected. Every signed-in volunteer can see these profiles.", "success");
       } else {
         renderVolunteerGuestState();
@@ -120,16 +283,17 @@
 
     if (refs.adminSharedSummary || refs.adminVolunteerRecords || refs.adminDonationRecords) {
       if (state.user && isManager()) {
-        if (!state.unsubscribeVolunteers) {
-          watchVolunteers();
+        if (!state.volunteers.length) {
+          await fetchVolunteers({ force: false });
         }
-        watchAdminDonations();
+        await fetchAdminDonations({ force: false });
         setAdminMessage("Admin dashboard connected to shared Firestore collections.", "success");
       } else {
         renderAdminLockedState();
       }
     }
 
+    startManagedRefreshLoop();
     syncVolunteerTopStats();
   }
 
@@ -137,9 +301,22 @@
     if (!state.db || !uid) {
       return null;
     }
+    const cacheKey = "user-profile:" + uid;
+    const cached = readSharedCache(cacheKey, getCacheTtl("userProfile", 21600000));
+    if (cached) {
+      return cached;
+    }
+    if (!ensureReadBudget(1, "ResourceFlow is using cached access details to stay inside the Firebase no-cost limit.")) {
+      return null;
+    }
     try {
       const snapshot = await state.db.collection("resourceflowUsers").doc(uid).get();
-      return snapshot.exists && snapshot.data() ? snapshot.data() : null;
+      recordGuard("reads", 1);
+      const profile = snapshot.exists && snapshot.data() ? snapshot.data() : null;
+      if (profile) {
+        writeSharedCache(cacheKey, profile);
+      }
+      return profile;
     } catch (error) {
       console.warn("Could not load user profile.", error);
       return null;
@@ -159,16 +336,30 @@
 
   function prefillDonationForms() {
     const displayName = currentDisplayName();
-    [refs.moneyDonationForm, refs.itemDonationForm].forEach(function (form) {
-      if (!form) {
-        return;
+    const moneyDraft = loadSharedDraft(SHARED_DONATION_DRAFT_MONEY_KEY) || {};
+    const itemDraft = loadSharedDraft(SHARED_DONATION_DRAFT_ITEM_KEY) || {};
+    if (refs.moneyDonationForm) {
+      ["donorName", "amount", "paymentMethod", "message"].forEach(function (fieldName) {
+        if (refs.moneyDonationForm.elements[fieldName] && moneyDraft[fieldName] != null && !refs.moneyDonationForm.elements[fieldName].value) {
+          refs.moneyDonationForm.elements[fieldName].value = moneyDraft[fieldName];
+        }
+      });
+      if (refs.moneyDonationForm.elements.donorName && !safeText(refs.moneyDonationForm.elements.donorName.value, 120)) {
+        refs.moneyDonationForm.elements.donorName.value = displayName;
       }
-      if (form.elements.donorName && !safeText(form.elements.donorName.value, 120)) {
-        form.elements.donorName.value = displayName;
+    }
+    if (refs.itemDonationForm) {
+      ["donorName", "itemType", "quantity", "description", "contactDetails"].forEach(function (fieldName) {
+        if (refs.itemDonationForm.elements[fieldName] && itemDraft[fieldName] != null && !refs.itemDonationForm.elements[fieldName].value) {
+          refs.itemDonationForm.elements[fieldName].value = itemDraft[fieldName];
+        }
+      });
+      if (refs.itemDonationForm.elements.donorName && !safeText(refs.itemDonationForm.elements.donorName.value, 120)) {
+        refs.itemDonationForm.elements.donorName.value = displayName;
       }
-    });
-    if (refs.itemDonationForm && refs.itemDonationForm.elements.contactDetails && !safeText(refs.itemDonationForm.elements.contactDetails.value, 180)) {
-      refs.itemDonationForm.elements.contactDetails.value = currentContactEmail();
+      if (refs.itemDonationForm.elements.contactDetails && !safeText(refs.itemDonationForm.elements.contactDetails.value, 180)) {
+        refs.itemDonationForm.elements.contactDetails.value = currentContactEmail();
+      }
     }
   }
 
@@ -201,6 +392,35 @@
     bindSubmit(refs.moneyDonationForm, handleMoneyDonationSubmit);
     bindSubmit(refs.itemDonationForm, handleItemDonationSubmit);
     bindSubmit(refs.sharedVolunteerForm, handleVolunteerProfileSubmit);
+
+    if (refs.moneyDonationForm && refs.moneyDonationForm.dataset.draftBound !== "true") {
+      refs.moneyDonationForm.dataset.draftBound = "true";
+      ["input", "change"].forEach(function (eventName) {
+        refs.moneyDonationForm.addEventListener(eventName, function () {
+          saveSharedDraft(SHARED_DONATION_DRAFT_MONEY_KEY, {
+            donorName: safeText(refs.moneyDonationForm.elements.donorName && refs.moneyDonationForm.elements.donorName.value, 140),
+            amount: safeText(refs.moneyDonationForm.elements.amount && refs.moneyDonationForm.elements.amount.value, 40),
+            paymentMethod: safeText(refs.moneyDonationForm.elements.paymentMethod && refs.moneyDonationForm.elements.paymentMethod.value, 60),
+            message: safeText(refs.moneyDonationForm.elements.message && refs.moneyDonationForm.elements.message.value, 1200)
+          });
+        });
+      });
+    }
+
+    if (refs.itemDonationForm && refs.itemDonationForm.dataset.draftBound !== "true") {
+      refs.itemDonationForm.dataset.draftBound = "true";
+      ["input", "change"].forEach(function (eventName) {
+        refs.itemDonationForm.addEventListener(eventName, function () {
+          saveSharedDraft(SHARED_DONATION_DRAFT_ITEM_KEY, {
+            donorName: safeText(refs.itemDonationForm.elements.donorName && refs.itemDonationForm.elements.donorName.value, 140),
+            itemType: safeText(refs.itemDonationForm.elements.itemType && refs.itemDonationForm.elements.itemType.value, 80),
+            quantity: safeText(refs.itemDonationForm.elements.quantity && refs.itemDonationForm.elements.quantity.value, 40),
+            description: safeText(refs.itemDonationForm.elements.description && refs.itemDonationForm.elements.description.value, 1200),
+            contactDetails: safeText(refs.itemDonationForm.elements.contactDetails && refs.itemDonationForm.elements.contactDetails.value, 240)
+          });
+        });
+      });
+    }
 
     [
       refs.sharedVolunteerSearch,
@@ -280,48 +500,226 @@
     }
   }
 
-  function watchVolunteers() {
-    clearSubscription("unsubscribeVolunteers");
-    state.unsubscribeVolunteers = state.db.collection(VOLUNTEER_COLLECTION).orderBy("updatedAt", "desc").onSnapshot(function (snapshot) {
-      state.volunteers = snapshot.docs.map(function (doc) {
-        return sanitizeVolunteerProfile(doc.id, doc.data());
-      });
-      renderVolunteerDirectory();
-      renderAdminVolunteerRecords();
-      renderAdminSummary();
-      prefillVolunteerForm();
-      syncVolunteerTopStats();
-    }, function (error) {
-      console.warn("Volunteer directory feed failed.", error);
-      setVolunteerMessage("Volunteer directory could not load right now.", "error");
-      setAdminMessage("Volunteer directory feed failed to load.", "error");
-    });
+  function applyVolunteerData(nextVolunteers, options) {
+    state.volunteers = Array.isArray(nextVolunteers) ? nextVolunteers : [];
+    if (!options || options.writeCache !== false) {
+      writeSharedCache("volunteers", state.volunteers);
+    }
+    renderVolunteerDirectory();
+    renderAdminVolunteerRecords();
+    renderAdminSummary();
+    prefillVolunteerForm();
+    syncVolunteerTopStats();
   }
 
-  function watchOwnDonations() {
-    clearSubscription("unsubscribeOwnDonations");
-    state.unsubscribeOwnDonations = state.db.collection(DONATION_COLLECTION).where("ownerUid", "==", state.user.uid).onSnapshot(function (snapshot) {
-      state.donations = snapshot.docs.map(function (doc) {
-        return sanitizeDonationRecord(doc.id, doc.data());
-      }).sort(compareByNewest);
-      renderHomeDonationViews();
-    }, function (error) {
-      console.warn("Own donation feed failed.", error);
-      setDonationMessage("Your donation history could not be loaded right now.", "error");
-    });
-  }
-
-  function watchAdminDonations() {
-    clearSubscription("unsubscribeAdminDonations");
-    state.unsubscribeAdminDonations = state.db.collection(DONATION_COLLECTION).orderBy("createdAt", "desc").limit(100).onSnapshot(function (snapshot) {
-      state.donations = snapshot.docs.map(function (doc) {
-        return sanitizeDonationRecord(doc.id, doc.data());
-      });
+  function applyDonationData(nextDonations, audience, options) {
+    state.donations = Array.isArray(nextDonations) ? nextDonations : [];
+    const cacheKey = audience === "admin" ? "donations:admin" : "donations:user:" + safeText(state.user && state.user.uid ? state.user.uid : "", 120);
+    if (!options || options.writeCache !== false) {
+      writeSharedCache(cacheKey, state.donations);
+    }
+    if (audience === "admin") {
       renderAdminDonationRecords();
       renderAdminSummary();
-    }, function (error) {
-      console.warn("Admin donation feed failed.", error);
+      return;
+    }
+    renderHomeDonationViews();
+  }
+
+  async function fetchVolunteers(options) {
+    if (!state.db || !state.user) {
+      return [];
+    }
+    const force = Boolean(options && options.force);
+    const cacheKey = "volunteers";
+    const ttl = getCacheTtl("volunteers", 300000);
+    const cached = force ? null : readSharedCache(cacheKey, ttl);
+    if (Array.isArray(cached)) {
+      applyVolunteerData(cached, { writeCache: false });
+      return cached;
+    }
+    const limitCount = getQueryLimit("volunteers", 40);
+    const readBudget = previewGuard("reads", limitCount);
+    if (!readBudget.allowed) {
+      if (Array.isArray(cached)) {
+        applyVolunteerData(cached, { writeCache: false });
+      }
+      if (readBudget.message) {
+        setVolunteerMessage(readBudget.message, "error");
+        setAdminMessage(readBudget.message, "error");
+      }
+      return state.volunteers;
+    }
+    if (readBudget.state === "warning" && readBudget.message) {
+      setVolunteerMessage(readBudget.message, "error");
+      setAdminMessage(readBudget.message, "error");
+    }
+    try {
+      const snapshot = await state.db.collection(VOLUNTEER_COLLECTION).orderBy("updatedAt", "desc").limit(limitCount).get();
+      recordGuard("reads", snapshot.size || limitCount);
+      const volunteers = snapshot.docs.map(function (doc) {
+        return sanitizeVolunteerProfile(doc.id, doc.data());
+      });
+      applyVolunteerData(volunteers);
+      if (readBudget.state === "warning" && readBudget.message) {
+        setVolunteerMessage(readBudget.message, "error");
+        setAdminMessage(readBudget.message, "error");
+      }
+      return volunteers;
+    } catch (error) {
+      console.warn("Volunteer directory fetch failed.", error);
+      setVolunteerMessage("Volunteer directory could not load right now.", "error");
+      setAdminMessage("Volunteer directory could not load right now.", "error");
+      if (Array.isArray(cached)) {
+        applyVolunteerData(cached, { writeCache: false });
+      }
+      return state.volunteers;
+    }
+  }
+
+  async function fetchOwnDonations(options) {
+    if (!state.db || !state.user) {
+      return [];
+    }
+    const force = Boolean(options && options.force);
+    const cacheKey = "donations:user:" + safeText(state.user.uid, 120);
+    const ttl = getCacheTtl("ownDonations", 180000);
+    const cached = force ? null : readSharedCache(cacheKey, ttl);
+    if (Array.isArray(cached)) {
+      applyDonationData(cached, "user", { writeCache: false });
+      return cached;
+    }
+    const limitCount = getQueryLimit("ownDonations", 20);
+    const readBudget = previewGuard("reads", limitCount);
+    if (!readBudget.allowed) {
+      if (Array.isArray(cached)) {
+        applyDonationData(cached, "user", { writeCache: false });
+      }
+      if (readBudget.message) {
+        setDonationMessage(readBudget.message, "error");
+      }
+      return state.donations;
+    }
+    if (readBudget.state === "warning" && readBudget.message) {
+      setDonationMessage(readBudget.message, "error");
+    }
+    try {
+      const snapshot = await state.db.collection(DONATION_COLLECTION).where("ownerUid", "==", state.user.uid).limit(limitCount).get();
+      recordGuard("reads", snapshot.size || limitCount);
+      const donations = snapshot.docs.map(function (doc) {
+        return sanitizeDonationRecord(doc.id, doc.data());
+      }).sort(compareByNewest);
+      applyDonationData(donations, "user");
+      if (readBudget.state === "warning" && readBudget.message) {
+        setDonationMessage(readBudget.message, "error");
+      }
+      return donations;
+    } catch (error) {
+      console.warn("Own donation fetch failed.", error);
+      setDonationMessage("Your donation history could not be loaded right now.", "error");
+      if (Array.isArray(cached)) {
+        applyDonationData(cached, "user", { writeCache: false });
+      }
+      return state.donations;
+    }
+  }
+
+  async function fetchAdminDonations(options) {
+    if (!state.db || !state.user || !isManager()) {
+      return [];
+    }
+    const force = Boolean(options && options.force);
+    const cacheKey = "donations:admin";
+    const ttl = getCacheTtl("adminDonations", 180000);
+    const cached = force ? null : readSharedCache(cacheKey, ttl);
+    if (Array.isArray(cached)) {
+      applyDonationData(cached, "admin", { writeCache: false });
+      return cached;
+    }
+    const limitCount = getQueryLimit("adminDonations", 40);
+    const readBudget = previewGuard("reads", limitCount);
+    if (!readBudget.allowed) {
+      if (Array.isArray(cached)) {
+        applyDonationData(cached, "admin", { writeCache: false });
+      }
+      if (readBudget.message) {
+        setAdminMessage(readBudget.message, "error");
+      }
+      return state.donations;
+    }
+    if (readBudget.state === "warning" && readBudget.message) {
+      setAdminMessage(readBudget.message, "error");
+    }
+    try {
+      const snapshot = await state.db.collection(DONATION_COLLECTION).orderBy("createdAt", "desc").limit(limitCount).get();
+      recordGuard("reads", snapshot.size || limitCount);
+      const donations = snapshot.docs.map(function (doc) {
+        return sanitizeDonationRecord(doc.id, doc.data());
+      });
+      applyDonationData(donations, "admin");
+      if (readBudget.state === "warning" && readBudget.message) {
+        setAdminMessage(readBudget.message, "error");
+      }
+      return donations;
+    } catch (error) {
+      console.warn("Admin donation fetch failed.", error);
       setAdminMessage("Donation record feed failed to load.", "error");
+      if (Array.isArray(cached)) {
+        applyDonationData(cached, "admin", { writeCache: false });
+      }
+      return state.donations;
+    }
+  }
+
+  async function refreshSharedData(options) {
+    if (!state.user) {
+      return;
+    }
+    const force = Boolean(options && options.force);
+    if (refs.sharedVolunteerForm || refs.sharedVolunteerDirectoryList || refs.adminVolunteerRecords || refs.adminSharedSummary) {
+      await fetchVolunteers({ force: force });
+    }
+    if (refs.moneyDonationForm || refs.itemDonationForm) {
+      await fetchOwnDonations({ force: force });
+    }
+    if (refs.adminSharedSummary || refs.adminDonationRecords) {
+      await fetchAdminDonations({ force: force });
+    }
+  }
+
+  function startManagedRefreshLoop() {
+    stopManagedRefreshLoop();
+    if (!state.user) {
+      return;
+    }
+    const refreshIntervalMs = getGuardConfig().refreshIntervalMs || 300000;
+    if (!state.visibilityBound) {
+      document.addEventListener("visibilitychange", handleVisibilityRefresh);
+      state.visibilityBound = true;
+    }
+    state.refreshTimerId = window.setInterval(function () {
+      if (document.hidden) {
+        return;
+      }
+      refreshSharedData({ force: true }).catch(function (error) {
+        console.warn("Managed shared refresh failed.", error);
+      });
+    }, refreshIntervalMs);
+  }
+
+  function stopManagedRefreshLoop() {
+    if (state.refreshTimerId) {
+      window.clearInterval(state.refreshTimerId);
+      state.refreshTimerId = null;
+    }
+  }
+
+  function handleVisibilityRefresh() {
+    if (document.hidden || !state.user) {
+      return;
+    }
+    refreshSharedData({ force: false }).catch(function (error) {
+      console.warn("Visibility refresh failed.", error);
     });
   }
 
@@ -337,9 +735,15 @@
     if (!record.donorName || record.amount <= 0 || !record.paymentMethod) {
       throw new Error("Please complete donor name, amount, and payment method.");
     }
+    ensureWriteBudget(1, "New donation saves are paused to keep ResourceFlow inside the Firebase no-cost tier.");
     await state.db.collection(DONATION_COLLECTION).add(record);
+    recordGuard("writes", 1);
+    clearSharedCache("donations:user:" + safeText(state.user.uid, 120));
+    clearSharedCache("donations:admin");
+    clearSharedDraft(SHARED_DONATION_DRAFT_MONEY_KEY);
     refs.moneyDonationForm.reset();
     prefillDonationForms();
+    await fetchOwnDonations({ force: true });
     setDonationMessage("Money donation saved to the shared ResourceFlow backend.", "success");
   }
 
@@ -356,9 +760,15 @@
     if (!record.donorName || !record.itemType || record.quantity <= 0 || !record.description || !record.contactDetails) {
       throw new Error("Please complete all item donation fields before saving.");
     }
+    ensureWriteBudget(1, "New donation saves are paused to keep ResourceFlow inside the Firebase no-cost tier.");
     await state.db.collection(DONATION_COLLECTION).add(record);
+    recordGuard("writes", 1);
+    clearSharedCache("donations:user:" + safeText(state.user.uid, 120));
+    clearSharedCache("donations:admin");
+    clearSharedDraft(SHARED_DONATION_DRAFT_ITEM_KEY);
     refs.itemDonationForm.reset();
     prefillDonationForms();
+    await fetchOwnDonations({ force: true });
     setDonationMessage("Item donation saved to the shared ResourceFlow backend.", "success");
   }
 
@@ -382,7 +792,12 @@
     if (!record.fullName || !record.ngoGroup || !record.skills.length || !record.phone || !record.email || !record.availability) {
       throw new Error("Please complete all required volunteer profile fields.");
     }
+    ensureWriteBudget(1, "Volunteer profile saves are paused to keep ResourceFlow inside the Firebase no-cost tier.");
     await state.db.collection(VOLUNTEER_COLLECTION).doc(state.user.uid).set(record, { merge: true });
+    recordGuard("writes", 1);
+    clearSharedCache("volunteers");
+    clearSharedCache("user-profile:" + safeText(state.user.uid, 120));
+    await fetchVolunteers({ force: true });
     setVolunteerMessage("Shared volunteer profile saved. Other signed-in volunteers can now see it.", "success");
   }
 
@@ -392,11 +807,15 @@
     if (!select) {
       return;
     }
+    ensureWriteBudget(1, "Volunteer status updates are paused to protect the Firebase no-cost tier.");
     await state.db.collection(VOLUNTEER_COLLECTION).doc(recordId).set({
       activityStatus: normalizeActivityStatus(select.value),
       updatedAt: new Date().toISOString(),
       updatedBy: currentActor()
     }, { merge: true });
+    recordGuard("writes", 1);
+    clearSharedCache("volunteers");
+    await fetchVolunteers({ force: true });
     setAdminMessage("Volunteer activity status updated.", "success");
   }
 
@@ -406,11 +825,16 @@
     if (!select) {
       return;
     }
+    ensureWriteBudget(1, "Donation workflow updates are paused to protect the Firebase no-cost tier.");
     await state.db.collection(DONATION_COLLECTION).doc(recordId).set({
       status: normalizeDonationStatus(select.value),
       updatedAt: new Date().toISOString(),
       updatedBy: currentActor()
     }, { merge: true });
+    recordGuard("writes", 1);
+    clearSharedCacheByPrefix("donations:user:");
+    clearSharedCache("donations:admin");
+    await fetchAdminDonations({ force: true });
     setAdminMessage("Donation workflow status updated.", "success");
   }
 
@@ -422,11 +846,15 @@
     if (!profile) {
       return;
     }
+    ensureWriteBudget(1, "Volunteer verification updates are paused to protect the Firebase no-cost tier.");
     await state.db.collection(VOLUNTEER_COLLECTION).doc(recordId).set({
       verified: !profile.verified,
       updatedAt: new Date().toISOString(),
       updatedBy: currentActor()
     }, { merge: true });
+    recordGuard("writes", 1);
+    clearSharedCache("volunteers");
+    await fetchVolunteers({ force: true });
     setAdminMessage(profile.verified ? "Volunteer verification removed." : "Volunteer verified successfully.", "success");
   }
 
@@ -438,11 +866,15 @@
     if (!profile) {
       return;
     }
+    ensureWriteBudget(1, "Volunteer visibility updates are paused to protect the Firebase no-cost tier.");
     await state.db.collection(VOLUNTEER_COLLECTION).doc(recordId).set({
       visible: profile.visible === false ? true : false,
       updatedAt: new Date().toISOString(),
       updatedBy: currentActor()
     }, { merge: true });
+    recordGuard("writes", 1);
+    clearSharedCache("volunteers");
+    await fetchVolunteers({ force: true });
     setAdminMessage(profile.visible === false ? "Volunteer restored to the shared directory." : "Volunteer hidden from the shared directory.", "success");
   }
 
@@ -454,12 +886,17 @@
     if (!record) {
       return;
     }
+    ensureWriteBudget(1, "Donation verification updates are paused to protect the Firebase no-cost tier.");
     await state.db.collection(DONATION_COLLECTION).doc(recordId).set({
       verified: !record.verified,
       status: !record.verified && record.status === "submitted" ? "verified" : record.status,
       updatedAt: new Date().toISOString(),
       updatedBy: currentActor()
     }, { merge: true });
+    recordGuard("writes", 1);
+    clearSharedCacheByPrefix("donations:user:");
+    clearSharedCache("donations:admin");
+    await fetchAdminDonations({ force: true });
     setAdminMessage(record.verified ? "Donation verification removed." : "Donation verified successfully.", "success");
   }
 
@@ -471,11 +908,16 @@
     if (!record) {
       return;
     }
+    ensureWriteBudget(1, "Donation archive updates are paused to protect the Firebase no-cost tier.");
     await state.db.collection(DONATION_COLLECTION).doc(recordId).set({
       archived: record.archived === true ? false : true,
       updatedAt: new Date().toISOString(),
       updatedBy: currentActor()
     }, { merge: true });
+    recordGuard("writes", 1);
+    clearSharedCacheByPrefix("donations:user:");
+    clearSharedCache("donations:admin");
+    await fetchAdminDonations({ force: true });
     setAdminMessage(record.archived ? "Donation record restored." : "Donation record archived from the active queue.", "success");
   }
 
@@ -527,6 +969,7 @@
     refs.donationHistoryList.innerHTML = state.donations.map(function (item) {
       return renderDonationCard(item, false);
     }).join("");
+    syncSharedHashTarget();
   }
 
   function renderVolunteerDirectory() {
@@ -556,6 +999,7 @@
           return renderVolunteerCard(item, false);
         }).join("");
       }
+      syncSharedHashTarget();
     }
 
     setVolunteerMessage("Showing " + filtered.length + " of " + state.volunteers.length + " shared volunteer profile(s).", "success");
@@ -607,6 +1051,7 @@
     refs.adminVolunteerRecords.innerHTML = state.volunteers.map(function (item) {
       return renderVolunteerCard(item, true);
     }).join("");
+    syncSharedHashTarget();
   }
 
   function renderAdminDonationRecords() {
@@ -624,6 +1069,7 @@
     refs.adminDonationRecords.innerHTML = state.donations.map(function (item) {
       return renderDonationCard(item, true);
     }).join("");
+    syncSharedHashTarget();
   }
 
   function renderAdminStatusBoards() {
@@ -746,7 +1192,7 @@
     ].join("") : "";
 
     return [
-      '<div class="stack-card shared-record-card">',
+      '<div id="' + escapeHtml(recordAnchorId("volunteer", item.id || item.fullName)) + '" class="stack-card shared-record-card">',
       '<div class="shared-card-head">',
       "<strong>" + escapeHtml(item.fullName) + "</strong>",
       renderRecordStatusPill(item.activityStatus, "volunteer"),
@@ -802,7 +1248,7 @@
     ].join("") : "";
 
     return [
-      '<div class="stack-card shared-record-card">',
+      '<div id="' + escapeHtml(recordAnchorId("donation", item.id || item.donorName || item.donor)) + '" class="stack-card shared-record-card">',
       '<div class="shared-card-head">',
       "<strong>" + escapeHtml(item.donorName) + "</strong>",
       renderRecordStatusPill(item.status, "donation"),
@@ -996,6 +1442,7 @@
   }
 
   function clearRealtimeSubscriptions() {
+    stopManagedRefreshLoop();
     clearSubscription("unsubscribeVolunteers");
     clearSubscription("unsubscribeOwnDonations");
     clearSubscription("unsubscribeAdminDonations");

@@ -698,19 +698,80 @@
     return nextProfile;
   }
 
+  function getUsageGuard() {
+    return window.ResourceFlowUsageGuard || null;
+  }
+
+  function cacheEntryProfile(uid, profile) {
+    const guard = getUsageGuard();
+    if (!guard || !uid || !profile || typeof guard.writeCache !== "function") {
+      return;
+    }
+    guard.writeCache("entry-profile:" + uid, profile);
+  }
+
+  function readCachedEntryProfile(uid) {
+    const guard = getUsageGuard();
+    if (!guard || !uid || typeof guard.readCache !== "function") {
+      return null;
+    }
+    return guard.readCache("entry-profile:" + uid, 21600000);
+  }
+
+  function canWriteProfile(nextProfile) {
+    const guard = getUsageGuard();
+    if (!guard || typeof guard.preview !== "function") {
+      return true;
+    }
+    const result = guard.preview("writes", 1);
+    if (!result.allowed) {
+      setStatus(result.message || "Profile sync is paused to keep ResourceFlow inside the Firebase no-cost tier.", "error");
+      return false;
+    }
+    if (result.state === "warning" && result.message) {
+      setStatus(result.message, "info");
+    }
+    return true;
+  }
+
+  function markProfileWrite() {
+    const guard = getUsageGuard();
+    if (guard && typeof guard.record === "function") {
+      guard.record("writes", 1);
+    }
+  }
+
+  function areProfilesEquivalent(left, right) {
+    if (!left || !right) {
+      return false;
+    }
+    const keys = ["uid", "email", "displayName", "photoURL", "location", "role", "requestedRole"];
+    return keys.every(function (key) {
+      return safeValue(left[key]) === safeValue(right[key]);
+    });
+  }
+
   async function ensureUserProfile(user, overrides) {
     if (!user) {
       return null;
     }
     const nextProfile = buildEntryProfile(user, overrides);
+    const cachedProfile = readCachedEntryProfile(user.uid);
 
     persistEntryProfile(nextProfile);
+    cacheEntryProfile(user.uid, nextProfile);
+
+    if (areProfilesEquivalent(nextProfile, cachedProfile)) {
+      return nextProfile;
+    }
 
     try {
       await ensureFirestoreReady();
-      if (state.db) {
+      if (state.db && canWriteProfile(nextProfile)) {
         const profileRef = state.db.collection("resourceflowUsers").doc(user.uid);
         await profileRef.set(nextProfile, { merge: true });
+        markProfileWrite();
+        cacheEntryProfile(user.uid, nextProfile);
       }
     } catch (error) {
       console.warn("Entry profile sync fallback to local profile.", error);

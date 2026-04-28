@@ -10,6 +10,9 @@
   const CACHE_RESET_KEY = "resourceflow-portal-cache-reset-v1";
   const AI_CHAT_HISTORY_KEY = "resourceflow-ai-chat-v1";
   const DISMISSED_ALERTS_KEY = "resourceflow-dismissed-alerts-v1";
+  const COMMUNITY_DRAFT_KEY = "resourceflow-community-draft-v1";
+  const DONATION_DRAFT_KEY = "resourceflow-donation-draft-v1";
+  const RECENT_SEARCHES_KEY = "resourceflow-recent-searches-v1";
   const FIREBASE_SDK_VERSION = "10.12.5";
   const LANGUAGE_OPTIONS = [
     { value: "en", label: "English" },
@@ -104,8 +107,10 @@
   };
   const SEARCH_RUNTIME = {
     query: "",
-    searched: false
+    searched: false,
+    focused: false
   };
+  const LAUNCHER_NAV_ORDER = ["insights", "volunteer", "donations", "operations", "admin"];
 
   const PAGE_TITLES = {
     community: "Community Portal",
@@ -289,8 +294,8 @@
   const ASSIGNMENT_STAGES = ["Accepted", "In Progress", "Completed"];
   const DEMO_REFRESH_MS = 10 * 60 * 1000;
   const AUTOMATION_TICK_MS = 20 * 1000;
-  const LIVE_PRIORITY_RANK = 200;
-  const DISASTER_PRIORITY_RANK = 160;
+  const LIVE_PRIORITY_RANK = 180;
+  const DISASTER_PRIORITY_RANK = 240;
   const STANDARD_PRIORITY_RANK = 90;
   const DEMO_VOLUNTEER_NAMES = ["Arjun Das", "Meera Joseph", "Kavin Raj", "Nila Bose", "Farhan Ali", "Sowmya Devi", "Pranav Sen", "Ishita Paul"];
   const DEMO_DONOR_NAMES = ["Harbor Traders Forum", "Relief Supplies Hub", "CareLink Trust", "Rapid Aid Circle", "District Women Collective", "Health Basket Network"];
@@ -304,6 +309,13 @@
   const WORKSPACE_AUTOMATION_RUNTIME = {
     intervalId: 0,
     storageBound: false
+  };
+  const WORKSPACE_SYNC_RUNTIME = {
+    timerId: 0,
+    inflight: false,
+    pendingSerialized: "",
+    lastSyncedSerialized: "",
+    reason: ""
   };
 
   function init() {
@@ -327,6 +339,9 @@
         if (event.key === THEME_KEY) {
           applyTheme(loadTheme());
         }
+        renderApp(root);
+      });
+      window.addEventListener("resourceflow:workspace-synced", function () {
         renderApp(root);
       });
       WORKSPACE_AUTOMATION_RUNTIME.storageBound = true;
@@ -415,7 +430,7 @@
       window.location.replace("./index.html");
       return;
     }
-    const workspace = getWorkspace();
+    const workspace = getManagedWorkspace({ reason: "render" });
     const allowed = isPageAllowed(session.role, page);
     let pageMarkup = "";
     let headerMarkup = "";
@@ -484,6 +499,7 @@
     document.body.classList.remove("rf-sidebar-open");
     document.body.classList.toggle("rf-ai-open", !!AI_RUNTIME.drawerOpen || !!DEMO_RUNTIME.drawerOpen);
     bindEvents(root, page, session);
+    syncPendingSearchAnchor();
     ensureInteractiveTestIds(document);
   }
 
@@ -635,6 +651,10 @@
     return "AI shifted " + assignment.title + " to " + nextVolunteer.name + " because " + request.title + " crossed 50% of its estimated duration without completion.";
   }
 
+  function buildVolunteerStatusLine(assignment, status) {
+    return "Volunteer " + safeText(assignment && assignment.volunteer || "Assigned volunteer", 140) + " is currently " + safeText(status || normalizeAssignmentStatus(assignment && assignment.status), 60) + " on " + safeText(assignment && assignment.title || "the active task", 180) + ".";
+  }
+
   function enrichWorkspace(workspace) {
     const next = workspace && typeof workspace === "object" ? workspace : {};
     const requests = cloneScenarioItems(next.requests || []).map(function (item, index) {
@@ -773,7 +793,7 @@
   function renderHeader(page, session, workspace) {
     const roleData = ROLE_CONFIG[session.role] || ROLE_CONFIG.user;
     const searchQuery = safeText(SEARCH_RUNTIME.query, 160);
-    const searchResults = SEARCH_RUNTIME.searched && searchQuery
+    const searchResults = (SEARCH_RUNTIME.searched || SEARCH_RUNTIME.focused) && searchQuery
       ? buildWorkspaceSearchResults(searchQuery, session, workspace)
       : [];
     return [
@@ -809,13 +829,30 @@
   }
 
   function renderHeaderSearchResults(query, results) {
-    if (!SEARCH_RUNTIME.searched || !query) {
+    const recentSearches = loadRecentSearches();
+    const showingSuggestions = SEARCH_RUNTIME.focused && !SEARCH_RUNTIME.searched;
+    if (!query && !SEARCH_RUNTIME.focused) {
       return "";
     }
-    if (!results.length) {
+    if (!query && recentSearches.length) {
+      return [
+        '<div class="rf-search-results" data-testid="header-search-results">',
+        '<div class="rf-search-results-copy">',
+        '<p class="section-label">Recent searches</p>',
+        '<p class="section-copy">Pick up where you left off.</p>',
+        "</div>",
+        '<div class="rf-search-recent-list">',
+        recentSearches.map(function (item, index) {
+          return '<button class="rf-search-recent" type="button" data-action="recent-search" data-query="' + escapeHtml(item) + '" data-testid="header-recent-search-' + escapeHtml(String(index)) + '">' + escapeHtml(item) + "</button>";
+        }).join(""),
+        "</div>",
+        "</div>"
+      ].join("");
+    }
+    if (!results.length && (SEARCH_RUNTIME.searched || showingSuggestions)) {
       return [
         '<div class="rf-search-results is-empty" data-testid="header-search-results">',
-        '<p class="section-label">Search Results</p>',
+        '<p class="section-label">' + escapeHtml(SEARCH_RUNTIME.searched ? "Search Results" : "Suggestions") + '</p>',
         '<div class="rf-search-empty-state">',
         '<strong>Not found</strong>',
         '<p>No matches for "' + escapeHtml(query) + '". Try a volunteer name, request title, donor, district, or category.</p>',
@@ -823,16 +860,21 @@
         "</div>"
       ].join("");
     }
+    if (!results.length) {
+      return "";
+    }
     return [
       '<div class="rf-search-results" data-testid="header-search-results">',
       '<div class="rf-search-results-copy">',
-      '<p class="section-label">Search Results</p>',
-      '<p class="section-copy">Showing ' + escapeHtml(String(results.length)) + ' match(es) for "' + escapeHtml(query) + '".</p>',
+      '<p class="section-label">' + escapeHtml(SEARCH_RUNTIME.searched ? "Search Results" : "Suggestions") + '</p>',
+      '<p class="section-copy">' + (SEARCH_RUNTIME.searched
+        ? ('Showing ' + escapeHtml(String(results.length)) + ' match(es) for "' + escapeHtml(query) + '".')
+        : ('Top matches for "' + escapeHtml(query) + '". Press Enter to search or choose one result.')) + "</p>",
       "</div>",
       '<div class="rf-search-results-list">',
       results.map(function (result, index) {
         return [
-          '<a class="rf-search-result" href="' + escapeHtml(result.href) + '" data-testid="header-search-result-' + escapeHtml(String(index)) + '">',
+          '<a class="rf-search-result" href="' + escapeHtml(result.href) + '" data-testid="header-search-result-' + escapeHtml(String(index)) + '" data-search-page="' + escapeHtml(result.pageKey || "") + '" data-search-anchor="' + escapeHtml(result.anchor || "") + '" data-search-exact="' + escapeHtml(result.exact ? "true" : "false") + '">',
           '<span class="chip">' + escapeHtml(result.kind) + "</span>",
           '<strong>' + escapeHtml(result.title) + "</strong>",
           result.meta ? '<small>' + escapeHtml(result.meta) + "</small>" : "",
@@ -844,6 +886,22 @@
       "</div>",
       "</div>"
     ].join("");
+  }
+
+  function loadRecentSearches() {
+    const saved = loadJson(RECENT_SEARCHES_KEY, []);
+    return Array.isArray(saved) ? saved.filter(Boolean).slice(0, 6) : [];
+  }
+
+  function saveRecentSearch(query) {
+    const text = safeText(query, 160);
+    if (!text) {
+      return;
+    }
+    const next = [text].concat(loadRecentSearches().filter(function (item) {
+      return normalizeSearchQuery(item) !== normalizeSearchQuery(text);
+    })).slice(0, 6);
+    saveJson(RECENT_SEARCHES_KEY, next);
   }
 
   function buildWorkspaceSearchResults(query, session, workspace) {
@@ -885,13 +943,17 @@
       if (!profile || typeof profile !== "object") {
         return;
       }
+      const anchor = buildAnchorId("volunteer", profile.id || profile.fullName || profile.displayName || roleKey);
       pushResult({
         kind: "Volunteer",
         title: safeText(profile.fullName || profile.displayName || "Volunteer profile", 120),
         meta: safeText(profile.ngoGroup || profile.location || ROLE_CONFIG[roleKey] && ROLE_CONFIG[roleKey].label || "Profile", 160),
         summary: safeText(joinSkills(profile.skills) || profile.email || profile.phone || "Shared volunteer profile", 220),
         actionLabel: "Open Volunteer Directory",
-        href: "./directory.html"
+        href: pageHref("directory", anchor),
+        pageKey: "directory",
+        anchor: anchor,
+        exact: scoreSearchFields(normalizedQuery, [profile.fullName, profile.displayName]) >= 140
       }, [
         profile.fullName,
         profile.displayName,
@@ -904,13 +966,17 @@
     });
 
     workspace.volunteers.forEach(function (volunteer) {
+      const anchor = buildAnchorId("volunteer", volunteer.id || volunteer.name);
       pushResult({
         kind: "Volunteer",
         title: safeText(volunteer.name, 120),
         meta: safeText([volunteer.ngo, volunteer.location].filter(Boolean).join(" · "), 160),
         summary: safeText(joinSkills(volunteer.skills) + (volunteer.contact ? " · " + volunteer.contact : ""), 220),
         actionLabel: "Open Volunteer Directory",
-        href: "./directory.html"
+        href: pageHref("directory", anchor),
+        pageKey: "directory",
+        anchor: anchor,
+        exact: scoreSearchFields(normalizedQuery, [volunteer.name, volunteer.ngo, volunteer.contact]) >= 140
       }, [
         volunteer.name,
         volunteer.ngo,
@@ -922,13 +988,17 @@
     });
 
     workspace.requests.forEach(function (request) {
+      const anchor = buildAnchorId("request", request.id || request.title);
       pushResult({
         kind: "Request",
         title: safeText(request.title, 140),
         meta: safeText([request.category, request.district, normalizeRequestStatus(request.status)].filter(Boolean).join(" · "), 180),
         summary: safeText(request.summary || request.location || "Open the request tracker", 220),
         actionLabel: "Open Community Portal",
-        href: "./community.html"
+        href: pageHref("community", anchor),
+        pageKey: "community",
+        anchor: anchor,
+        exact: scoreSearchFields(normalizedQuery, [request.title, request.id, request.requester]) >= 140
       }, [
         request.title,
         request.category,
@@ -942,13 +1012,17 @@
     });
 
     workspace.assignments.forEach(function (assignment) {
+      const anchor = buildAnchorId("assignment", assignment.id || assignment.title);
       pushResult({
         kind: "Assignment",
         title: safeText(assignment.title, 140),
         meta: safeText([assignment.volunteer, assignment.district, normalizeAssignmentStatus(assignment.status)].filter(Boolean).join(" · "), 180),
         summary: safeText(assignment.location || assignment.date || "Open the assignment board", 220),
         actionLabel: "Open Volunteer Portal",
-        href: "./volunteer.html"
+        href: pageHref("volunteer", anchor),
+        pageKey: "volunteer",
+        anchor: anchor,
+        exact: scoreSearchFields(normalizedQuery, [assignment.title, assignment.id, assignment.volunteer]) >= 140
       }, [
         assignment.title,
         assignment.volunteer,
@@ -960,13 +1034,17 @@
     });
 
     workspace.donations.forEach(function (donation) {
+      const anchor = buildAnchorId("donation", donation.id || donation.donor || donation.donorName);
       pushResult({
         kind: "Donation",
         title: safeText(donation.donor || "Donation record", 120),
         meta: safeText([donation.kind === "money" ? "Money" : donation.itemType || "Item", formatDonationLine(donation), normalizeDonationLifecycle(donation.status)].filter(Boolean).join(" · "), 180),
         summary: safeText(donation.note || donation.description || donation.contactDetails || "Open the donation portal", 220),
         actionLabel: "Open Donation Portal",
-        href: "./donations.html"
+        href: pageHref("donations", anchor),
+        pageKey: "donations",
+        anchor: anchor,
+        exact: scoreSearchFields(normalizedQuery, [donation.donor, donation.donorName, donation.id, donation.contactDetails]) >= 140
       }, [
         donation.donor,
         donation.kind,
@@ -986,7 +1064,9 @@
         meta: item.caption,
         summary: "Open the " + item.shortLabel + " workspace.",
         actionLabel: "Open portal",
-        href: item.href
+        href: item.href,
+        pageKey: item.key,
+        exact: scoreSearchFields(normalizedQuery, [item.label, item.shortLabel, item.key]) >= 140
       }, [
         item.label,
         item.shortLabel,
@@ -1039,29 +1119,253 @@
     return bestScore;
   }
 
-  function renderPortalLauncher(session, page) {
-    const activeRole = normalizePortal(session.role) || "user";
-    const roleData = ROLE_CONFIG[session.role] || ROLE_CONFIG.user;
-    const activeItem = PORTAL_MENU_ITEMS.find(function (item) {
-      return item.role === activeRole;
-    }) || PORTAL_MENU_ITEMS[0];
-    const nav = SIDEBAR_ITEMS.map(function (item) {
+  function slugifyToken(value) {
+    return safeText(value, 160)
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 72) || "item";
+  }
+
+  function buildAnchorId(prefix, value) {
+    return "rf-" + slugifyToken(prefix) + "-" + slugifyToken(value);
+  }
+
+  function pageHref(pageKey, anchor) {
+    const item = SIDEBAR_ITEMS.find(function (entry) {
+      return entry.key === pageKey;
+    });
+    const base = item ? item.href : "./community.html";
+    return anchor ? base + "#" + encodeURIComponent(anchor) : base;
+  }
+
+  function currentPageHref(pageKey, anchor) {
+    const activePath = safeText(window.location.pathname || "", 240).toLowerCase();
+    const target = pageHref(pageKey, anchor);
+    const targetPath = safeText(target.split("#")[0] || "", 240).toLowerCase();
+    return activePath.endsWith(targetPath.replace("./", "/"));
+  }
+
+  function flashSearchTarget(target) {
+    if (!target) {
+      return;
+    }
+    target.classList.add("is-search-hit");
+    window.clearTimeout(target.__rfSearchTimeout);
+    target.__rfSearchTimeout = window.setTimeout(function () {
+      target.classList.remove("is-search-hit");
+    }, 1800);
+  }
+
+  function jumpToAnchor(anchor, options) {
+    const targetId = safeText(anchor, 120);
+    if (!targetId) {
+      return false;
+    }
+    const target = document.getElementById(targetId);
+    if (!target) {
+      return false;
+    }
+    target.scrollIntoView({
+      behavior: options && options.instant ? "auto" : "smooth",
+      block: "start"
+    });
+    flashSearchTarget(target);
+    try {
+      window.history.replaceState(null, "", "#" + encodeURIComponent(targetId));
+    } catch (error) {
+      window.location.hash = targetId;
+    }
+    return true;
+  }
+
+  function syncPendingSearchAnchor() {
+    const rawHash = safeText(window.location.hash || "", 180).replace(/^#/, "");
+    if (!rawHash) {
+      return;
+    }
+    const targetId = decodeURIComponent(rawHash);
+    window.setTimeout(function () {
+      jumpToAnchor(targetId, { instant: true });
+    }, 90);
+  }
+
+  function buildLauncherNavigationItems(session, page) {
+    return LAUNCHER_NAV_ORDER.map(function (key) {
+      return SIDEBAR_ITEMS.find(function (item) { return item.key === key; }) || null;
+    }).filter(Boolean).map(function (item) {
       const allowed = item.roles.indexOf(session.role) !== -1;
       const active = item.key === page;
       return [
-        '<a class="tab-link',
+        '<a class="portal-launcher-shortcut',
         active ? " is-active" : "",
         allowed ? "" : " is-locked",
-        ' portal-launcher-nav-item" href="' + (allowed ? escapeHtml(item.href) : "#") + '"',
+        '" href="' + escapeHtml(allowed ? item.href : "#") + '"',
         allowed ? "" : ' data-locked="true"',
-        ' data-nav-target="' + escapeHtml(item.key) + '"',
-        ' data-testid="portal-launcher-nav-' + escapeHtml(item.key) + '">',
-        '<span class="tab-icon"><span class="rf-symbol" aria-hidden="true">' + escapeHtml(item.icon) + '</span></span>',
-        '<span class="tab-copy"><strong>' + escapeHtml(item.label) + '</strong><small>' + escapeHtml(item.caption) + '</small></span>',
-        '<span class="tab-state">' + (allowed ? (active ? "Open" : "Go") : "Locked") + "</span>",
+        ' data-testid="portal-shortcut-' + escapeHtml(item.key) + '">',
+        '<span class="portal-launcher-shortcut-icon"><span class="rf-symbol" aria-hidden="true">' + escapeHtml(item.icon) + "</span></span>",
+        '<span class="portal-launcher-shortcut-copy"><strong>' + escapeHtml(item.label) + '</strong><small>' + escapeHtml(item.caption) + "</small></span>",
+        '<span class="portal-launcher-state">' + escapeHtml(active ? "Open" : (allowed ? "Go" : "Locked")) + "</span>",
         "</a>"
       ].join("");
     }).join("");
+  }
+
+  function buildCompactLauncherNavigationItems(session, page) {
+    return LAUNCHER_NAV_ORDER.map(function (key) {
+      return SIDEBAR_ITEMS.find(function (item) { return item.key === key; }) || null;
+    }).filter(Boolean).map(function (item) {
+      const allowed = item.roles.indexOf(session.role) !== -1;
+      const active = item.key === page;
+      return [
+        '<a class="portal-launcher-mini',
+        active ? " is-active" : "",
+        allowed ? "" : " is-locked",
+        '" href="' + escapeHtml(allowed ? item.href : "#") + '"',
+        allowed ? "" : ' data-locked="true"',
+        ' data-testid="portal-mini-' + escapeHtml(item.key) + '">',
+        '<span class="portal-launcher-mini-icon"><span class="rf-symbol" aria-hidden="true">' + escapeHtml(item.icon) + "</span></span>",
+        '<span class="portal-launcher-mini-copy"><strong>' + escapeHtml(item.shortLabel || item.label) + '</strong><small>' + escapeHtml(active ? "Open" : (allowed ? "Go" : "Locked")) + "</small></span>",
+        "</a>"
+      ].join("");
+    }).join("");
+  }
+
+  function buildUsageGuardCards() {
+    const guard = window.ResourceFlowUsageGuard;
+    if (!guard || typeof guard.preview !== "function") {
+      return '<div class="empty-box">Usage guard is not available in this workspace.</div>';
+    }
+    const metrics = [
+      { key: "reads", label: "Reads", suffix: "/day" },
+      { key: "writes", label: "Writes", suffix: "/day" },
+      { key: "deletes", label: "Deletes", suffix: "/day" },
+      { key: "hostingDownloadsMbPerDay", label: "Downloads", suffix: " MB/day" },
+      { key: "bandwidthMbPerMonth", label: "Bandwidth", suffix: " MB/month" }
+    ];
+    return metrics.map(function (metric) {
+      const preview = guard.preview(metric.key, 0);
+      const value = metric.key.indexOf("Mb") !== -1
+        ? (Math.round(Number(preview.current || 0) * 10) / 10) + metric.suffix
+        : String(preview.current || 0) + metric.suffix;
+      const limit = metric.key.indexOf("Mb") !== -1
+        ? (Math.round(Number(preview.limit || 0) * 10) / 10) + metric.suffix
+        : String(preview.limit || 0) + metric.suffix;
+      return '<article class="feed-card usage-guard-card"><div class="feed-card-head"><div><strong>' + escapeHtml(metric.label) + '</strong><p class="feed-meta">' + escapeHtml(value) + " of " + escapeHtml(limit) + '</p></div>' + renderStatus(preview.state === "blocked" ? "Paused" : (preview.state === "warning" ? "Warning" : "Safe")) + '</div><p class="card-copy">' + escapeHtml(preview.message || "Usage is inside the Firebase no-cost guard.") + '</p></article>';
+    }).join("");
+  }
+
+  function buildAiActionHistory(workspace) {
+    return (workspace.audit || []).filter(function (entry) {
+      const line = safeText(entry, 240);
+      return /^ai\b/i.test(line) || /gemini/i.test(line) || /recommended next move/i.test(line);
+    }).slice(0, 6).map(function (entry) {
+      return {
+        title: "AI action",
+        meta: "Workspace audit",
+        status: "Active",
+        copy: safeText(entry, 260)
+      };
+    });
+  }
+
+  function buildRequestTimelineCards(workspace) {
+    return (workspace.requests || []).slice(0, 4).map(function (request) {
+      const linkedAssignments = (workspace.assignments || []).filter(function (assignment) {
+        return assignment.requestId === request.id;
+      });
+      const latestAssignment = linkedAssignments[0] || null;
+      return {
+        id: buildAnchorId("timeline", request.id),
+        title: request.title,
+        meta: request.district + " · " + normalizeRequestStatus(request.status),
+        status: normalizeRequestStatus(request.status),
+        assignment: latestAssignment ? (latestAssignment.volunteer + " · " + normalizeAssignmentStatus(latestAssignment.status)) : "No volunteer linked yet",
+        copy: request.summary || "Timeline details are visible once the request enters the lifecycle."
+      };
+    });
+  }
+
+  function renderRequestTimelineCards(workspace) {
+    const cards = buildRequestTimelineCards(workspace);
+    if (!cards.length) {
+      return '<div class="empty-box">Request timelines appear after requests enter the active workspace.</div>';
+    }
+    return cards.map(function (item) {
+      return '<article id="' + escapeHtml(item.id) + '" class="feed-card timeline-card"><div class="feed-card-head"><div><strong>' + escapeHtml(item.title) + '</strong><p class="feed-meta">' + escapeHtml(item.meta) + '</p></div>' + renderStatus(item.status) + '</div>' + renderStepper(item.status) + '<p class="card-copy"><strong>Assignment:</strong> ' + escapeHtml(item.assignment) + '</p><p class="card-copy">' + escapeHtml(item.copy) + '</p></article>';
+    }).join("");
+  }
+
+  function buildVolunteerRouteBundles(session, workspace) {
+    const snapshot = buildVolunteerSnapshot(session, workspace);
+    const items = (snapshot.activeTasks || []).slice();
+    if (!items.length) {
+      return [];
+    }
+    const grouped = {};
+    items.forEach(function (assignment) {
+      const key = safeText(assignment.district || "Unknown", 80);
+      grouped[key] = grouped[key] || { district: key, tasks: [], locations: [] };
+      grouped[key].tasks.push(assignment);
+      if (assignment.location && grouped[key].locations.indexOf(assignment.location) < 0) {
+        grouped[key].locations.push(assignment.location);
+      }
+    });
+    return Object.keys(grouped).map(function (key) {
+      const group = grouped[key];
+      return {
+        title: group.district,
+        meta: String(group.tasks.length) + " nearby task(s)",
+        status: group.tasks.some(function (task) { return normalizeAssignmentStatus(task.status) === "In Progress"; }) ? "In Progress" : "Accepted",
+        copy: "These assignments are clustered so the volunteer lane can move through one district without extra routing delay.",
+        locations: group.locations.slice(0, 4)
+      };
+    }).sort(function (left, right) {
+      return right.locations.length - left.locations.length;
+    });
+  }
+
+  function renderVolunteerRouteBundleCards(session, workspace) {
+    const bundles = buildVolunteerRouteBundles(session, workspace);
+    if (!bundles.length) {
+      return '<div class="empty-box">Route bundles appear when the volunteer lane has nearby active assignments.</div>';
+    }
+    return bundles.map(function (bundle) {
+      return '<article class="feed-card"><div class="feed-card-head"><div><strong>' + escapeHtml(bundle.title) + '</strong><p class="feed-meta">' + escapeHtml(bundle.meta) + '</p></div>' + renderStatus(bundle.status) + '</div><p class="card-copy">' + escapeHtml(bundle.copy) + '</p><div class="feed-chip-row">' + bundle.locations.map(function (location) { return '<span class="feed-chip">' + escapeHtml(location) + "</span>"; }).join("") + '</div></article>';
+    }).join("");
+  }
+
+  function loadDraft(key) {
+    try {
+      const raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function saveDraft(key, payload) {
+    try {
+      localStorage.setItem(key, JSON.stringify(payload || {}));
+    } catch (error) {
+      // Ignore local storage failures.
+    }
+  }
+
+  function clearDraft(key) {
+    try {
+      localStorage.removeItem(key);
+    } catch (error) {
+      // Ignore local storage failures.
+    }
+  }
+
+  function renderPortalLauncher(session, page) {
+    const activeRole = normalizePortal(session.role) || "user";
+    const activeItem = PORTAL_MENU_ITEMS.find(function (item) {
+      return item.role === activeRole;
+    }) || PORTAL_MENU_ITEMS[0];
+    const navigationMarkup = buildCompactLauncherNavigationItems(session, page);
     return [
       '<details class="portal-launcher" data-testid="portal-launcher">',
       '<summary class="ghost-button portal-launcher-toggle" data-testid="portal-launcher-toggle" aria-label="Open portal switching menu">',
@@ -1069,6 +1373,7 @@
       '<span class="portal-launcher-copy"><strong>' + escapeHtml(activeItem.label) + '</strong><small>Switch portal workspace</small></span>',
       '<span class="rf-symbol portal-launcher-caret" aria-hidden="true">expand_more</span>',
       "</summary>",
+      '<button class="portal-launcher-backdrop" type="button" data-action="close-portal-launcher" aria-label="Close portal switching menu" tabindex="-1"></button>',
       '<div class="portal-launcher-menu" role="menu" aria-label="Portal switcher">',
       '<section class="portal-launcher-section">',
       '<p class="section-label">Switch Portal</p>',
@@ -1092,22 +1397,7 @@
       }).join(""),
       "</div>",
       "</section>",
-      '<section class="surface-card portal-launcher-panel">',
-      '<p class="section-label">' + escapeHtml(copy("navigation", "Navigation")) + '</p>',
-      '<div class="portal-launcher-nav">' + nav + "</div>",
-      "</section>",
-      '<section class="surface-card portal-launcher-panel">',
-      '<p class="section-label">' + escapeHtml(copy("profile", "Profile")) + '</p>',
-      '<div class="portal-launcher-profile">',
-      '<h3 class="section-title portal-launcher-title">' + escapeHtml(session.name) + "</h3>",
-      '<p class="section-copy">' + escapeHtml(session.email || "Signed-in workspace session") + "</p>",
-      '<div class="chip-row portal-launcher-chip-row">',
-      '<span class="chip">' + escapeHtml(roleData.label) + "</span>",
-      session.profile.primarySummary ? '<span class="chip">' + escapeHtml(session.profile.primarySummary) + "</span>" : "",
-      "</div>",
-      '<button class="ghost-button portal-launcher-demo-button" type="button" data-action="seed-demo" data-scenario="flood" data-testid="portal-launcher-load-demo">' + escapeHtml(copy("loadDemo", "Load Flood Demo")) + '</button>',
-      "</div>",
-      "</section>",
+      navigationMarkup ? '<section class="portal-launcher-section"><p class="section-label">Navigation</p><div class="portal-launcher-grid">' + navigationMarkup + "</div></section>" : "",
       "</div>",
       "</details>"
     ].join("");
@@ -1281,10 +1571,15 @@
   function renderMobileDock(page, session) {
     const items = SIDEBAR_ITEMS.filter(function (item) {
       return item.roles.indexOf(session.role) !== -1;
-    }).slice(0, 4);
-    return '<nav class="rf-mobile-dock">' + items.map(function (item) {
+    }).slice(0, 2);
+    const actionItems = [
+      { key: "insights-action", label: "AI", icon: "auto_awesome", href: "./insights.html", active: page === "insights", action: true },
+      { key: "demo-action", label: "Demo", icon: "deployed_code", href: "#demo", active: false, action: true }
+    ];
+    const navItems = items.concat(actionItems);
+    return '<nav class="rf-mobile-dock">' + navItems.map(function (item) {
       const active = item.key === page;
-      return '<a class="rf-mobile-link' + (active ? ' is-active' : '') + '" href="' + escapeHtml(item.href) + '" data-testid="mobile-nav-' + escapeHtml(item.key) + '"><span class="rf-symbol" aria-hidden="true">' + escapeHtml(item.icon) + '</span><span>' + escapeHtml(item.shortLabel || item.label) + '</span></a>';
+      return '<a class="rf-mobile-link' + (active ? ' is-active' : '') + (item.action ? ' is-action' : '') + '" href="' + escapeHtml(item.href) + '" data-mobile-action="' + escapeHtml(item.key) + '" data-testid="mobile-nav-' + escapeHtml(item.key) + '"><span class="rf-symbol" aria-hidden="true">' + escapeHtml(item.icon) + '</span><span>' + escapeHtml(item.shortLabel || item.label) + '</span></a>';
     }).join("") + "</nav>";
   }
 
@@ -1330,7 +1625,7 @@
     const routeGroupsSection = '<article class="surface-card"><p class="section-label">Route Groups</p><h2 class="section-title">Map-linked response clusters</h2><div class="feed-list">' + renderRouteGroups(workspace) + '</div></article>';
     const notificationsSection = '<article class="surface-card"><p class="section-label">Notifications</p><h2 class="section-title">What changed most recently</h2><div class="feed-list">' + renderNotificationCards(buildNotifications(workspace, getSession())) + '</div></article>';
     const requestFormSection = '<article class="surface-card"><p class="section-label">Community Request Form</p><h2 class="section-title">Raise a support request</h2><form id="communityRequestForm" class="form-grid" data-testid="community-request-form"><label><span>Request title</span><input class="text-input" name="title" type="text" placeholder="Emergency food kits for affected streets" required></label><div class="grid-2"><label><span>Category</span><select class="text-select" name="category" required><option value="">Choose category</option><option>Food</option><option>Medical</option><option>Shelter</option><option>Education</option><option>Logistics</option></select></label><label><span>District</span><input class="text-input" name="district" type="text" placeholder="Chennai" required></label></div><div class="grid-2"><label><span>Location address</span><input class="text-input" name="location" type="text" placeholder="Velachery, Chennai" required></label><label><span>Estimated people affected</span><input class="text-input" name="beneficiaries" type="number" min="1" step="1" placeholder="40" required></label></div><div class="grid-2"><label><span>Urgency</span><select class="text-select" name="priority" required><option value="Critical">Critical</option><option value="High">High</option><option value="Medium" selected>Medium</option><option value="Low">Low</option></select></label><label><span>Need summary</span><input class="text-input" name="shortSummary" type="text" placeholder="Families need food, blankets, and safe shelter." required></label></div><label><span>Detailed context</span><textarea class="text-area" name="summary" placeholder="Describe the situation, road access, vulnerable groups, and immediate needs." required></textarea></label><button class="primary-button" type="submit" data-testid="submit-community-request">Submit Request</button></form><div id="communityRequestStatus" class="notice-box">Submitted requests are added to the tracker below and become part of the visible feed immediately.</div></article>';
-    const responseStorySection = '<article class="surface-card"><p class="section-label">Response Story</p><h2 class="section-title">What changes after a request is entered</h2><div class="feed-list">' + renderListCards(["The request enters the lifecycle as Requested and appears in the community tracker immediately.", "Operations can review the mapped location, urgency, district, and people affected.", "The AI story updates as volunteers, donations, and assignments are attached.", "Admins can later use the same request in reports, exports, and public impact summaries."]) + '</div></article>';
+    const responseStorySection = '<article class="surface-card"><p class="section-label">Response Story</p><h2 class="section-title">What changes after a request is entered</h2><div class="feed-list">' + renderListCards(["The request enters the lifecycle as Pending and appears in the community tracker immediately.", "Operations can review the mapped location, urgency, district, and people affected.", "The AI story updates as volunteers, donations, and assignments are attached.", "Admins can later use the same request in reports, exports, and public impact summaries."]) + '</div></article>';
     const donationBreakdownSection = '<article class="surface-card"><p class="section-label">Donation Breakdown</p><h2 class="section-title">What support is already visible</h2><div class="feed-list">' + renderDonationBreakdownCards(workspace) + '</div></article>';
     const completionTrendSection = '<article class="surface-card"><p class="section-label">Completion Trend</p><h2 class="section-title">Progress across the active request lifecycle</h2><div class="feed-list">' + renderAnalyticsCards(buildLifecycleAnalytics(workspace)) + '</div></article>';
     return [
@@ -1377,7 +1672,7 @@
     const requests = (workspace.requests || []).slice(0, 4).map(function (item) {
       return [
         '<article class="feed-card">',
-        '<div class="feed-card-head"><div><strong>' + escapeHtml(item.title || "Community request") + '</strong><p class="feed-meta">' + escapeHtml(item.district || "District") + ' - ' + escapeHtml(item.location || "Location") + '</p></div>' + renderStatus(normalizeRequestStatus(item.status || "Requested")) + '</div>',
+        '<div class="feed-card-head"><div><strong>' + escapeHtml(item.title || "Community request") + '</strong><p class="feed-meta">' + escapeHtml(item.district || "District") + ' - ' + escapeHtml(item.location || "Location") + '</p></div>' + renderStatus(normalizeRequestStatus(item.status || "Pending")) + '</div>',
         '<p class="card-copy">' + escapeHtml(item.summary || "Visible request details will appear here.") + '</p>',
         '<div class="feed-chip-row"><span class="feed-chip">' + escapeHtml(item.category || "General") + '</span><span class="feed-chip">' + escapeHtml(String(item.beneficiaries || 0)) + ' people</span><span class="feed-chip">' + escapeHtml(item.priority || "Medium") + '</span></div>',
         '<div class="action-stack" style="margin-top:14px;"><button class="ghost-button" type="button" data-map-location="' + escapeHtml(item.location || item.district || "India") + '" data-testid="overview-fallback-map-' + escapeHtml((item.id || "request").toLowerCase()) + '">View on Map</button></div>',
@@ -1411,7 +1706,7 @@
 
   function renderMinimalRecoveryPage(page, workspace) {
     const topRequests = (workspace.requests || []).slice(0, 3).map(function (item) {
-      return '<div class="feed-card"><div class="feed-card-head"><div><strong>' + escapeHtml(item.title || "Community request") + '</strong><p class="feed-meta">' + escapeHtml(item.district || "District") + ' - ' + escapeHtml(item.location || "Location") + '</p></div>' + renderStatus(normalizeRequestStatus(item.status || "Requested")) + '</div><p class="card-copy">' + escapeHtml(item.summary || "Visible request details will appear here once the full page refreshes.") + '</p></div>';
+      return '<div class="feed-card"><div class="feed-card-head"><div><strong>' + escapeHtml(item.title || "Community request") + '</strong><p class="feed-meta">' + escapeHtml(item.district || "District") + ' - ' + escapeHtml(item.location || "Location") + '</p></div>' + renderStatus(normalizeRequestStatus(item.status || "Pending")) + '</div><p class="card-copy">' + escapeHtml(item.summary || "Visible request details will appear here once the full page refreshes.") + '</p></div>';
     }).join("");
     return [
       '<section class="surface-card access-restricted">',
@@ -1444,6 +1739,7 @@
     const prioritySection = '<article class="surface-card"><p class="section-label">AI Task Priority</p><h2 class="section-title">Optimized for ' + escapeHtml(firstName(session.name)) + '</h2><div class="stack-list">' + renderPriorityQueue(personal.activeTasks.length ? personal.activeTasks : workspace.requests.slice(0, 3)) + '</div></article>';
     const growthSection = '<article class="surface-card"><p class="section-label">Volunteer Growth</p><h2 class="section-title">Badges, streak, NGO, and reliability</h2><div class="feed-list">' + renderVolunteerGrowthCards(personal) + '</div></article>';
     const directoryPreviewSection = '<article class="surface-card"><p class="section-label">Volunteer Directory Preview</p><h2 class="section-title">See other registered volunteers</h2><div class="record-grid">' + renderVolunteerPreviewCards(workspace.volunteers) + '</div></article>';
+    const routeBundlesSection = '<article class="surface-card"><p class="section-label">Route Bundles</p><h2 class="section-title">Nearby task groups for this volunteer</h2><div class="feed-list">' + renderVolunteerRouteBundleCards(session, workspace) + '</div></article>';
     const tasksSection = '<article class="surface-card"><p class="section-label">My Tasks</p><h2 class="section-title">Assignments for this volunteer session</h2><div class="feed-list">' + renderAssignmentCards(personal.activeTasks) + '</div></article>';
     const archiveSection = '<article class="surface-card"><p class="section-label">Volunteer Activity Archive</p><h2 class="section-title">Completed work visible to the team</h2><div class="feed-list">' + renderArchiveCards(personal.archive) + '</div></article>';
     const leaderboardSection = '<article class="surface-card"><p class="section-label">Volunteer Leaderboard</p><h2 class="section-title">Visible contribution momentum</h2><div class="record-grid">' + renderLeaderboardCards(workspace) + '</div></article>';
@@ -1478,6 +1774,7 @@
         { weight: 3, markup: prioritySection },
         { weight: 3, markup: growthSection },
         { weight: 3, markup: directoryPreviewSection },
+        { weight: 2, markup: routeBundlesSection },
         { weight: 4, markup: tasksSection },
         { weight: 2, markup: archiveSection },
         { weight: 3, markup: leaderboardSection }
@@ -1556,6 +1853,7 @@
     const activeDispatchSection = '<article class="surface-card"><p class="section-label">Active Dispatch</p><h2 class="section-title">Assignments currently being coordinated</h2><div class="feed-list">' + renderAssignmentCards(workspace.assignments) + '</div></article>';
     const blockedSection = '<article class="surface-card"><p class="section-label">Blocked Cases</p><h2 class="section-title">Requests that need escalation</h2><div class="feed-list">' + renderApprovalCards(buildBlockedCases(workspace)) + '</div></article>';
     const routeGroupsSection = '<article class="surface-card"><p class="section-label">Route Groups</p><h2 class="section-title">Grouped movements by district</h2><div class="feed-list">' + renderRouteGroups(workspace) + '</div></article>';
+    const timelineSection = '<article class="surface-card"><p class="section-label">Assignment Timeline</p><h2 class="section-title">Per-request progression and handoff</h2><div class="feed-list">' + renderRequestTimelineCards(workspace) + '</div></article>';
     const workflowSection = '<section class="surface-card"><p class="section-label">Request Workflow</p><h2 class="section-title">Status pipeline across the active scenario</h2>' + renderStatusBoard(workspace.requests) + '</section>';
     return [
       renderHero({
@@ -1585,6 +1883,7 @@
         { weight: 3, markup: activeDispatchSection },
         { weight: 2, markup: blockedSection },
         { weight: 2, markup: routeGroupsSection },
+        { weight: 2, markup: timelineSection },
         { weight: 3, markup: workflowSection }
       ], "portal-weighted-flow")
     ].join("");
@@ -1641,8 +1940,11 @@
     const donationRecordsSection = '<article class="surface-card"><p class="section-label">Donation Records</p><h2 class="section-title">Money and item support from the backend</h2><div id="adminDonationRecords" class="record-grid"><div class="empty-box">Shared donation management is loading.</div></div></article>';
     const moderationSection = '<article class="surface-card"><p class="section-label">Moderation Center</p><h2 class="section-title">Verification, approvals, and blocked work</h2><div class="feed-list">' + renderApprovalCards(buildModerationQueue(workspace)) + '</div></article>';
     const analyticsSection = '<article class="surface-card"><p class="section-label">Analytics Upgrade</p><h2 class="section-title">District comparison, donation mix, and completion trend</h2><div class="feed-list">' + renderAnalyticsCards(buildAdminAnalytics(workspace)) + '</div></article>';
+    const usageGuardSection = '<article class="surface-card"><p class="section-label">Firebase Usage Guard</p><h2 class="section-title">Safe usage inside the no-cost tier</h2><div class="feed-list">' + buildUsageGuardCards() + '</div></article>';
+    const aiActionSection = '<article class="surface-card"><p class="section-label">AI Action History</p><h2 class="section-title">What the copilot changed and why</h2><div class="feed-list">' + renderNotificationCards(buildAiActionHistory(workspace)) + '</div></article>';
     const outreachSection = '<article class="surface-card"><p class="section-label">Outreach Center</p><form id="adminOutreachForm" class="form-grid" data-testid="outreach-center-form"><label><span>Subject</span><input class="text-input" name="subject" type="text" placeholder="Volunteer briefing for evening flood response"></label><label><span>Message</span><textarea class="text-area" name="message" placeholder="Share timing, district, safety notes, and reporting instructions."></textarea></label><label><span>Recipients</span><input class="text-input" name="recipients" type="text" placeholder="Community, Volunteer, Donation portal"></label><button class="primary-button" type="button" data-action="save-outreach" data-testid="save-outreach-draft">Save Draft</button></form></article>';
     const draftsSection = '<article class="surface-card"><p class="section-label">Outreach Drafts</p><div id="adminOutreachDrafts" class="feed-list">' + renderListCards(workspace.outreach) + '</div></article>';
+    const timelineSection = '<article class="surface-card"><p class="section-label">Assignment Timeline</p><h2 class="section-title">Per-request lifecycle and handoff</h2><div class="feed-list">' + renderRequestTimelineCards(workspace) + '</div></article>';
     const roleManagementSection = '<section class="surface-card"><p class="section-label">User Role Management</p><h2 class="section-title">Who can access which portal right now</h2><div class="table-shell"><table><thead><tr><th>Name</th><th>Role</th><th>Current Access</th><th>Status</th></tr></thead><tbody>' + renderRoleRows() + '</tbody></table></div></section>';
     return [
       renderHero({
@@ -1675,8 +1977,11 @@
         { weight: 8, markup: donationRecordsSection },
         { weight: 3, markup: moderationSection },
         { weight: 2, markup: analyticsSection },
+        { weight: 2, markup: usageGuardSection },
+        { weight: 2, markup: aiActionSection },
         { weight: 3, markup: outreachSection },
         { weight: 2, markup: draftsSection },
+        { weight: 2, markup: timelineSection },
         { weight: 3, markup: roleManagementSection }
       ], "portal-weighted-flow")
     ].join("");
@@ -1970,13 +2275,13 @@
       const actionButtons = [
         '<button class="ghost-button" type="button" data-map-location="' + escapeHtml(item.location) + '" data-testid="view-map-' + escapeHtml(item.id.toLowerCase()) + '">View on Map</button>'
       ];
-      if (canManage && stage !== "Closed") {
+      if (canManage && !isRequestCompleteStage(stage)) {
         actionButtons.push('<button class="ghost-button" type="button" data-action="advance-request-status" data-request-id="' + escapeHtml(item.id) + '" data-testid="advance-request-' + escapeHtml(item.id.toLowerCase()) + '">Advance Status</button>');
       }
-      if (canManage && stage !== "Closed") {
+      if (canManage && !isRequestCompleteStage(stage)) {
         actionButtons.push('<button class="ghost-button" type="button" data-action="close-request" data-request-id="' + escapeHtml(item.id) + '" data-testid="close-request-' + escapeHtml(item.id.toLowerCase()) + '">Close Request</button>');
       }
-      return '<article class="feed-card"><div class="feed-card-head"><div><strong>' + escapeHtml(item.title) + '</strong><p class="feed-meta">' + escapeHtml(item.summary) + '</p></div>' + renderStatus(stage) + '</div><div class="feed-chip-row"><span class="feed-chip">' + escapeHtml(item.category) + '</span><span class="feed-chip">' + escapeHtml(item.district) + '</span><span class="feed-chip">' + escapeHtml(String(item.beneficiaries)) + ' beneficiaries</span><span class="feed-chip">' + escapeHtml(item.priority) + '</span><span class="feed-chip feed-chip-risk feed-chip-risk-' + escapeHtml(prediction.tone) + '">Risk ' + escapeHtml(String(prediction.score)) + '</span></div>' + renderStepper(stage) + '<p class="card-copy"><strong>Boosted triage:</strong> ' + escapeHtml(prediction.explanation) + '</p><p class="card-copy"><strong>AI match:</strong> ' + escapeHtml(item.ai) + '</p><div class="action-stack" style="margin-top:14px;">' + actionButtons.join("") + '</div></article>';
+      return '<article id="' + escapeHtml(buildAnchorId("request", item.id || item.title)) + '" class="feed-card"><div class="feed-card-head"><div><strong>' + escapeHtml(item.title) + '</strong><p class="feed-meta">' + escapeHtml(item.summary) + '</p></div>' + renderStatus(stage) + '</div><div class="feed-chip-row"><span class="feed-chip">' + escapeHtml(item.category) + '</span><span class="feed-chip">' + escapeHtml(item.district) + '</span><span class="feed-chip">' + escapeHtml(String(item.beneficiaries)) + ' beneficiaries</span><span class="feed-chip">' + escapeHtml(item.priority) + '</span><span class="feed-chip feed-chip-risk feed-chip-risk-' + escapeHtml(prediction.tone) + '">Risk ' + escapeHtml(String(prediction.score)) + '</span></div>' + renderStepper(stage) + '<p class="card-copy"><strong>Boosted triage:</strong> ' + escapeHtml(prediction.explanation) + '</p><p class="card-copy"><strong>AI match:</strong> ' + escapeHtml(item.ai) + '</p><div class="action-stack" style="margin-top:14px;">' + actionButtons.join("") + '</div></article>';
     }).join("");
   }
   function renderAssignmentCards(items) {
@@ -1987,10 +2292,10 @@
     return items.map(function (item) {
       const normalizedStatus = normalizeAssignmentStatus(item.status);
       const actions = ['<button class="ghost-button" type="button" data-map-location="' + escapeHtml(item.location) + '" data-testid="assignment-map-' + escapeHtml(item.id.toLowerCase()) + '">View on Map</button>'];
-      if (normalizedStatus !== "Closed" && normalizedStatus !== "Delivered") {
+      if (!isAssignmentCompleteStage(normalizedStatus)) {
         actions.push('<button class="ghost-button" type="button" data-action="advance-assignment-status" data-assignment-id="' + escapeHtml(item.id) + '" data-testid="advance-assignment-' + escapeHtml(item.id.toLowerCase()) + '">' + escapeHtml(session.role === "volunteer" ? "Update Progress" : "Advance Assignment") + '</button>');
       }
-      return '<article class="feed-card"><div class="feed-card-head"><div><strong>' + escapeHtml(item.title) + '</strong><p class="feed-meta">' + escapeHtml(item.volunteer) + ' - ' + escapeHtml(item.date) + '</p></div>' + renderStatus(normalizedStatus) + '</div><div class="feed-chip-row"><span class="feed-chip">' + escapeHtml(item.district) + '</span><span class="feed-chip">' + escapeHtml(item.location) + '</span><span class="feed-chip">' + escapeHtml(String(item.points)) + ' pts</span></div><div class="action-stack" style="margin-top:14px;">' + actions.join("") + '</div></article>';
+      return '<article id="' + escapeHtml(buildAnchorId("assignment", item.id || item.title)) + '" class="feed-card"><div class="feed-card-head"><div><strong>' + escapeHtml(item.title) + '</strong><p class="feed-meta">' + escapeHtml(item.volunteer) + ' - ' + escapeHtml(item.date) + '</p></div>' + renderStatus(normalizedStatus) + '</div><div class="feed-chip-row"><span class="feed-chip">' + escapeHtml(item.district) + '</span><span class="feed-chip">' + escapeHtml(item.location) + '</span><span class="feed-chip">' + escapeHtml(String(item.points)) + ' pts</span></div><div class="action-stack" style="margin-top:14px;">' + actions.join("") + '</div></article>';
     }).join("");
   }
   function renderArchiveCards(items) {
@@ -2022,7 +2327,7 @@
     }
     return items.slice(0, 5).map(function (item) {
       const stage = normalizeRequestStatus(item.status);
-      return '<article class="feed-card"><div class="feed-card-head"><div><strong>' + escapeHtml(item.title) + '</strong><p class="feed-meta">' + escapeHtml(item.district) + ' - ' + escapeHtml(item.location) + '</p></div>' + renderStatus(stage) + '</div>' + renderStepper(stage) + '<div class="feed-chip-row"><span class="feed-chip">' + escapeHtml(item.category) + '</span><span class="feed-chip">' + escapeHtml(String(item.beneficiaries)) + ' people</span><span class="feed-chip">' + escapeHtml(item.priority) + '</span></div></article>';
+      return '<article id="' + escapeHtml(buildAnchorId("request", item.id || item.title)) + '" class="feed-card"><div class="feed-card-head"><div><strong>' + escapeHtml(item.title) + '</strong><p class="feed-meta">' + escapeHtml(item.district) + ' - ' + escapeHtml(item.location) + '</p></div>' + renderStatus(stage) + '</div>' + renderStepper(stage) + '<div class="feed-chip-row"><span class="feed-chip">' + escapeHtml(item.category) + '</span><span class="feed-chip">' + escapeHtml(String(item.beneficiaries)) + ' people</span><span class="feed-chip">' + escapeHtml(item.priority) + '</span></div></article>';
     }).join("");
   }
 
@@ -2170,8 +2475,8 @@
     const assignments = workspace.assignments.filter(function (item) {
       return baseName && safeText(item.volunteer, 120).toLowerCase() === baseName;
     });
-    const activeTasks = assignments.filter(function (item) { return !/(delivered|closed|completed)/i.test(safeText(item.status, 40)); });
-    const archive = assignments.filter(function (item) { return /(delivered|closed|completed)/i.test(safeText(item.status, 40)); });
+    const activeTasks = assignments.filter(function (item) { return !isAssignmentCompleteStage(item.status); });
+    const archive = assignments.filter(function (item) { return isAssignmentCompleteStage(item.status); });
     const fallbackAssignments = assignments.length ? assignments : workspace.assignments.slice(0, 3);
     const points = fallbackAssignments.reduce(function (sum, item) { return sum + Number(item.points || 0); }, 0);
     const reliability = Math.max(68, Math.min(99, computeVolunteerReliability(sharedVolunteer || { name: session.name }, workspace.assignments) + archive.length * 2));
@@ -2184,7 +2489,7 @@
       attendance: Math.max(archive.length + (activeTasks.length ? 1 : 0), assignments.length ? 4 : 0),
       streak: Math.max(archive.length, assignments.length ? 3 : 1),
       activeTasks: activeTasks.length ? activeTasks : workspace.assignments.slice(0, 3),
-      archive: archive.length ? archive : workspace.assignments.filter(function (item) { return /(delivered|closed|completed)/i.test(safeText(item.status, 40)); }).slice(0, 3),
+      archive: archive.length ? archive : workspace.assignments.filter(function (item) { return isAssignmentCompleteStage(item.status); }).slice(0, 3),
       badges: buildVolunteerBadges(points, archive.length),
       reliability: reliability,
       ngoGroup: safeText(portalProfile.ngoGroup || (sharedVolunteer && sharedVolunteer.ngo) || "Relief Network", 120)
@@ -2257,7 +2562,7 @@
   }
 
   function statusMetaCopy(stage) {
-    if (stage === "Requested") return "Fresh community requests waiting for first review.";
+    if (stage === "Pending") return "Fresh community requests waiting for first review.";
     if (stage === "Reviewed") return "Requests checked and ready for assignment.";
     if (stage === "Assigned") return "A team or volunteer has been attached.";
     if (stage === "In Progress") return "Field work is currently active.";
@@ -2490,6 +2795,33 @@
     return Math.max(0, Math.min(1, Number(value || 0)));
   }
 
+  function finiteNumber(value) {
+    const number = Number(value);
+    return Number.isFinite(number) ? number : null;
+  }
+
+  function distanceKm(fromLat, fromLng, toLat, toLng) {
+    const startLat = finiteNumber(fromLat);
+    const startLng = finiteNumber(fromLng);
+    const endLat = finiteNumber(toLat);
+    const endLng = finiteNumber(toLng);
+    if (startLat == null || startLng == null || endLat == null || endLng == null) {
+      return null;
+    }
+    const toRad = function (value) {
+      return value * Math.PI / 180;
+    };
+    const earthRadiusKm = 6371;
+    const deltaLat = toRad(endLat - startLat);
+    const deltaLng = toRad(endLng - startLng);
+    const a =
+      Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
+      Math.cos(toRad(startLat)) * Math.cos(toRad(endLat)) *
+      Math.sin(deltaLng / 2) * Math.sin(deltaLng / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return earthRadiusKm * c;
+  }
+
   function joinPredictionSkills(category) {
     return (CATEGORY_SKILLS[safeText(category, 60).toLowerCase()] || ["coordination", "support"]).slice(0, 3).join(", ");
   }
@@ -2519,7 +2851,7 @@
     });
     return Object.keys(bucket).map(function (key) {
       const item = bucket[key];
-      const stage = item.assignments >= item.requests && item.requests > 0 ? "In Progress" : item.requests ? "Reviewed" : "Requested";
+      const stage = item.assignments >= item.requests && item.requests > 0 ? "In Progress" : item.requests ? "Reviewed" : "Pending";
       return {
         district: item.district,
         requests: item.requests,
@@ -2540,6 +2872,57 @@
     const latestAssignment = workspace.assignments[0];
     const latestDonation = workspace.donations[0];
     const volunteerSnapshot = session && session.role === "volunteer" ? buildVolunteerSnapshot(session, workspace) : null;
+    (workspace.audit || []).slice(0, 12).forEach(function (entry) {
+      const line = safeText(entry, 260);
+      const normalized = line.toLowerCase();
+      if (!line) {
+        return;
+      }
+      if (normalized.indexOf("shift") !== -1 || normalized.indexOf("reassign") !== -1) {
+        notices.push({
+          title: "Assignment shifted",
+          meta: "Lifecycle automation",
+          status: "Shifted",
+          copy: line
+        });
+        return;
+      }
+      if (normalized.indexOf("completed") !== -1 || normalized.indexOf("delivered") !== -1) {
+        notices.push({
+          title: "Completion update",
+          meta: "Volunteer / delivery progress",
+          status: "Completed",
+          copy: line
+        });
+        return;
+      }
+      if (normalized.indexOf("in progress") !== -1) {
+        notices.push({
+          title: "Field work in progress",
+          meta: "Live assignment update",
+          status: "In Progress",
+          copy: line
+        });
+        return;
+      }
+      if (normalized.indexOf("matched") !== -1 || normalized.indexOf("assigned") !== -1) {
+        notices.push({
+          title: "Assignment created",
+          meta: "AI / operator matching",
+          status: "Assigned",
+          copy: line
+        });
+        return;
+      }
+      if (normalized.indexOf("pending") !== -1 || normalized.indexOf("submitted") !== -1 || normalized.indexOf("broadcast") !== -1) {
+        notices.push({
+          title: "New pending request",
+          meta: "Request intake",
+          status: "Pending",
+          copy: line
+        });
+      }
+    });
 
     if (latestRequest) {
       notices.push({
@@ -2569,7 +2952,9 @@
       notices.push({
         title: "Volunteer growth update",
         meta: volunteerSnapshot.ngoGroup + " · " + volunteerSnapshot.reliability + "% reliable",
-        status: volunteerSnapshot.completed ? "Delivered" : "Assigned",
+        status: volunteerSnapshot.activeTasks && volunteerSnapshot.activeTasks[0]
+          ? normalizeAssignmentStatus(volunteerSnapshot.activeTasks[0].status)
+          : (volunteerSnapshot.completed ? "Completed" : "Accepted"),
         copy: "You have " + volunteerSnapshot.activeTasks.length + " active task(s) and " + volunteerSnapshot.completed + " completed task(s) visible in your lane."
       });
     }
@@ -2577,11 +2962,15 @@
       return [{
         title: "No live notifications yet",
         meta: "Load a scenario",
-        status: "Requested",
+        status: "Pending",
         copy: "Requests, assignments, and donations will appear here once the workspace is active."
       }];
     }
-    return notices.slice(0, 5);
+    return notices.filter(function (item, index, list) {
+      return list.findIndex(function (candidate) {
+        return candidate.title === item.title && candidate.copy === item.copy;
+      }) === index;
+    }).slice(0, 6);
   }
 
   function buildRouteGroups(workspace) {
@@ -2608,13 +2997,12 @@
         return priorityScore(request.priority) >= 0.82;
       }).length;
       const activeAssignments = item.assignments.filter(function (assignment) {
-        const stage = normalizeAssignmentStatus(assignment.status);
-        return stage === "Assigned" || stage === "In Progress";
+        return isAssignmentActiveStage(assignment.status);
       }).length;
       return {
         title: item.district + " route group",
         meta: item.requests.length + " requests · " + item.assignments.length + " assignments",
-        status: criticalCount ? "High Priority" : activeAssignments ? "In Progress" : "Requested",
+        status: criticalCount ? "High Priority" : activeAssignments ? "In Progress" : "Pending",
         copy: criticalCount
           ? "This route group has " + criticalCount + " urgent request(s) waiting on tight movement coordination."
           : "Use this grouped lane to batch volunteers, donations, and field visits in one district.",
@@ -2635,8 +3023,7 @@
         return safeText(request.district, 80) === summary.district;
       });
       const delivered = requestList.filter(function (request) {
-        const stage = normalizeRequestStatus(request.status);
-        return stage === "Delivered" || stage === "Closed";
+        return isRequestCompleteStage(request.status);
       }).length;
       const completion = requestList.length ? Math.round((delivered / requestList.length) * 100) : 0;
       const donations = requestList.reduce(function (sum, request) {
@@ -2758,8 +3145,7 @@
 
   function buildActiveDeployments(workspace) {
     return (workspace.assignments || []).filter(function (assignment) {
-      const stage = normalizeAssignmentStatus(assignment.status);
-      return stage === "Assigned" || stage === "In Progress";
+      return isAssignmentActiveStage(assignment.status);
     }).map(function (assignment) {
       return {
         title: assignment.title,
@@ -2772,8 +3158,7 @@
 
   function buildBlockedCases(workspace) {
     return (workspace.requests || []).filter(function (request) {
-      const stage = normalizeRequestStatus(request.status);
-      return request.blocked || ((stage === "Requested" || stage === "Reviewed") && priorityScore(request.priority) >= 0.82);
+      return request.blocked || (isRequestPendingStage(request.status) && priorityScore(request.priority) >= 0.82);
     }).map(function (request) {
       return {
         title: request.title,
@@ -2786,8 +3171,7 @@
 
   function buildPendingApprovals(workspace) {
     return (workspace.requests || []).filter(function (request) {
-      const stage = normalizeRequestStatus(request.status);
-      return stage === "Requested" || stage === "Reviewed";
+      return isRequestPendingStage(request.status);
     }).map(function (request) {
       return {
         title: request.title,
@@ -2804,8 +3188,7 @@
       return 0;
     }
     const complete = workspace.requests.filter(function (request) {
-      const stage = normalizeRequestStatus(request.status);
-      return stage === "Delivered" || stage === "Closed";
+      return isRequestCompleteStage(request.status);
     }).length;
     return Math.round((complete / total) * 100);
   }
@@ -2835,7 +3218,7 @@
       items.push({
         title: "Moderation queue is clear",
         meta: "No urgent admin actions",
-        status: "Delivered",
+        status: "Completed",
         copy: "Visible request and donation records are moving without an obvious moderation backlog."
       });
     }
@@ -2844,8 +3227,7 @@
 
   function buildAdminAnalytics(workspace) {
     const deliveredAssignments = workspace.assignments.filter(function (assignment) {
-      const stage = normalizeAssignmentStatus(assignment.status);
-      return stage === "Delivered" || stage === "Closed";
+      return isAssignmentCompleteStage(assignment.status);
     }).length;
     const totalMoney = workspace.donations.reduce(function (sum, donation) {
       return sum + (donation.kind === "money" ? Number(donation.amount || 0) : 0);
@@ -2858,7 +3240,7 @@
         copy: "This shows how much of the visible request load has reached delivery or closure."
       },
       {
-        title: "Delivered assignments",
+        title: "Completed assignments",
         meta: "Closed volunteer work",
         value: String(deliveredAssignments),
         copy: "Completed assignments help validate attendance, points, and volunteer reliability."
@@ -2884,8 +3266,7 @@
         return safeText(assignment.volunteer, 120).toLowerCase() === safeText(volunteer.name, 120).toLowerCase();
       });
       const delivered = assignments.filter(function (assignment) {
-        const stage = normalizeAssignmentStatus(assignment.status);
-        return stage === "Delivered" || stage === "Closed";
+        return isAssignmentCompleteStage(assignment.status);
       }).length;
       const points = assignments.reduce(function (sum, assignment) {
         return sum + Number(assignment.points || 0);
@@ -2913,7 +3294,7 @@
     const normalized = safeText(status, 40).toLowerCase();
     if (normalized.indexOf("blocked") !== -1 || normalized.indexOf("critical") !== -1) return "muted";
     if (normalized.indexOf("complete") !== -1 || normalized.indexOf("delivered") !== -1 || normalized.indexOf("closed") !== -1 || normalized.indexOf("available") !== -1 || normalized.indexOf("active") !== -1 || normalized.indexOf("visible") !== -1) return "success";
-    if (normalized.indexOf("requested") !== -1 || normalized.indexOf("submitted") !== -1 || normalized.indexOf("review") !== -1 || normalized.indexOf("queue") !== -1 || normalized.indexOf("pending") !== -1 || normalized.indexOf("verified") !== -1 || normalized.indexOf("packed") !== -1 || normalized.indexOf("dispatch") !== -1 || normalized.indexOf("scheduled") !== -1 || normalized.indexOf("assigned") !== -1 || normalized.indexOf("progress") !== -1) return "pending";
+    if (normalized.indexOf("requested") !== -1 || normalized.indexOf("submitted") !== -1 || normalized.indexOf("review") !== -1 || normalized.indexOf("queue") !== -1 || normalized.indexOf("pending") !== -1 || normalized.indexOf("verified") !== -1 || normalized.indexOf("packed") !== -1 || normalized.indexOf("dispatch") !== -1 || normalized.indexOf("scheduled") !== -1 || normalized.indexOf("assigned") !== -1 || normalized.indexOf("progress") !== -1 || normalized.indexOf("shift") !== -1) return "pending";
     return "muted";
   }
 
@@ -2929,33 +3310,121 @@
     if (headerSearchForm) {
       const headerSearchInput = headerSearchForm.querySelector(".rf-search-input");
       if (headerSearchInput) {
+        headerSearchInput.addEventListener("focus", function () {
+          SEARCH_RUNTIME.focused = true;
+          renderApp(document.getElementById("portalApp"));
+          const refreshedInput = document.querySelector(".rf-search-input");
+          if (refreshedInput) {
+            refreshedInput.focus();
+            refreshedInput.setSelectionRange(refreshedInput.value.length, refreshedInput.value.length);
+          }
+        });
+        headerSearchInput.addEventListener("blur", function () {
+          window.setTimeout(function () {
+            SEARCH_RUNTIME.focused = false;
+            renderApp(document.getElementById("portalApp"));
+          }, 120);
+        });
         headerSearchInput.addEventListener("input", function () {
           SEARCH_RUNTIME.query = safeText(headerSearchInput.value, 160);
-          if (!SEARCH_RUNTIME.query && SEARCH_RUNTIME.searched) {
-            SEARCH_RUNTIME.searched = false;
-            renderApp(document.getElementById("portalApp"));
+          SEARCH_RUNTIME.searched = false;
+          renderApp(document.getElementById("portalApp"));
+          const refreshedInput = document.querySelector(".rf-search-input");
+          if (refreshedInput) {
+            refreshedInput.focus();
+            refreshedInput.setSelectionRange(refreshedInput.value.length, refreshedInput.value.length);
           }
         });
       }
       headerSearchForm.addEventListener("submit", function (event) {
         event.preventDefault();
         SEARCH_RUNTIME.query = safeText(headerSearchInput && headerSearchInput.value, 160);
-        SEARCH_RUNTIME.searched = Boolean(SEARCH_RUNTIME.query);
-        renderApp(document.getElementById("portalApp"));
-        if (!SEARCH_RUNTIME.searched) {
+        if (!SEARCH_RUNTIME.query) {
+          SEARCH_RUNTIME.searched = false;
+          renderApp(document.getElementById("portalApp"));
           announce("Enter a volunteer name, request title, donor, or district to search.");
           return;
         }
         const results = buildWorkspaceSearchResults(SEARCH_RUNTIME.query, session, getWorkspace());
+        const topResult = results[0] || null;
+        const exactResult = results.find(function (result) {
+          return result.exact || false;
+        }) || null;
+        const jumpResult = exactResult || (results.length === 1 ? topResult : null);
+        SEARCH_RUNTIME.searched = Boolean(SEARCH_RUNTIME.query);
+        SEARCH_RUNTIME.focused = false;
+        if (results.length) {
+          saveRecentSearch(SEARCH_RUNTIME.query);
+        }
         announce(results.length ? (String(results.length) + " result(s) found.") : "Not found.");
+        if (jumpResult && jumpResult.pageKey === page && jumpResult.anchor) {
+          renderApp(document.getElementById("portalApp"));
+          jumpToAnchor(jumpResult.anchor, { instant: false });
+          return;
+        }
+        if (jumpResult && jumpResult.href) {
+          window.location.assign(jumpResult.href);
+          return;
+        }
+        renderApp(document.getElementById("portalApp"));
       });
     }
+
+    root.querySelectorAll(".rf-search-result[data-search-anchor]").forEach(function (resultLink) {
+      resultLink.addEventListener("click", function (event) {
+        const targetPage = safeText(resultLink.dataset.searchPage || "", 40);
+        const targetAnchor = safeText(resultLink.dataset.searchAnchor || "", 120);
+        saveRecentSearch(SEARCH_RUNTIME.query);
+        if (!targetPage || !targetAnchor) {
+          return;
+        }
+        if (targetPage === page) {
+          event.preventDefault();
+          jumpToAnchor(targetAnchor, { instant: false });
+        }
+      });
+    });
+
+    root.querySelectorAll("[data-action='recent-search']").forEach(function (button) {
+      button.addEventListener("click", function () {
+        SEARCH_RUNTIME.query = safeText(button.dataset.query || "", 160);
+        SEARCH_RUNTIME.searched = true;
+        SEARCH_RUNTIME.focused = false;
+        saveRecentSearch(SEARCH_RUNTIME.query);
+        const results = buildWorkspaceSearchResults(SEARCH_RUNTIME.query, session, getWorkspace());
+        const topResult = results[0] || null;
+        const exactResult = results.find(function (result) {
+          return result.exact || false;
+        }) || null;
+        const jumpResult = exactResult || (results.length === 1 ? topResult : null);
+        if (jumpResult && jumpResult.pageKey === page && jumpResult.anchor) {
+          renderApp(document.getElementById("portalApp"));
+          jumpToAnchor(jumpResult.anchor, { instant: false });
+          return;
+        }
+        if (jumpResult && jumpResult.href) {
+          window.location.assign(jumpResult.href);
+          return;
+        }
+        renderApp(document.getElementById("portalApp"));
+      });
+    });
 
     root.querySelectorAll("[data-action='clear-search']").forEach(function (button) {
       button.addEventListener("click", function () {
         SEARCH_RUNTIME.query = "";
         SEARCH_RUNTIME.searched = false;
+        SEARCH_RUNTIME.focused = false;
         renderApp(document.getElementById("portalApp"));
+      });
+    });
+
+    root.querySelectorAll("[data-action='close-portal-launcher']").forEach(function (button) {
+      button.addEventListener("click", function () {
+        const launcher = button.closest(".portal-launcher");
+        if (launcher) {
+          launcher.removeAttribute("open");
+        }
       });
     });
 
@@ -2988,6 +3457,15 @@
 
     root.querySelectorAll("[data-action='toggle-demo-drawer']").forEach(function (button) {
       button.addEventListener("click", function () {
+        AI_RUNTIME.drawerOpen = false;
+        DEMO_RUNTIME.drawerOpen = !DEMO_RUNTIME.drawerOpen;
+        renderApp(document.getElementById("portalApp"));
+      });
+    });
+
+    root.querySelectorAll("[data-mobile-action='demo-action']").forEach(function (link) {
+      link.addEventListener("click", function (event) {
+        event.preventDefault();
         AI_RUNTIME.drawerOpen = false;
         DEMO_RUNTIME.drawerOpen = !DEMO_RUNTIME.drawerOpen;
         renderApp(document.getElementById("portalApp"));
@@ -3138,6 +3616,29 @@
 
     const communityForm = document.getElementById("communityRequestForm");
     if (communityForm) {
+      const draft = loadDraft(COMMUNITY_DRAFT_KEY) || {};
+      ["title", "category", "district", "location", "beneficiaries", "priority", "shortSummary", "summary"].forEach(function (fieldName) {
+        if (communityForm.elements[fieldName] && draft[fieldName] != null && !communityForm.elements[fieldName].value) {
+          communityForm.elements[fieldName].value = draft[fieldName];
+        }
+      });
+      if (communityForm.dataset.draftBound !== "true") {
+        communityForm.dataset.draftBound = "true";
+        ["input", "change"].forEach(function (eventName) {
+          communityForm.addEventListener(eventName, function () {
+            saveDraft(COMMUNITY_DRAFT_KEY, {
+              title: safeText(communityForm.elements.title && communityForm.elements.title.value, 160),
+              category: safeText(communityForm.elements.category && communityForm.elements.category.value, 80),
+              district: safeText(communityForm.elements.district && communityForm.elements.district.value, 120),
+              location: safeText(communityForm.elements.location && communityForm.elements.location.value, 160),
+              beneficiaries: safeText(communityForm.elements.beneficiaries && communityForm.elements.beneficiaries.value, 40),
+              priority: safeText(communityForm.elements.priority && communityForm.elements.priority.value, 40),
+              shortSummary: safeText(communityForm.elements.shortSummary && communityForm.elements.shortSummary.value, 220),
+              summary: safeText(communityForm.elements.summary && communityForm.elements.summary.value, 1200)
+            });
+          });
+        });
+      }
       communityForm.addEventListener("submit", function (event) {
         event.preventDefault();
         submitCommunityRequest(communityForm);
@@ -3246,14 +3747,14 @@
       exportedAt: new Date().toISOString(),
       page: page,
       role: session.role,
-      workspace: getWorkspace()
+      workspace: getManagedWorkspace({ reason: "export-json" })
     };
     downloadTextFile("resourceflow-" + page + "-report.json", JSON.stringify(payload, null, 2), "application/json");
     announce("JSON export created for the current workspace.");
   }
 
   function exportWorkspaceCsv(page, session) {
-    const workspace = getWorkspace();
+    const workspace = getManagedWorkspace({ reason: "export-csv" });
     const lines = [
       ["type", "id", "title", "district", "location", "status", "priority", "beneficiaries", "owner"].join(",")
     ];
@@ -3387,7 +3888,7 @@
   }
 
   function advanceRequestLifecycle(requestId) {
-    const workspace = getWorkspace();
+    const workspace = getManagedWorkspace({ reason: "advance-request" });
     const request = workspace.requests.find(function (item) {
       return item.id === requestId;
     });
@@ -3398,7 +3899,7 @@
     const currentIndex = REQUEST_STAGES.indexOf(currentStage);
     const nextStage = REQUEST_STAGES[Math.min(currentIndex + 1, REQUEST_STAGES.length - 1)];
     request.status = nextStage;
-    request.updatedAt = new Date().toISOString();
+    request.updatedAt = nowIso();
     if (nextStage === "Assigned" && !workspace.assignments.some(function (item) { return item.requestId === request.id; })) {
       workspace.assignments.unshift(createAssignmentFromRequest(request, workspace));
     }
@@ -3410,7 +3911,7 @@
   }
 
   function closeRequestLifecycle(requestId) {
-    const workspace = getWorkspace();
+    const workspace = getManagedWorkspace({ reason: "close-request" });
     const request = workspace.requests.find(function (item) {
       return item.id === requestId;
     });
@@ -3418,7 +3919,7 @@
       return;
     }
     request.status = "Closed";
-    request.updatedAt = new Date().toISOString();
+    request.updatedAt = nowIso();
     syncAssignmentsForRequest(request, workspace, "Closed");
     workspace.audit.unshift(request.title + " was closed from the admin or operations lane.");
     workspace.systemNotice = request.title + " is now closed.";
@@ -3427,7 +3928,7 @@
   }
 
   function advanceAssignmentLifecycle(assignmentId) {
-    const workspace = getWorkspace();
+    const workspace = getManagedWorkspace({ reason: "advance-assignment" });
     const assignment = workspace.assignments.find(function (item) {
       return item.id === assignmentId;
     });
@@ -3437,28 +3938,41 @@
     const currentStage = normalizeAssignmentStatus(assignment.status);
     const currentIndex = ASSIGNMENT_STAGES.indexOf(currentStage);
     const nextStage = ASSIGNMENT_STAGES[Math.min(currentIndex + 1, ASSIGNMENT_STAGES.length - 1)];
-    assignment.status = nextStage;
-    assignment.updatedAt = new Date().toISOString();
+    if (nextStage === "Completed") {
+      completeAssignment(assignment, workspace.requests.find(function (item) { return item.id === assignment.requestId; }) || null, workspace);
+    } else {
+      assignment.status = nextStage;
+      assignment.updatedAt = nowIso();
+      assignment.acceptedAt = assignment.acceptedAt || nowIso();
+      if (nextStage === "In Progress") {
+        assignment.startedAt = assignment.startedAt || nowIso();
+      }
+    }
     if (assignment.requestId) {
       const request = workspace.requests.find(function (item) { return item.id === assignment.requestId; });
       if (request) {
-        if (nextStage === "In Progress") {
+        if (nextStage === "Accepted") {
+          request.status = "Assigned";
+        } else if (nextStage === "In Progress") {
           request.status = "In Progress";
-        } else if (nextStage === "Delivered") {
-          request.status = "Delivered";
-        } else if (nextStage === "Closed") {
-          request.status = "Closed";
         }
+        request.updatedAt = nowIso();
       }
     }
-    workspace.audit.unshift(assignment.title + " moved to " + nextStage + ".");
-    workspace.systemNotice = assignment.title + " updated to " + nextStage + ".";
+    if (nextStage !== "Completed") {
+      workspace.audit.unshift(buildVolunteerStatusLine(assignment, nextStage));
+      workspace.systemNotice = buildVolunteerStatusLine(assignment, nextStage);
+    }
     saveWorkspace(workspace);
     renderApp(document.getElementById("portalApp"));
   }
 
-  function createAssignmentFromRequest(request, workspace) {
-    const bestVolunteer = pickBestVolunteerForRequest(request, workspace) || workspace.volunteers[0] || { name: "Volunteer pending", location: request.location, ngo: "ResourceFlow" };
+  function createAssignmentFromRequest(request, workspace, options) {
+    const config = options && typeof options === "object" ? options : {};
+    const bestVolunteer = config.volunteer || pickBestVolunteerForRequest(request, workspace) || workspace.volunteers[0] || { name: "Volunteer pending", location: request.location, ngo: "ResourceFlow", origin: "demo" };
+    const createdAt = nowIso();
+    const stage = normalizeAssignmentStatus(config.status || "Accepted");
+    const volunteerOrigin = safeText(config.volunteerOrigin || bestVolunteer.origin || "demo", 20).toLowerCase() || "demo";
     return {
       id: "ASG-" + Math.floor(Math.random() * 900 + 100),
       requestId: request.id,
@@ -3466,26 +3980,61 @@
       volunteer: bestVolunteer.name,
       district: request.district,
       location: request.location,
-      status: "Assigned",
-      date: "Today " + new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      points: Math.max(14, Math.round(Number(request.beneficiaries || 10) / 8))
+      status: stage,
+      date: "Today " + new Date(createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      points: Number(config.points || computeTaskPoints(request && request.priority || "Medium", config.shiftCount || 0)),
+      createdAt: createdAt,
+      updatedAt: createdAt,
+      acceptedAt: stage === "Accepted" || stage === "In Progress" || stage === "Completed" ? createdAt : "",
+      startedAt: stage === "In Progress" || stage === "Completed" ? createdAt : "",
+      completedAt: stage === "Completed" ? createdAt : "",
+      estimatedDurationMinutes: Math.max(6, Number(config.estimatedDurationMinutes || request && request.estimatedDurationMinutes || estimatedDurationMinutes(request && request.priority, request && (request.source || request.origin)))),
+      origin: safeText(config.origin || request.origin || request.source || "demo", 30).toLowerCase(),
+      volunteerOrigin: volunteerOrigin,
+      autoManaged: config.autoManaged == null ? volunteerOrigin === "demo" : Boolean(config.autoManaged),
+      supportLane: Boolean(config.supportLane),
+      shiftCount: Number(config.shiftCount || 0),
+      shifted: Boolean(config.shifted),
+      pointsAwarded: Boolean(config.pointsAwarded)
     };
   }
 
-  function pickBestVolunteerForRequest(request, workspace) {
+  function pickBestVolunteerForRequest(request, workspace, options) {
+    const config = options && typeof options === "object" ? options : {};
     const category = safeText(request.category, 60).toLowerCase();
     const district = safeText(request.district, 80).toLowerCase();
     const keywords = CATEGORY_SKILLS[category] || [];
-    const candidates = workspace.volunteers.map(function (volunteer) {
+    const desiredOrigin = safeText(config.origin || "", 20).toLowerCase();
+    const excluded = (config.excludeVolunteerNames || []).map(function (item) { return normalizeSearchQuery(item); });
+    const requestLat = finiteNumber(request && request.lat);
+    const requestLng = finiteNumber(request && request.lng);
+    const candidates = workspace.volunteers.filter(function (volunteer) {
+      const origin = safeText(volunteer.origin || "demo", 20).toLowerCase();
+      if (desiredOrigin && origin !== desiredOrigin) {
+        return false;
+      }
+      if (excluded.indexOf(normalizeSearchQuery(volunteer.name)) !== -1) {
+        return false;
+      }
+      return isVolunteerAvailable(volunteer);
+    }).map(function (volunteer) {
       const location = safeText(volunteer.location, 140).toLowerCase();
       const skills = joinSkills(volunteer.skills).toLowerCase();
+      const volunteerLat = finiteNumber(volunteer.lat);
+      const volunteerLng = finiteNumber(volunteer.lng);
+      const nearestKm = distanceKm(requestLat, requestLng, volunteerLat, volunteerLng);
       let score = Number(volunteer.reliability || computeVolunteerReliability(volunteer, workspace.assignments));
       if (district && location.indexOf(district) !== -1) score += 12;
+      if (safeText(request.location, 140).toLowerCase() && location.indexOf(safeText(request.location, 140).toLowerCase()) !== -1) score += 14;
       if (keywords.some(function (keyword) { return skills.indexOf(keyword) !== -1; })) score += 14;
-      if (/available|active|on call/.test(safeText(volunteer.availability, 40).toLowerCase())) score += 8;
-      return { volunteer: volunteer, score: score };
+      if (normalizedAvailability(volunteer.availability || volunteer.activityStatus) === "available") score += 8;
+      if (safeText(volunteer.origin || "", 20).toLowerCase() === "real") score += 4;
+      if (nearestKm != null) {
+        score += Math.max(0, 24 - Math.round(nearestKm * 2));
+      }
+      return { volunteer: volunteer, score: score, nearestKm: nearestKm == null ? Number.POSITIVE_INFINITY : nearestKm };
     }).sort(function (left, right) {
-      return right.score - left.score;
+      return right.score - left.score || left.nearestKm - right.nearestKm;
     });
     return candidates.length ? candidates[0].volunteer : null;
   }
@@ -3496,23 +4045,22 @@
       if (assignment.requestId !== request.id) {
         return;
       }
-      if (targetStatus === "Assigned") {
-        assignment.status = "Assigned";
+      if (targetStatus === "Pending" || targetStatus === "Reviewed" || targetStatus === "Assigned") {
+        assignment.status = "Accepted";
       } else if (targetStatus === "In Progress") {
         assignment.status = "In Progress";
-      } else if (targetStatus === "Delivered") {
-        assignment.status = "Delivered";
-      } else if (targetStatus === "Closed") {
-        assignment.status = "Closed";
+      } else if (targetStatus === "Delivered" || targetStatus === "Closed") {
+        assignment.status = "Completed";
       }
+      assignment.updatedAt = nowIso();
     });
   }
 
   function submitCommunityRequest(form) {
     const data = new FormData(form);
-    const workspace = getWorkspace();
+    const workspace = getManagedWorkspace({ reason: "submit-request" });
     const session = getSession();
-    workspace.requests.unshift({
+    const request = {
       id: "REQ-" + Math.floor(Math.random() * 900 + 100),
       title: safeText(data.get("title"), 140),
       category: safeText(data.get("category"), 80),
@@ -3520,16 +4068,27 @@
       location: safeText(data.get("location"), 140),
       beneficiaries: Number(data.get("beneficiaries") || 40),
       priority: safeText(data.get("priority"), 40) || "Medium",
-      status: "Requested",
+      status: "Pending",
       summary: safeText(data.get("shortSummary"), 180) || safeText(data.get("summary"), 280),
-      ai: "The AI will attach skills, district fit, and donation needs after an operator reviews this request.",
-      requestedAt: new Date().toISOString(),
+      ai: "The AI is broadcasting this request to Admin and Government, then matching the best volunteers and donation gaps.",
+      requestedAt: nowIso(),
+      createdAt: nowIso(),
+      updatedAt: nowIso(),
       requester: safeText(session.name || "Community user", 120),
-      blocked: false
-    });
-    workspace.systemNotice = "New community request added to the live tracker and set to Requested.";
+      blocked: false,
+      source: "live",
+      origin: "live",
+      priorityLane: "live",
+      broadcastTo: ["admin", "government"],
+      complexity: inferTaskComplexity(safeText(data.get("priority"), 40) || "Medium"),
+      estimatedDurationMinutes: estimatedDurationMinutes(safeText(data.get("priority"), 40) || "Medium", "live")
+    };
+    workspace.requests.unshift(request);
+    workspace.systemNotice = "New community request added to the live tracker and broadcasted as Pending.";
     workspace.audit.unshift("A community request was submitted for " + safeText(data.get("district"), 80) + " and routed into the lifecycle board.");
     saveWorkspace(workspace);
+    clearDraft(COMMUNITY_DRAFT_KEY);
+    runWorkspaceAutomation({ reason: "submit-request" });
     renderApp(document.getElementById("portalApp"));
   }
 
@@ -3543,7 +4102,7 @@
     if (!subject) {
       return;
     }
-    const workspace = getWorkspace();
+    const workspace = getManagedWorkspace({ reason: "save-outreach-draft" });
     workspace.outreach.unshift(subject + " - " + safeText(data.get("recipients"), 120));
     saveWorkspace(workspace);
     renderApp(document.getElementById("portalApp"));
@@ -3573,23 +4132,25 @@
     renderApp(document.getElementById("portalApp"));
 
     try {
-      const workspace = getWorkspace();
+      const workspace = getManagedWorkspace({ reason: "ai-submit" });
       const history = getAiChatHistory(session.role);
       const result = await requestAiCopilot(message, session, workspace, history);
       const execution = executeAiActionPlan(result.actions || [], session, workspace, message);
       if (execution.changed) {
         saveWorkspace(workspace);
+        getManagedWorkspace({ reason: "ai-submit-actions" });
       }
       appendAiChatMessage(session.role, "assistant", mergeCopilotReplyWithExecution(result.text, execution), result.sourceLabel);
       AI_RUNTIME.engine = result.engine;
       AI_RUNTIME.status = execution.notice || result.notice;
       AI_RUNTIME.tone = execution.changed ? "success" : (result.engine === "local-boosted" ? "" : "success");
     } catch (error) {
-      const fallback = buildLocalCopilotResponse(message, getWorkspace(), session, getAiChatHistory(session.role));
-      const fallbackWorkspace = getWorkspace();
+      const fallbackWorkspace = getManagedWorkspace({ reason: "ai-submit-fallback" });
+      const fallback = buildLocalCopilotResponse(message, fallbackWorkspace, session, getAiChatHistory(session.role));
       const execution = executeAiActionPlan(fallback.actions || [], session, fallbackWorkspace, message);
       if (execution.changed) {
         saveWorkspace(fallbackWorkspace);
+        getManagedWorkspace({ reason: "ai-submit-fallback-actions" });
       }
       appendAiChatMessage(session.role, "assistant", mergeCopilotReplyWithExecution(fallback.text, execution), "Local boosted engine");
       AI_RUNTIME.engine = "local-boosted";
@@ -3657,6 +4218,7 @@
 
   async function requestDirectGeminiResponse(message, session, workspace, history) {
     const config = window.RESOURCEFLOW_FIREBASE_CONFIG || {};
+    const prompt = buildCopilotPrompt(workspace, session, message, history);
     const response = await fetch(
       "https://generativelanguage.googleapis.com/v1beta/models/" +
         encodeURIComponent(config.geminiModel || "gemini-2.5-flash") +
@@ -3666,17 +4228,18 @@
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          contents: [
-            {
-              role: "user",
-              parts: [{ text: buildCopilotPrompt(workspace, session, message, history) }]
-            }
-          ],
+          systemInstruction: {
+            parts: [
+              {
+                text: buildGeminiSystemInstruction(session)
+              }
+            ]
+          },
+          contents: buildGeminiConversationContents(history, prompt),
           generationConfig: {
-            temperature: 0.3,
-            topP: 0.92,
-            maxOutputTokens: 1200,
-            responseMimeType: "application/json"
+            temperature: 0.88,
+            topP: 0.95,
+            maxOutputTokens: 1800
           }
         })
       }
@@ -3691,17 +4254,52 @@
     }
     return {
       engine: "gemini-direct",
-      sourceLabel: "Gemini direct",
+      sourceLabel: "Gemini",
       notice: "Gemini answered directly from the configured browser key.",
       text: structured.text,
       actions: structured.actions
     };
   }
 
+  function buildGeminiSystemInstruction(session) {
+    const roleLabel = (ROLE_CONFIG[session.role] || ROLE_CONFIG.user).label;
+    return [
+      "You are Gemini inside ResourceFlow, a multi-role response coordination platform.",
+      "Sound natural, calm, and human.",
+      "Do not answer like a rigid rule engine or JSON bot unless the user explicitly asks for structure.",
+      "Use clear operational reasoning with simple language.",
+      "Respect the current signed-in role: " + roleLabel + ".",
+      "If the user asks you to operate the workspace, explain the action briefly first and only then provide action payloads if needed."
+    ].join(" ");
+  }
+
+  function buildGeminiConversationContents(history, prompt) {
+    const conversation = [];
+    (Array.isArray(history) ? history.slice(-6) : []).forEach(function (entry) {
+      const text = safeText(entry && entry.text, 1600);
+      if (!text) {
+        return;
+      }
+      conversation.push({
+        role: entry && entry.speaker === "assistant" ? "model" : "user",
+        parts: [{ text: text }]
+      });
+    });
+    conversation.push({
+      role: "user",
+      parts: [{ text: prompt }]
+    });
+    return conversation;
+  }
+
   function extractGeminiStructuredPayload(payload) {
     const rawText = extractGeminiTextClient(payload);
     if (!rawText) {
       return null;
+    }
+    const envelope = extractGeminiActionEnvelope(rawText);
+    if (envelope) {
+      return envelope;
     }
     const parsed = parseJsonLikeResponse(rawText);
     if (!parsed || typeof parsed !== "object") {
@@ -3713,6 +4311,22 @@
     return {
       text: formatStructuredCopilotAnswer(parsed.answer || parsed),
       actions: normalizeAiActionPlan(parsed.actions)
+    };
+  }
+
+  function extractGeminiActionEnvelope(text) {
+    const raw = safeText(text, 12000);
+    const marker = "ACTIONS_JSON:";
+    const markerIndex = raw.lastIndexOf(marker);
+    if (markerIndex === -1) {
+      return null;
+    }
+    const answerText = safeText(raw.slice(0, markerIndex).trim(), 6000);
+    const actionText = safeText(raw.slice(markerIndex + marker.length).trim(), 4000);
+    const parsedActions = parseJsonLikeResponse(actionText);
+    return {
+      text: answerText || safeText(raw, 6000),
+      actions: normalizeAiActionPlan(parsedActions)
     };
   }
 
@@ -3881,25 +4495,41 @@
     }
     const volunteer = findVolunteerForAiAction(action, workspace, request);
     let assignment = workspace.assignments.find(function (item) {
-      return item.requestId === request.id;
+      return item.requestId === request.id && !isAssignmentCompleteStage(item.status);
     }) || null;
     if (!assignment) {
-      assignment = createAssignmentFromRequest(request, workspace);
-      assignment.requestId = request.id;
+      assignment = createAssignmentFromRequest(request, workspace, {
+        volunteer: volunteer,
+        origin: request.source === "live" ? "live" : "demo",
+        volunteerOrigin: volunteer && volunteer.origin || "",
+        status: action.targetStatus || "Accepted",
+        autoManaged: safeText(volunteer && volunteer.origin || "", 20).toLowerCase() === "demo"
+      });
       workspace.assignments.unshift(assignment);
     }
     if (volunteer) {
       assignment.volunteer = volunteer.name;
+      assignment.volunteerOrigin = safeText(volunteer.origin || "demo", 20).toLowerCase() || "demo";
+      assignment.autoManaged = assignment.volunteerOrigin === "demo";
     }
     assignment.district = request.district;
     assignment.location = request.location;
-    assignment.status = normalizeAssignmentStatus(action.targetStatus || assignment.status || "Assigned");
-    assignment.updatedAt = new Date().toISOString();
-    request.status = normalizeRequestStatus(request.status) === "Requested" ? "Assigned" : normalizeRequestStatus(request.status);
-    request.updatedAt = new Date().toISOString();
-    syncAssignmentsForRequest(request, workspace, assignment.status === "In Progress" ? "In Progress" : request.status);
+    assignment.status = normalizeAssignmentStatus(action.targetStatus || assignment.status || "Accepted");
+    assignment.updatedAt = nowIso();
+    assignment.acceptedAt = assignment.acceptedAt || nowIso();
+    if (assignment.status === "In Progress") {
+      assignment.startedAt = assignment.startedAt || nowIso();
+      request.status = "In Progress";
+    } else if (isAssignmentCompleteStage(assignment.status)) {
+      request.status = "Delivered";
+    } else {
+      request.status = normalizeRequestStatus(request.status) === "Pending" ? "Assigned" : normalizeRequestStatus(request.status);
+    }
+    request.updatedAt = nowIso();
+    syncAssignmentsForRequest(request, workspace, request.status);
     workspace.audit.unshift("AI assigned " + assignment.title + " to " + assignment.volunteer + ".");
-    workspace.systemNotice = "AI assigned " + request.title + " to " + assignment.volunteer + ".";
+    workspace.audit.unshift(buildVolunteerStatusLine(assignment, assignment.status));
+    workspace.systemNotice = buildVolunteerStatusLine(assignment, assignment.status);
     return {
       ok: true,
       summary: "Assigned " + request.title + " to " + assignment.volunteer + " in " + safeText(request.district || "the active district", 120) + "."
@@ -3917,7 +4547,7 @@
       return { ok: false, summary: request.title + " is already in the " + target + " stage." };
     }
     request.status = target;
-    request.updatedAt = new Date().toISOString();
+    request.updatedAt = nowIso();
     if (target === "Assigned" && !workspace.assignments.some(function (item) { return item.requestId === request.id; })) {
       workspace.assignments.unshift(createAssignmentFromRequest(request, workspace));
     }
@@ -3943,19 +4573,29 @@
     if (current === target) {
       return { ok: false, summary: assignment.title + " is already marked " + target + "." };
     }
-    assignment.status = target;
-    assignment.updatedAt = new Date().toISOString();
+    if (target === "Completed") {
+      completeAssignment(assignment, workspace.requests.find(function (item) { return item.id === assignment.requestId; }) || null, workspace, "AI completed " + assignment.title + " after field confirmation.");
+    } else {
+      assignment.status = target;
+      assignment.updatedAt = nowIso();
+      assignment.acceptedAt = assignment.acceptedAt || nowIso();
+      if (target === "In Progress") {
+        assignment.startedAt = assignment.startedAt || nowIso();
+      }
+    }
     if (assignment.requestId) {
       const request = workspace.requests.find(function (item) { return item.id === assignment.requestId; });
       if (request) {
+        if (target === "Accepted") request.status = "Assigned";
         if (target === "In Progress") request.status = "In Progress";
-        if (target === "Delivered") request.status = "Delivered";
-        if (target === "Closed") request.status = "Closed";
-        request.updatedAt = new Date().toISOString();
+        if (target === "Completed") request.status = "Delivered";
+        request.updatedAt = nowIso();
       }
     }
-    workspace.audit.unshift("AI moved " + assignment.title + " to " + target + ".");
-    workspace.systemNotice = assignment.title + " updated to " + target + ".";
+    if (target !== "Completed") {
+      workspace.audit.unshift(buildVolunteerStatusLine(assignment, target));
+      workspace.systemNotice = buildVolunteerStatusLine(assignment, target);
+    }
     return {
       ok: true,
       summary: "Updated " + assignment.title + " to " + target + "."
@@ -4242,7 +4882,7 @@
     }
 
     if (matchesAiIntent(prompt, ["manage", "operate", "run", "control room", "take action", "do it", "start now", "stabilize"])) {
-      if (targetRequest && normalizeRequestStatus(targetRequest.status) === "Requested") {
+      if (targetRequest && normalizeRequestStatus(targetRequest.status) === "Pending") {
         actions.push({ type: "update_request_status", requestId: targetRequest.id, targetStatus: "Reviewed" });
       }
       if (targetRequest) {
@@ -4252,7 +4892,7 @@
           volunteerName: targetVolunteer && targetVolunteer.name || ""
         });
       }
-      if (targetAssignment && normalizeAssignmentStatus(targetAssignment.status) === "Assigned") {
+      if (targetAssignment && normalizeAssignmentStatus(targetAssignment.status) === "Accepted") {
         actions.push({ type: "update_assignment_status", assignmentId: targetAssignment.id, targetStatus: "In Progress" });
       }
       if (targetDonation && targetRequest) {
@@ -4312,8 +4952,11 @@
     if (/close|closed/.test(prompt)) {
       return "Closed";
     }
-    if (/deliver|delivered|complete|completed/.test(prompt)) {
-      return "Delivered";
+    if (/deliver|delivered/.test(prompt)) {
+      return kind === "assignment" ? "Completed" : "Delivered";
+    }
+    if (/complete|completed/.test(prompt)) {
+      return kind === "assignment" ? "Completed" : "Closed";
     }
     if (/progress|start|started|active/.test(prompt)) {
       return "In Progress";
@@ -4322,7 +4965,7 @@
       return "Reviewed";
     }
     if (/(assign|assigned|dispatch|allocate|match)/.test(prompt)) {
-      return "Assigned";
+      return kind === "assignment" ? "Accepted" : "Assigned";
     }
     return "";
   }
@@ -4490,8 +5133,7 @@
       return normalizeSearchQuery(assignment.volunteer) === normalizeSearchQuery(volunteer.name);
     });
     const completed = relatedAssignments.filter(function (assignment) {
-      const stage = normalizeAssignmentStatus(assignment.status);
-      return stage === "Delivered" || stage === "Closed";
+      return isAssignmentCompleteStage(assignment.status);
     }).length;
     const active = relatedAssignments.length - completed;
     const reliability = Math.max(Number(volunteer.reliability || 0), computeVolunteerReliability(volunteer, workspace.assignments));
@@ -4543,7 +5185,7 @@
     return formatCopilotSections(
       assignment.title + " is currently " + status + " for " + safeText(assignment.volunteer || "the assigned volunteer", 140) + " in " + safeText(assignment.district || "the visible district", 120) + ".",
       volunteerSummary + " The task location is " + safeText(assignment.location || "not visible", 180) + " and the visible reward value is " + String(assignment.points || 0) + " point(s).",
-      status === "Delivered" || status === "Closed"
+      isAssignmentCompleteStage(status)
         ? "Keep the task in the archive and use it as proof for attendance, impact, and reporting."
         : "Advance the assignment status after field confirmation and capture proof once the work is completed."
     );
@@ -4728,21 +5370,30 @@
   function formatCopilotSections(recommendation, whyNow, nextAction, extras) {
     const parts = [];
     if (recommendation) {
-      parts.push("Recommendation: " + safeText(recommendation, 600));
+      parts.push(safeText(recommendation, 600));
     }
     if (whyNow) {
-      parts.push("Why it matters now: " + safeText(whyNow, 900));
+      parts.push(safeText(whyNow, 900));
     }
     if (nextAction) {
-      parts.push("Next action: " + safeText(nextAction, 700));
+      const actionText = safeText(nextAction, 700);
+      parts.push(/^next\b/i.test(actionText) ? actionText : ("A practical next step is to " + actionText.charAt(0).toLowerCase() + actionText.slice(1)));
     }
     const visibleSignals = Array.isArray(extras) ? extras.filter(Boolean).slice(0, 4) : [];
     if (visibleSignals.length) {
-      parts.push("Visible signals:\n- " + visibleSignals.map(function (item) {
+      parts.push("Visible signals include " + visibleSignals.map(function (item) {
         return safeText(item, 180);
-      }).join("\n- "));
+      }).join(", ") + ".");
     }
     return parts.join("\n\n");
+  }
+
+  function shouldCopilotEmitActions(message) {
+    const normalized = normalizeSearchQuery(message);
+    if (!normalized) {
+      return false;
+    }
+    return /(assign|reassign|shift|move|update|change|set|advance|mark|complete|start|draft|write|generate outreach|send outreach|route|use donation|recommend donation|manage|operate|handle|take action|approve|review)/.test(normalized);
   }
 
   function buildCopilotPrompt(workspace, session, message, history) {
@@ -4808,39 +5459,23 @@
     const transcript = history.slice(-6).map(function (item) {
       return (item.speaker === "assistant" ? "Assistant" : "User") + ": " + item.text;
     }).join("\n");
+    const wantsActions = shouldCopilotEmitActions(message);
     return [
       "You are ResourceFlow Copilot, a calm operations analyst inside an NGO coordination and disaster-response platform.",
-      "Answer like a real operational assistant: specific, grounded, and decisive without sounding robotic.",
+      "Answer like a real Gemini-style operational assistant: specific, grounded, conversational, and decisive without sounding robotic or template-driven.",
       "Use only the workspace data provided. If a person, district, request, assignment, or donation is not visible in the snapshot, say it is not found.",
       "Mention exact names, districts, counts, statuses, and risk scores when relevant.",
       "Do not invent hidden data, unseen volunteers, extra donors, or completed work that is not in the snapshot.",
       "The active portal role is: " + (ROLE_CONFIG[session.role] || ROLE_CONFIG.user).label + ". Tailor the answer to that role.",
-      "Return strict JSON only with this exact shape:",
-      '{',
-      '  "answer": {',
-      '    "recommendation": "short operational recommendation",',
-      '    "whyNow": "why this matters right now using visible data",',
-      '    "nextAction": "the next best action",',
-      '    "visibleSignals": ["optional signal 1", "optional signal 2"]',
-      '  },',
-      '  "actions": [',
-      '    {',
-      '      "type": "assign_task | update_request_status | update_assignment_status | recommend_donation_use | generate_outreach_draft",',
-      '      "requestId": "optional visible request id",',
-      '      "requestTitle": "optional visible request title",',
-      '      "assignmentId": "optional visible assignment id",',
-      '      "assignmentTitle": "optional visible assignment title",',
-      '      "volunteerName": "optional visible volunteer name",',
-      '      "donationDonor": "optional visible donor name",',
-      '      "targetStatus": "optional explicit stage",',
-      '      "recipients": "optional outreach recipients",',
-      '      "reason": "short why for this action"',
-      '    }',
-      '  ]',
-      '}',
-      "Only include actions when the user explicitly asks you to change, assign, manage, update, route, draft, or operate the workspace. Otherwise return an empty actions array.",
+      "Respond in natural language first, with short clear paragraphs that sound like a thoughtful real assistant.",
+      "Avoid rigid labels unless the user explicitly asks for a structured answer. Do not sound like a rules engine or a template.",
+      wantsActions ? "Because the user is asking you to operate the workspace, you may add one final line only in this exact format:" : "",
+      wantsActions ? 'ACTIONS_JSON: [{"type":"assign_task","requestId":"...","requestTitle":"...","assignmentId":"...","assignmentTitle":"...","volunteerName":"...","donationDonor":"...","targetStatus":"...","recipients":"...","reason":"..."}]' : "",
+      wantsActions ? "Allowed action types are: assign_task, update_request_status, update_assignment_status, recommend_donation_use, generate_outreach_draft." : "",
+      wantsActions ? "Only include ACTIONS_JSON if you are confident the visible workspace data supports that action." : "",
       "Community User cannot mutate the workspace. Volunteer can only update their own assignments. Government and Admin can use all listed action types.",
       "Keep actions conservative and safe. Never create fake people or fake records. Use only the currently visible scenario.",
+      "Keep the answer human, useful, and a little strategic. Short paragraphs are better than rigid headings unless the user asks for a structured plan.",
       transcript ? "Recent conversation:\n" + transcript : "",
       "Workspace snapshot:\n" + JSON.stringify(snapshot, null, 2),
       "User question: " + message
@@ -5068,8 +5703,75 @@
     saveDismissedAlerts(items);
   }
 
-  function saveWorkspace(workspace) {
-    localStorage.setItem(WORKSPACE_KEY, JSON.stringify(enrichWorkspace(workspace)));
+  function saveWorkspace(workspace, options) {
+    const nextWorkspace = enrichWorkspace(workspace);
+    const serialized = JSON.stringify(nextWorkspace);
+    localStorage.setItem(WORKSPACE_KEY, serialized);
+    if (!(options && options.skipBackendSync)) {
+      scheduleWorkspaceBackendSync(serialized, options && options.reason);
+    }
+  }
+
+  function scheduleWorkspaceBackendSync(serialized, reason) {
+    const config = window.RESOURCEFLOW_FIREBASE_CONFIG || {};
+    if (!config.enabled || config.forceLocalWorkspace || !config.lifecycleBackendEnabled) {
+      return;
+    }
+    WORKSPACE_SYNC_RUNTIME.pendingSerialized = safeText(serialized, 2500000);
+    WORKSPACE_SYNC_RUNTIME.reason = safeText(reason || "workspace-save", 80) || "workspace-save";
+    if (WORKSPACE_SYNC_RUNTIME.timerId) {
+      window.clearTimeout(WORKSPACE_SYNC_RUNTIME.timerId);
+    }
+    WORKSPACE_SYNC_RUNTIME.timerId = window.setTimeout(function () {
+      WORKSPACE_SYNC_RUNTIME.timerId = 0;
+      flushWorkspaceBackendSync();
+    }, 900);
+  }
+
+  async function flushWorkspaceBackendSync() {
+    const config = window.RESOURCEFLOW_FIREBASE_CONFIG || {};
+    const serialized = WORKSPACE_SYNC_RUNTIME.pendingSerialized;
+    if (!config.enabled || config.forceLocalWorkspace || !config.lifecycleBackendEnabled || !serialized) {
+      return;
+    }
+    if (WORKSPACE_SYNC_RUNTIME.inflight) {
+      return;
+    }
+    if (serialized === WORKSPACE_SYNC_RUNTIME.lastSyncedSerialized) {
+      return;
+    }
+    WORKSPACE_SYNC_RUNTIME.inflight = true;
+    try {
+      const functions = await ensureFirebaseFunctionsClient(config);
+      const callable = functions.httpsCallable("processWorkspaceLifecycle");
+      const result = await callable({
+        workspace: JSON.parse(serialized),
+        reason: WORKSPACE_SYNC_RUNTIME.reason || "workspace-save"
+      });
+      const state = result && result.data && result.data.state ? enrichWorkspace(result.data.state) : null;
+      const nextSerialized = state ? JSON.stringify(state) : serialized;
+      WORKSPACE_SYNC_RUNTIME.lastSyncedSerialized = nextSerialized;
+      WORKSPACE_SYNC_RUNTIME.pendingSerialized = nextSerialized;
+      if (state && nextSerialized !== localStorage.getItem(WORKSPACE_KEY)) {
+        localStorage.setItem(WORKSPACE_KEY, nextSerialized);
+        window.dispatchEvent(new CustomEvent("resourceflow:workspace-synced"));
+      }
+    } catch (error) {
+      console.warn("Workspace backend sync skipped.", error);
+      WORKSPACE_SYNC_RUNTIME.lastSyncedSerialized = serialized;
+    } finally {
+      WORKSPACE_SYNC_RUNTIME.inflight = false;
+      if (
+        WORKSPACE_SYNC_RUNTIME.pendingSerialized &&
+        WORKSPACE_SYNC_RUNTIME.pendingSerialized !== WORKSPACE_SYNC_RUNTIME.lastSyncedSerialized &&
+        !WORKSPACE_SYNC_RUNTIME.timerId
+      ) {
+        WORKSPACE_SYNC_RUNTIME.timerId = window.setTimeout(function () {
+          WORKSPACE_SYNC_RUNTIME.timerId = 0;
+          flushWorkspaceBackendSync();
+        }, 1500);
+      }
+    }
   }
 
   function buildScenarioWorkspace(scenario, existingWorkspace) {
@@ -5336,7 +6038,6 @@
     let changed = false;
     const sorted = sortRequestsForLifecycle(workspace.requests || []);
     sorted.forEach(function (request) {
-      const stage = normalizeRequestStatus(request.status);
       if (request.broadcastedAt == null && (request.source === "live" || request.source === "disaster-demo")) {
         request.status = "Pending";
         request.broadcastedAt = nowIso();
@@ -5344,6 +6045,7 @@
         workspace.systemNotice = request.title + " is Pending and visible in Admin and Government review queues.";
         changed = true;
       }
+      const stage = normalizeRequestStatus(request.status);
       if ((stage === "Pending" || stage === "Reviewed") && !workspace.assignments.some(function (assignment) { return assignment.requestId === request.id && isAssignmentActiveStage(assignment.status); })) {
         const createdAssignments = createLifecycleAssignmentsForRequest(request, workspace);
         if (createdAssignments.length) {
@@ -5366,8 +6068,9 @@
       const request = workspace.requests.find(function (item) { return item.id === assignment.requestId; }) || null;
       const elapsed = elapsedMinutes(assignment.startedAt || assignment.acceptedAt || assignment.createdAt);
       const duration = Math.max(6, Number(assignment.estimatedDurationMinutes || (request && request.estimatedDurationMinutes) || 12));
+      const autoManaged = Boolean(assignment.autoManaged || safeText(assignment.volunteerOrigin || "", 20).toLowerCase() === "demo");
 
-      if (stage === "Accepted" && elapsed >= Math.max(1, duration * 0.2)) {
+      if (autoManaged && stage === "Accepted" && elapsed >= Math.max(1, duration * 0.2)) {
         assignment.status = "In Progress";
         assignment.startedAt = assignment.startedAt || nowIso();
         assignment.updatedAt = nowIso();
@@ -5444,6 +6147,18 @@
           supportLane: true
         }));
       }
+      if (!assignments.length) {
+        const fallbackVolunteer = pickBestVolunteerForRequest(request, workspace);
+        if (fallbackVolunteer) {
+          assignments.push(createAssignmentFromRequest(request, workspace, {
+            volunteer: fallbackVolunteer,
+            origin: "live-fallback",
+            volunteerOrigin: safeText(fallbackVolunteer.origin || "demo", 20).toLowerCase() || "demo",
+            status: "Accepted",
+            autoManaged: safeText(fallbackVolunteer.origin || "demo", 20).toLowerCase() === "demo"
+          }));
+        }
+      }
     } else {
       const nearest = pickBestVolunteerForRequest(request, workspace, { origin: "demo" }) || pickBestVolunteerForRequest(request, workspace);
       if (nearest) {
@@ -5470,6 +6185,7 @@
     assignment.shifted = true;
     assignment.volunteer = nextVolunteer.name;
     assignment.volunteerOrigin = safeText(nextVolunteer.origin || "demo", 20).toLowerCase() || "demo";
+    assignment.autoManaged = assignment.volunteerOrigin === "demo";
     assignment.status = "Accepted";
     assignment.acceptedAt = nowIso();
     assignment.startedAt = "";
@@ -5480,7 +6196,8 @@
       request.updatedAt = nowIso();
     }
     workspace.audit.unshift(buildShiftAuditLine(assignment, nextVolunteer, request || { title: assignment.title }));
-    workspace.systemNotice = "AI shifted " + assignment.title + " to " + nextVolunteer.name + " after a stalled assignment window.";
+    workspace.audit.unshift(buildVolunteerStatusLine(assignment, "Accepted"));
+    workspace.systemNotice = buildVolunteerStatusLine(assignment, "Accepted");
     return true;
   }
 
@@ -5494,8 +6211,9 @@
       request.status = "Delivered";
       request.updatedAt = nowIso();
     }
+    workspace.audit.unshift(buildVolunteerStatusLine(assignment, "Completed"));
     workspace.audit.unshift(reason || ("Volunteer " + assignment.volunteer + " completed " + assignment.title + "."));
-    workspace.systemNotice = assignment.volunteer + " completed " + assignment.title + ".";
+    workspace.systemNotice = buildVolunteerStatusLine(assignment, "Completed");
   }
 
   function awardVolunteerPoints(workspace, assignment) {
@@ -5580,6 +6298,14 @@
       return raw ? JSON.parse(raw) : fallback;
     } catch (error) {
       return fallback;
+    }
+  }
+
+  function saveJson(key, value) {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+    } catch (error) {
+      // Ignore localStorage failures and keep the app responsive.
     }
   }
 

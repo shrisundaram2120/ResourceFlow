@@ -48,7 +48,7 @@
         "headers": [
           {
             "key": "Cache-Control",
-            "value": "public,max-age=3600"
+            "value": "public,max-age=86400"
           }
         ]
       },
@@ -57,7 +57,16 @@
         "headers": [
           {
             "key": "Cache-Control",
-            "value": "public,max-age=3600"
+            "value": "public,max-age=86400"
+          }
+        ]
+      },
+      {
+        "source": "**/*.{png,jpg,jpeg,svg,webp,woff,woff2}",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "public,max-age=604800"
           }
         ]
       },
