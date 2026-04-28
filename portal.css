@@ -2727,3 +2727,137 @@ html.rf-theme-dark .rf-mobile-link.is-action {
     min-width: 480px;
   }
 }
+
+.rf-sync-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.rf-sync-banner strong {
+  font-size: 0.92rem;
+}
+
+.rf-sync-banner p {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.rf-sync-banner-synced {
+  border-color: rgba(47, 125, 95, 0.18);
+}
+
+.rf-sync-banner-syncing,
+.rf-sync-banner-queued {
+  border-color: rgba(192, 137, 0, 0.24);
+}
+
+.rf-sync-banner-offline,
+.rf-sync-banner-error {
+  border-color: rgba(186, 26, 26, 0.18);
+}
+
+.rf-sync-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 92px;
+  min-height: 34px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: var(--surface-soft);
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.rf-toast-stack {
+  position: fixed;
+  right: 18px;
+  bottom: 82px;
+  z-index: 95;
+  width: min(360px, calc(100vw - 24px));
+  display: grid;
+  gap: 10px;
+}
+
+.rf-toast {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: var(--shadow);
+}
+
+html.rf-theme-dark .rf-toast {
+  background: rgba(26, 31, 38, 0.96);
+}
+
+.rf-toast strong {
+  display: block;
+  font-size: 0.92rem;
+}
+
+.rf-toast p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.rf-toast-success {
+  border-color: rgba(47, 125, 95, 0.2);
+}
+
+.rf-toast-warning {
+  border-color: rgba(192, 137, 0, 0.24);
+}
+
+.rf-toast-error {
+  border-color: rgba(186, 26, 26, 0.2);
+}
+
+.rf-toast-close,
+.compact-button {
+  min-height: 36px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface-soft);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.feed-card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.feed-unread-dot {
+  display: inline-flex;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+}

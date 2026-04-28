@@ -16,7 +16,10 @@ service cloud.firestore {
     }
 
     function canManageWorkspace() {
-      return signedIn();
+      return signedIn() && (
+        isAdminEmail()
+        || currentProfileRole() in ["admin", "coordinator", "government"]
+      );
     }
 
     function validVolunteerProfile() {
@@ -68,9 +71,14 @@ service cloud.firestore {
           "quantity",
           "description",
           "contactDetails",
+          "linkedRequestId",
+          "linkedRequestTitle",
+          "deliveryProof",
           "status",
           "verified",
           "archived",
+          "flagged",
+          "flagReason",
           "createdAt",
           "updatedAt",
           "updatedBy"
@@ -86,9 +94,14 @@ service cloud.firestore {
         && request.resource.data.quantity is int
         && request.resource.data.description is string
         && request.resource.data.contactDetails is string
+        && request.resource.data.linkedRequestId is string
+        && request.resource.data.linkedRequestTitle is string
+        && request.resource.data.deliveryProof is string
         && request.resource.data.status is string
         && request.resource.data.verified is bool
         && request.resource.data.archived is bool
+        && request.resource.data.flagged is bool
+        && request.resource.data.flagReason is string
         && request.resource.data.createdAt is string
         && request.resource.data.updatedAt is string
         && request.resource.data.updatedBy is string

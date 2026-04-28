@@ -730,7 +730,10 @@
       donorName: formData.get("donorName"),
       amount: formData.get("amount"),
       paymentMethod: formData.get("paymentMethod"),
-      message: formData.get("message")
+      message: formData.get("message"),
+      linkedRequestId: formData.get("linkedRequestId"),
+      linkedRequestTitle: formData.get("linkedRequestTitle"),
+      deliveryProof: formData.get("deliveryProof")
     });
     if (!record.donorName || record.amount <= 0 || !record.paymentMethod) {
       throw new Error("Please complete donor name, amount, and payment method.");
@@ -755,7 +758,10 @@
       itemType: formData.get("itemType"),
       quantity: formData.get("quantity"),
       description: formData.get("description"),
-      contactDetails: formData.get("contactDetails")
+      contactDetails: formData.get("contactDetails"),
+      linkedRequestId: formData.get("linkedRequestId"),
+      linkedRequestTitle: formData.get("linkedRequestTitle"),
+      deliveryProof: formData.get("deliveryProof")
     });
     if (!record.donorName || !record.itemType || record.quantity <= 0 || !record.description || !record.contactDetails) {
       throw new Error("Please complete all item donation fields before saving.");
@@ -1219,6 +1225,8 @@
           renderDetailItem("Amount", formatCurrency(item.amount)),
           renderDetailItem("Payment", item.paymentMethod || "Manual"),
           renderDetailItem("Contact", item.ownerEmail || "Not shared"),
+          renderDetailItem("Linked Request", item.linkedRequestTitle || item.linkedRequestId || "Not linked"),
+          renderDetailItem("Delivery Proof", item.deliveryProof || "Pending"),
           renderDetailItem("Status", titleCase(item.status || "submitted")),
           renderDetailItem("Verification", item.verified ? "Verified" : "Pending review"),
           renderDetailItem("Queue State", item.archived ? "Archived" : "Active queue")
@@ -1227,6 +1235,8 @@
           renderDetailItem("Donation Type", titleCase(item.itemType || "Item")),
           renderDetailItem("Quantity", String(item.quantity || 0)),
           renderDetailItem("Contact", item.contactDetails || item.ownerEmail || "Not shared"),
+          renderDetailItem("Linked Request", item.linkedRequestTitle || item.linkedRequestId || "Not linked"),
+          renderDetailItem("Delivery Proof", item.deliveryProof || "Pending"),
           renderDetailItem("Status", titleCase(item.status)),
           renderDetailItem("Verification", item.verified ? "Verified" : "Pending review"),
           renderDetailItem("Queue State", item.archived ? "Archived" : "Active queue")
@@ -1256,7 +1266,7 @@
       '<p class="card-meta shared-subtitle">' + escapeHtml(headline) + "</p>",
       '<div class="shared-detail-grid">' + details.join("") + "</div>",
       '<div class="shared-divider"></div>',
-      '<div class="chip-row">' + renderChip(titleCase(item.kind)) + renderChip(formatShortDate(item.createdAt)) + renderChip(item.verified ? "Verified" : "Pending") + renderChip(item.archived ? "Archived" : "Active") + "</div>",
+      '<div class="chip-row">' + renderChip(titleCase(item.kind)) + renderChip(formatShortDate(item.createdAt)) + renderChip(item.verified ? "Verified" : "Pending") + renderChip(item.archived ? "Archived" : "Active") + (item.flagged ? renderChip("Flagged") : "") + "</div>",
       '<p class="card-meta">' + escapeHtml(description) + "</p>",
       controls,
       "</div>"
@@ -1379,9 +1389,14 @@
       quantity: safeInteger(next.quantity, 0),
       description: safeText(next.description || "", 280),
       contactDetails: safeText(next.contactDetails || next.ownerEmail || "", 180),
+      linkedRequestId: safeText(next.linkedRequestId || "", 120),
+      linkedRequestTitle: safeText(next.linkedRequestTitle || "", 180),
+      deliveryProof: safeText(next.deliveryProof || "", 280),
       status: normalizeDonationStatus(next.status || "submitted"),
       verified: Boolean(next.verified),
       archived: next.archived === true,
+      flagged: Boolean(next.flagged),
+      flagReason: safeText(next.flagReason || "", 220),
       createdAt: safeIso(next.createdAt),
       updatedAt: safeIso(next.updatedAt),
       updatedBy: safeText(next.updatedBy || "", 140)
@@ -1404,9 +1419,14 @@
       quantity: normalizedKind === "item" ? safeInteger(next.quantity, 0) : 0,
       description: normalizedKind === "item" ? safeText(next.description, 280) : "",
       contactDetails: normalizedKind === "item" ? safeText(next.contactDetails || currentContactEmail(), 180) : currentContactEmail(),
+      linkedRequestId: safeText(next.linkedRequestId, 120),
+      linkedRequestTitle: safeText(next.linkedRequestTitle, 180),
+      deliveryProof: safeText(next.deliveryProof, 280),
       status: "submitted",
       verified: false,
       archived: false,
+      flagged: Boolean(next.flagged),
+      flagReason: safeText(next.flagReason, 220),
       createdAt: now,
       updatedAt: now,
       updatedBy: currentActor()
@@ -1473,10 +1493,7 @@
       return false;
     }
     const role = normalizeRole(state.profile && (state.profile.role || state.profile.requestedRole || ""));
-    const selectedPortal = normalizeRole(localStorage.getItem("resourceflow-portal-selection-v2") || "");
     return ADMIN_ROLES.indexOf(role) >= 0
-      || selectedPortal === "admin"
-      || refs.page === "admin"
       || isConfiguredAdminEmail(currentContactEmail());
   }
 
