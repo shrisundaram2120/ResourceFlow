@@ -112,6 +112,9 @@
   const DEMO_RUNTIME = {
     drawerOpen: false
   };
+  const NOTIFICATION_RUNTIME = {
+    drawerOpen: false
+  };
   const SEARCH_RUNTIME = {
     query: "",
     searched: false,
@@ -447,6 +450,7 @@
     let railMarkup = "";
     let demoMarkup = "";
     let aiMarkup = "";
+    let notificationMarkup = "";
     let mobileMarkup = "";
 
     try {
@@ -488,6 +492,12 @@
     }
 
     try {
+      notificationMarkup = renderNotificationShell(session, workspace);
+    } catch (error) {
+      console.error("Notification shell render failed:", error);
+    }
+
+    try {
       mobileMarkup = renderMobileDock(page, session);
     } catch (error) {
       console.error("Mobile dock render failed:", error);
@@ -504,12 +514,13 @@
       "</div>",
       demoMarkup,
       aiMarkup,
+      notificationMarkup,
       mobileMarkup,
       renderToastStack()
     ].join("");
 
     document.body.classList.remove("rf-sidebar-open");
-    document.body.classList.toggle("rf-ai-open", !!AI_RUNTIME.drawerOpen || !!DEMO_RUNTIME.drawerOpen);
+    document.body.classList.toggle("rf-ai-open", !!AI_RUNTIME.drawerOpen || !!DEMO_RUNTIME.drawerOpen || !!NOTIFICATION_RUNTIME.drawerOpen);
     bindEvents(root, page, session);
     syncPendingSearchAnchor();
     ensureInteractiveTestIds(document);
@@ -838,6 +849,8 @@
     const searchResults = (SEARCH_RUNTIME.searched || SEARCH_RUNTIME.focused) && searchQuery
       ? buildWorkspaceSearchResults(searchQuery, session, workspace)
       : [];
+    const notifications = buildNotifications(workspace, session);
+    const unreadCount = notifications.filter(function (item) { return item.unread !== false; }).length;
     return [
       '<header class="rf-header">',
       '<div class="rf-header-main">',
@@ -859,6 +872,7 @@
       renderHeaderSearchResults(searchQuery, searchResults),
       "</div>",
       '<div class="rf-header-toolset">',
+      '<button class="ghost-button header-notification-button" type="button" data-action="toggle-notification-drawer" data-testid="toggle-notification-drawer" aria-label="Open notifications" aria-expanded="' + (NOTIFICATION_RUNTIME.drawerOpen ? "true" : "false") + '"><span class="rf-symbol" aria-hidden="true">notifications</span>' + (unreadCount ? '<span class="notification-count-badge" aria-label="' + escapeHtml(String(unreadCount)) + ' unread notifications">' + escapeHtml(String(Math.min(unreadCount, 99))) + "</span>" : "") + '</button>',
       '<div class="rf-header-chip">' + escapeHtml(roleData.label) + '</div>',
       renderLanguageSelect(),
       '<button class="ghost-button theme-toggle header-theme-button" type="button" data-action="toggle-theme" data-testid="toggle-theme"><span class="button-full-label">' + escapeHtml(themeToggleLabel()) + '</span><span class="button-short-label">Theme</span></button>',
@@ -1573,7 +1587,6 @@
     const insightItems = buildInsightItems(workspace);
     const donations = workspace.donations.slice(0, 3);
     const topPrediction = buildBoostedPredictionRows(workspace)[0] || null;
-    const notifications = buildNotifications(workspace, session);
     return [
       '<aside class="rf-rail right-stack">',
       '<section class="surface-card">',
@@ -1590,11 +1603,6 @@
       "</div>",
       '<div class="notice-box" style="margin-top:12px;">' + escapeHtml(workspace.systemNotice || "Use the Demo drawer or quick actions to load a response story.") + "</div>",
       "</section>",
-      '<section class="surface-card">',
-      '<p class="section-label">' + escapeHtml(copy("notifications", "Notifications")) + '</p>',
-      '<h3 class="section-title">Live updates across requests, donations, and assignments</h3>',
-      '<div class="stack-list">' + renderNotificationCards(notifications) + '</div>',
-      '</section>',
       '<section class="surface-card">',
       '<p class="section-label">AI Insights</p>',
       '<h3 class="section-title">Why the system is recommending this next step</h3>',
@@ -1674,6 +1682,25 @@
     ].join("");
   }
 
+  function renderNotificationShell(session, workspace) {
+    const notifications = buildNotifications(workspace, session);
+    const unreadCount = notifications.filter(function (item) { return item.unread !== false; }).length;
+    return [
+      '<section class="notification-shell' + (NOTIFICATION_RUNTIME.drawerOpen ? ' is-open' : '') + '">',
+      '<div class="notification-drawer-backdrop" data-action="close-notification-drawer"></div>',
+      '<aside class="notification-drawer" aria-label="Notification center">',
+      '<div class="notification-drawer-header">',
+      '<div><p class="section-label">' + escapeHtml(copy("notifications", "Notifications")) + '</p><h2 class="section-title">Role updates and workflow alerts</h2><p class="section-copy">Check new requests, assignment changes, donation updates, and system notices from one compact center.</p></div>',
+      '<div class="notification-drawer-actions"><span class="chip">' + escapeHtml(String(unreadCount)) + ' unread</span><button class="ghost-button compact-button" type="button" data-action="mark-all-notifications-read" data-testid="notification-mark-all-read">Mark all read</button><button class="ghost-button notification-close-button" type="button" data-action="close-notification-drawer" data-testid="close-notification-drawer">Close</button></div>',
+      '</div>',
+      '<div class="notification-drawer-body">',
+      renderNotificationInbox(notifications, (ROLE_CONFIG[session.role] || ROLE_CONFIG.user).label),
+      '</div>',
+      '</aside>',
+      '</section>'
+    ].join("");
+  }
+
   function renderMobileDock(page, session) {
     const items = SIDEBAR_ITEMS.filter(function (item) {
       return item.roles.indexOf(session.role) !== -1;
@@ -1729,7 +1756,6 @@
     const activeNeedsSection = '<article class="surface-card"><div class="section-head"><div><p class="section-label">Active Needs</p><h2 class="section-title">Latest community requests</h2></div></div><div class="feed-list">' + renderRequestCards(workspace.requests) + '</div></article>';
     const aiMatchingSection = '<article class="surface-card"><p class="section-label">AI Matching Story</p><h2 class="section-title">How ResourceFlow explains the next step</h2><div class="feed-list">' + renderWorkflowCards(buildMatchingSteps(workspace)) + '</div><div class="shared-divider"></div><p class="section-label">Copilot Suggestions</p>' + renderAiSuggestionCards(session, workspace) + '</article>';
     const routeGroupsSection = '<article class="surface-card"><p class="section-label">Route Groups</p><h2 class="section-title">Map-linked response clusters</h2><div class="feed-list">' + renderRouteGroups(workspace) + '</div></article>';
-    const notificationsSection = renderNotificationInbox(buildNotifications(workspace, getSession()), "Community");
     const requestFormSection = '<article class="surface-card"><p class="section-label">Community Request Form</p><h2 class="section-title">Raise a support request</h2><form id="communityRequestForm" class="form-grid" data-testid="community-request-form"><label><span>Request title</span><input class="text-input" name="title" type="text" placeholder="Emergency food kits for affected streets" required></label><div class="grid-2"><label><span>Category</span><select class="text-select" name="category" required><option value="">Choose category</option><option>Food</option><option>Medical</option><option>Shelter</option><option>Education</option><option>Logistics</option></select></label><label><span>District</span><input class="text-input" name="district" type="text" placeholder="Chennai" required></label></div><div class="grid-2"><label><span>Location address</span><input class="text-input" name="location" type="text" placeholder="Velachery, Chennai" required></label><label><span>Estimated people affected</span><input class="text-input" name="beneficiaries" type="number" min="1" step="1" placeholder="40" required></label></div><div class="grid-2"><label><span>Urgency</span><select class="text-select" name="priority" required><option value="Critical">Critical</option><option value="High">High</option><option value="Medium" selected>Medium</option><option value="Low">Low</option></select></label><label><span>Need summary</span><input class="text-input" name="shortSummary" type="text" placeholder="Families need food, blankets, and safe shelter." required></label></div><label><span>Detailed context</span><textarea class="text-area" name="summary" placeholder="Describe the situation, road access, vulnerable groups, and immediate needs." required></textarea></label><button class="primary-button" type="submit" data-testid="submit-community-request">Submit Request</button></form><div id="communityRequestStatus" class="notice-box">Submitted requests are added to the tracker below and become part of the visible feed immediately.</div></article>';
     const responseStorySection = '<article class="surface-card"><p class="section-label">Response Story</p><h2 class="section-title">What changes after a request is entered</h2><div class="feed-list">' + renderListCards(["The request enters the lifecycle as Pending and appears in the community tracker immediately.", "Operations can review the mapped location, urgency, district, and people affected.", "The AI story updates as volunteers, donations, and assignments are attached.", "Admins can later use the same request in reports, exports, and public impact summaries."]) + '</div></article>';
     const donationBreakdownSection = '<article class="surface-card"><p class="section-label">Donation Breakdown</p><h2 class="section-title">What support is already visible</h2><div class="feed-list">' + renderDonationBreakdownCards(workspace) + '</div></article>';
@@ -1761,7 +1787,6 @@
         { weight: 4, markup: activeNeedsSection },
         { weight: 3, markup: aiMatchingSection },
         { weight: 2, markup: routeGroupsSection },
-        { weight: 2, markup: notificationsSection },
         { weight: 5, markup: requestFormSection },
         { weight: 2, markup: responseStorySection },
         { weight: 2, markup: donationBreakdownSection },
@@ -1846,7 +1871,6 @@
     const growthSection = '<article class="surface-card"><p class="section-label">Volunteer Growth</p><h2 class="section-title">Badges, streak, NGO, and reliability</h2><div class="feed-list">' + renderVolunteerGrowthCards(personal) + '</div></article>';
     const directoryPreviewSection = '<article class="surface-card"><p class="section-label">Volunteer Directory Preview</p><h2 class="section-title">See other registered volunteers</h2><div class="record-grid">' + renderVolunteerPreviewCards(workspace.volunteers) + '</div></article>';
     const routeBundlesSection = '<article class="surface-card"><p class="section-label">Route Bundles</p><h2 class="section-title">Nearby task groups for this volunteer</h2><div class="feed-list">' + renderVolunteerRouteBundleCards(session, workspace) + '</div></article>';
-    const notificationsSection = renderNotificationInbox(buildNotifications(workspace, session), "Volunteer");
     const tasksSection = '<article class="surface-card"><p class="section-label">My Tasks</p><h2 class="section-title">Assignments for this volunteer session</h2><div class="feed-list">' + renderAssignmentCards(personal.activeTasks) + '</div></article>';
     const archiveSection = '<article class="surface-card"><p class="section-label">Volunteer Activity Archive</p><h2 class="section-title">Completed work visible to the team</h2><div class="feed-list">' + renderArchiveCards(personal.archive) + '</div></article>';
     const leaderboardSection = '<article class="surface-card"><p class="section-label">Volunteer Leaderboard</p><h2 class="section-title">Visible contribution momentum</h2><div class="record-grid">' + renderLeaderboardCards(workspace) + '</div></article>';
@@ -1882,7 +1906,6 @@
         { weight: 3, markup: growthSection },
         { weight: 3, markup: directoryPreviewSection },
         { weight: 2, markup: routeBundlesSection },
-        { weight: 2, markup: notificationsSection },
         { weight: 4, markup: tasksSection },
         { weight: 2, markup: archiveSection },
         { weight: 3, markup: leaderboardSection }
@@ -1950,7 +1973,6 @@
   }
 
   function renderOperationsPage(workspace) {
-    const notificationsSection = renderNotificationInbox(buildNotifications(workspace, getSession()), "Government");
     const mapSection = renderMapStage(workspace, {
       eyebrow: "Live Deployment Map",
       title: "District movement and resource view",
@@ -1991,7 +2013,6 @@
         { weight: 4, markup: urgentSection },
         { weight: 3, markup: aiDispatchSection },
         { weight: 2, markup: approvalsSection },
-        { weight: 2, markup: notificationsSection },
         { weight: 3, markup: districtPressureSection },
         { weight: 3, markup: activeDispatchSection },
         { weight: 2, markup: blockedSection },
@@ -2047,7 +2068,6 @@
   }
 
   function renderAdminPage(workspace) {
-    const notificationsSection = renderNotificationInbox(buildNotifications(workspace, getSession()), "Admin");
     const governanceSection = '<article class="surface-card"><p class="section-label">Governance Pulse</p><h2 class="section-title">Audit events, review queue, and outreach drafts</h2><div class="feed-list">' + renderListCards(workspace.audit) + '</div><div id="adminVolunteerStatusBoard" class="shared-metric-grid" style="margin-top:16px;"><div class="empty-box">Volunteer activity status cards will appear here.</div></div><div id="adminDonationStatusBoard" class="shared-metric-grid" style="margin-top:16px;"><div class="empty-box">Donation workflow status cards will appear here.</div></div></article>';
     const snapshotSection = '<article class="surface-card"><p class="section-label">Live Snapshot</p><h2 class="section-title">Shared backend summary</h2><div id="sharedAdminStatus" class="notice-box">Admin dashboard is checking the shared backend.</div><div id="adminSharedSummary" class="shared-metric-grid"><div class="empty-box">Admin metrics will appear here after sign-in.</div></div></article>';
     const volunteerRecordsSection = '<article class="surface-card"><p class="section-label">Volunteer Directory Records</p><h2 class="section-title">Shared volunteer visibility</h2><div id="adminVolunteerRecords" class="record-grid"><div class="empty-box">Shared volunteer management is loading.</div></div></article>';
@@ -3709,6 +3729,7 @@
 
     root.querySelectorAll("[data-action='toggle-ai-drawer']").forEach(function (button) {
       button.addEventListener("click", function () {
+        NOTIFICATION_RUNTIME.drawerOpen = false;
         DEMO_RUNTIME.drawerOpen = false;
         AI_RUNTIME.drawerOpen = !AI_RUNTIME.drawerOpen;
         renderApp(document.getElementById("portalApp"));
@@ -3724,8 +3745,25 @@
 
     root.querySelectorAll("[data-action='toggle-demo-drawer']").forEach(function (button) {
       button.addEventListener("click", function () {
+        NOTIFICATION_RUNTIME.drawerOpen = false;
         AI_RUNTIME.drawerOpen = false;
         DEMO_RUNTIME.drawerOpen = !DEMO_RUNTIME.drawerOpen;
+        renderApp(document.getElementById("portalApp"));
+      });
+    });
+
+    root.querySelectorAll("[data-action='toggle-notification-drawer']").forEach(function (button) {
+      button.addEventListener("click", function () {
+        AI_RUNTIME.drawerOpen = false;
+        DEMO_RUNTIME.drawerOpen = false;
+        NOTIFICATION_RUNTIME.drawerOpen = !NOTIFICATION_RUNTIME.drawerOpen;
+        renderApp(document.getElementById("portalApp"));
+      });
+    });
+
+    root.querySelectorAll("[data-action='close-notification-drawer']").forEach(function (button) {
+      button.addEventListener("click", function () {
+        NOTIFICATION_RUNTIME.drawerOpen = false;
         renderApp(document.getElementById("portalApp"));
       });
     });
@@ -3948,6 +3986,24 @@
       });
     });
 
+    root.querySelectorAll("[data-action='bulk-reject-items']").forEach(function (button) {
+      button.addEventListener("click", function () {
+        applyBulkModeration("reject");
+      });
+    });
+
+    root.querySelectorAll("[data-action='bulk-archive-items']").forEach(function (button) {
+      button.addEventListener("click", function () {
+        applyBulkModeration("archive");
+      });
+    });
+
+    root.querySelectorAll("[data-action='bulk-export-items']").forEach(function (button) {
+      button.addEventListener("click", function () {
+        applyBulkModeration("export");
+      });
+    });
+
     root.querySelectorAll("[data-action='bulk-approve-request']").forEach(function (button) {
       button.addEventListener("click", function () {
         applyModerationRequestAction(button.dataset.requestId || "", "approve");
@@ -3960,6 +4016,18 @@
       });
     });
 
+    root.querySelectorAll("[data-action='reject-suspicious-request']").forEach(function (button) {
+      button.addEventListener("click", function () {
+        applyModerationRequestAction(button.dataset.requestId || "", "reject");
+      });
+    });
+
+    root.querySelectorAll("[data-action='archive-suspicious-request']").forEach(function (button) {
+      button.addEventListener("click", function () {
+        applyModerationRequestAction(button.dataset.requestId || "", "archive");
+      });
+    });
+
     root.querySelectorAll("[data-action='bulk-approve-donation']").forEach(function (button) {
       button.addEventListener("click", function () {
         applyModerationDonationAction(button.dataset.donationId || "", "approve");
@@ -3969,6 +4037,18 @@
     root.querySelectorAll("[data-action='toggle-suspicious-donation']").forEach(function (button) {
       button.addEventListener("click", function () {
         applyModerationDonationAction(button.dataset.donationId || "", "toggle-flag");
+      });
+    });
+
+    root.querySelectorAll("[data-action='reject-suspicious-donation']").forEach(function (button) {
+      button.addEventListener("click", function () {
+        applyModerationDonationAction(button.dataset.donationId || "", "reject");
+      });
+    });
+
+    root.querySelectorAll("[data-action='archive-suspicious-donation']").forEach(function (button) {
+      button.addEventListener("click", function () {
+        applyModerationDonationAction(button.dataset.donationId || "", "archive");
       });
     });
 
@@ -4080,6 +4160,10 @@
         }
         if (DEMO_RUNTIME.drawerOpen) {
           DEMO_RUNTIME.drawerOpen = false;
+          changed = true;
+        }
+        if (NOTIFICATION_RUNTIME.drawerOpen) {
+          NOTIFICATION_RUNTIME.drawerOpen = false;
           changed = true;
         }
         if (changed) {
@@ -6020,6 +6104,10 @@
   function seedWorkspace(scenario) {
     const nextWorkspace = buildScenarioWorkspace(scenario, getWorkspace());
     saveWorkspace(nextWorkspace);
+    if (navigator.onLine && loadOfflineQueue().length) {
+      flushOfflineQueue({ silent: true });
+    }
+    setSyncStatus(canUseWorkspaceBackendSync() ? "queued" : "local", canUseWorkspaceBackendSync() ? "Demo workspace changes are queued for secure backend sync." : "Demo workspace loaded locally.");
   }
 
   function resetWorkspace() {
@@ -6032,6 +6120,10 @@
       generatedAt: nowIso(),
       lastRefreshedAt: nowIso()
     })));
+    if (navigator.onLine && loadOfflineQueue().length) {
+      flushOfflineQueue({ silent: true });
+    }
+    setSyncStatus("local", "Workspace reset locally.");
   }
 
   function loadDismissedAlerts() {
@@ -6276,7 +6368,7 @@
     setSyncStatus("queued", "Connection is limited. ResourceFlow queued your change and will sync when possible.");
   }
 
-  function flushOfflineQueue() {
+  function flushOfflineQueue(options) {
     if (!navigator.onLine) {
       return;
     }
@@ -6285,13 +6377,24 @@
       return;
     }
     saveOfflineQueue([]);
-    pushToast("info", "Offline queue synced", String(queue.length) + " queued change(s) were folded back into the workspace.");
+    if (!(options && options.silent)) {
+      pushToast("info", "Offline queue synced", String(queue.length) + " queued change(s) were folded back into the workspace.");
+    }
     setSyncStatus("synced", "Queued changes were synced back into the workspace.");
   }
 
   function getSyncStatus() {
     const items = loadJson(SYNC_STATUS_KEY, { state: "", message: "" });
-    return items && typeof items === "object" ? items : { state: "", message: "" };
+    const normalized = items && typeof items === "object" ? items : { state: "", message: "" };
+    const state = safeText(normalized.state || "", 20).toLowerCase();
+    const queuedItems = loadOfflineQueue();
+    if (!canUseWorkspaceBackendSync() && navigator.onLine && !queuedItems.length && (state === "queued" || state === "syncing" || state === "error")) {
+      return {
+        state: "local",
+        message: ""
+      };
+    }
+    return normalized;
   }
 
   function setSyncStatus(state, message) {
@@ -7007,6 +7110,19 @@
       appendRequestHistory(request, "reviewed", "Admin approved the request for lifecycle progression.", "Admin");
       workspace.audit.unshift("Admin approved request " + request.title + " for " + request.district + ".");
       pushToast("success", "Request approved", request.title + " moved into the reviewed stage.");
+    } else if (action === "reject") {
+      request.status = "Closed";
+      request.flagged = false;
+      request.flagReason = "";
+      request.archived = true;
+      appendRequestHistory(request, "rejected", "Admin rejected and closed the request after moderation review.", "Admin");
+      workspace.audit.unshift("Admin rejected request " + request.title + " for " + request.district + ".");
+      pushToast("warning", "Request rejected", request.title + " was closed and archived from the active review queue.");
+    } else if (action === "archive") {
+      request.archived = true;
+      appendRequestHistory(request, "archived", "Admin archived the request for reporting and later review.", "Admin");
+      workspace.audit.unshift("Admin archived request " + request.title + ".");
+      pushToast("success", "Request archived", request.title + " moved into the archived request history.");
     } else if (action === "toggle-flag") {
       request.flagged = !Boolean(request.flagged);
       request.flagReason = request.flagged ? "Flagged by admin for moderation review." : "";
@@ -7032,6 +7148,17 @@
       donation.flagReason = "";
       workspace.audit.unshift("Admin verified donation from " + safeText(donation.donorName || donation.donor, 120) + ".");
       pushToast("success", "Donation verified", safeText(donation.donorName || donation.donor, 120) + " is ready for packing or routing.");
+    } else if (action === "reject") {
+      donation.status = "Submitted";
+      donation.archived = true;
+      donation.flagged = false;
+      donation.flagReason = "";
+      workspace.audit.unshift("Admin rejected donation from " + safeText(donation.donorName || donation.donor, 120) + ".");
+      pushToast("warning", "Donation rejected", safeText(donation.donorName || donation.donor, 120) + " was archived from the active moderation queue.");
+    } else if (action === "archive") {
+      donation.archived = true;
+      workspace.audit.unshift("Admin archived donation from " + safeText(donation.donorName || donation.donor, 120) + ".");
+      pushToast("success", "Donation archived", safeText(donation.donorName || donation.donor, 120) + " is now stored for reporting and proof.");
     } else if (action === "toggle-flag") {
       donation.flagged = !Boolean(donation.flagged);
       donation.flagReason = donation.flagged ? "Flagged by admin for verification or routing review." : "";
@@ -7084,6 +7211,49 @@
         }
       });
       workspace.audit.unshift("Admin bulk-flagged " + changed + " moderation item(s).");
+    } else if (decision === "reject") {
+      (workspace.requests || []).forEach(function (request) {
+        if (changed >= 3) return;
+        if (normalizeRequestStatus(request.status) === "Pending" || request.flagged) {
+          request.status = "Closed";
+          request.archived = true;
+          request.flagged = false;
+          request.flagReason = "";
+          appendRequestHistory(request, "rejected", "Admin bulk-rejected the request during moderation review.", "Admin");
+          changed += 1;
+        }
+      });
+      (workspace.donations || []).forEach(function (donation) {
+        if (changed >= 6) return;
+        if (normalizeDonationLifecycle(donation.status) === "Submitted" || donation.flagged) {
+          donation.archived = true;
+          donation.flagged = false;
+          donation.flagReason = "";
+          changed += 1;
+        }
+      });
+      workspace.audit.unshift("Admin bulk-rejected " + changed + " moderation item(s).");
+    } else if (decision === "archive") {
+      (workspace.requests || []).forEach(function (request) {
+        if (changed >= 3) return;
+        if (!request.archived && (normalizeRequestStatus(request.status) === "Closed" || request.flagged)) {
+          request.archived = true;
+          appendRequestHistory(request, "archived", "Admin bulk-archived the request for reporting.", "Admin");
+          changed += 1;
+        }
+      });
+      (workspace.donations || []).forEach(function (donation) {
+        if (changed >= 6) return;
+        if (!donation.archived && (normalizeDonationLifecycle(donation.status) === "Delivered" || donation.flagged || normalizeDonationLifecycle(donation.status) === "Submitted")) {
+          donation.archived = true;
+          changed += 1;
+        }
+      });
+      workspace.audit.unshift("Admin bulk-archived " + changed + " moderation item(s).");
+    } else if (decision === "export") {
+      exportWorkspaceJson(PAGE_KEY_BY_ROUTE.admin || "admin", getSession());
+      pushToast("success", "Moderation export ready", "The current moderation snapshot was exported as JSON.");
+      return;
     }
     if (!changed) {
       pushToast("warning", "No items changed", "There were no matching moderation items for that action.");
@@ -7106,7 +7276,9 @@
         copy: request.title + " is still pending while carrying critical urgency and should be reviewed immediately.",
         actions: [
           { label: "Approve", action: "bulk-approve-request", requestId: request.id, tone: "primary-button compact-button", testId: "moderation-approve-request" },
-          { label: request.flagged ? "Unflag" : "Flag", action: "toggle-suspicious-request", requestId: request.id, tone: "ghost-button compact-button", testId: "moderation-flag-request" }
+          { label: request.flagged ? "Unflag" : "Flag", action: "toggle-suspicious-request", requestId: request.id, tone: "ghost-button compact-button", testId: "moderation-flag-request" },
+          { label: "Reject", action: "reject-suspicious-request", requestId: request.id, tone: "ghost-button compact-button", testId: "moderation-reject-request" },
+          { label: "Archive", action: "archive-suspicious-request", requestId: request.id, tone: "ghost-button compact-button", testId: "moderation-archive-request" }
         ]
       });
     });
@@ -7123,7 +7295,9 @@
           : "This donation should be linked, verified, or flagged before it continues through dispatch.",
         actions: [
           { label: "Verify", action: "bulk-approve-donation", donationId: donation.id, tone: "primary-button compact-button", testId: "moderation-verify-donation" },
-          { label: donation.flagged ? "Unflag" : "Flag", action: "toggle-suspicious-donation", donationId: donation.id, tone: "ghost-button compact-button", testId: "moderation-flag-donation" }
+          { label: donation.flagged ? "Unflag" : "Flag", action: "toggle-suspicious-donation", donationId: donation.id, tone: "ghost-button compact-button", testId: "moderation-flag-donation" },
+          { label: "Reject", action: "reject-suspicious-donation", donationId: donation.id, tone: "ghost-button compact-button", testId: "moderation-reject-donation" },
+          { label: "Archive", action: "archive-suspicious-donation", donationId: donation.id, tone: "ghost-button compact-button", testId: "moderation-archive-donation" }
         ]
       });
     });
@@ -7137,12 +7311,15 @@
       + donations.filter(function (donation) { return donation.flagged; }).length;
     const pendingCount = requests.filter(function (request) { return normalizeRequestStatus(request.status) === "Pending"; }).length
       + donations.filter(function (donation) { return normalizeDonationLifecycle(donation.status) === "Submitted"; }).length;
+    const archivedCount = requests.filter(function (request) { return Boolean(request.archived); }).length
+      + donations.filter(function (donation) { return Boolean(donation.archived); }).length;
     return {
       filter: loadModerationFilter(),
       counts: {
-        all: pendingCount + flaggedCount,
+        all: pendingCount + flaggedCount + archivedCount,
         pending: pendingCount,
         flagged: flaggedCount,
+        archived: archivedCount,
         requests: requests.filter(function (request) { return normalizeRequestStatus(request.status) === "Pending" || request.flagged; }).length,
         donations: donations.filter(function (donation) { return normalizeDonationLifecycle(donation.status) === "Submitted" || donation.flagged; }).length
       }
@@ -7167,6 +7344,7 @@
       const normalizedStatus = normalizeSearchQuery(item.status);
       if (filterInfo.filter === "pending") return normalizedStatus.indexOf("pending") !== -1 || normalizedStatus.indexOf("submitted") !== -1;
       if (filterInfo.filter === "flagged") return normalizedStatus.indexOf("flagged") !== -1;
+      if (filterInfo.filter === "archived") return normalizedStatus.indexOf("archived") !== -1 || normalizedStatus.indexOf("closed") !== -1;
       if (filterInfo.filter === "requests") return normalizedTitle.indexOf("request") !== -1;
       if (filterInfo.filter === "donations") return normalizedTitle.indexOf("donation") !== -1;
       return true;
@@ -7175,12 +7353,13 @@
       { key: "all", label: "All", count: filterInfo.counts.all },
       { key: "pending", label: "Pending", count: filterInfo.counts.pending },
       { key: "flagged", label: "Flagged", count: filterInfo.counts.flagged },
+      { key: "archived", label: "Archived", count: filterInfo.counts.archived },
       { key: "requests", label: "Requests", count: filterInfo.counts.requests },
       { key: "donations", label: "Donations", count: filterInfo.counts.donations }
     ].map(function (item) {
       return '<button class="' + escapeHtml(item.key === filterInfo.filter ? "primary-button compact-button" : "ghost-button compact-button") + '" type="button" data-action="set-moderation-filter" data-filter-key="' + escapeHtml(item.key) + '" data-testid="moderation-filter-' + escapeHtml(item.key) + '">' + escapeHtml(item.label) + " (" + escapeHtml(String(item.count)) + ')</button>';
     }).join("");
-    const bulkButtons = '<div class="feed-card-actions"><button class="primary-button compact-button" type="button" data-action="bulk-approve-items" data-testid="bulk-approve-items">Bulk Approve</button><button class="ghost-button compact-button" type="button" data-action="bulk-flag-items" data-testid="bulk-flag-items">Bulk Flag</button></div>';
+    const bulkButtons = '<div class="feed-card-actions"><button class="primary-button compact-button" type="button" data-action="bulk-approve-items" data-testid="bulk-approve-items">Bulk Approve</button><button class="ghost-button compact-button" type="button" data-action="bulk-flag-items" data-testid="bulk-flag-items">Bulk Flag</button><button class="ghost-button compact-button" type="button" data-action="bulk-reject-items" data-testid="bulk-reject-items">Bulk Reject</button><button class="ghost-button compact-button" type="button" data-action="bulk-archive-items" data-testid="bulk-archive-items">Bulk Archive</button><button class="ghost-button compact-button" type="button" data-action="bulk-export-items" data-testid="bulk-export-items">Bulk Export</button></div>';
     return '<article class="surface-card"><p class="section-label">Moderation Center</p><h2 class="section-title">Verification, approvals, and suspicious activity</h2><div class="feed-card-actions">' + filterButtons + '</div>' + bulkButtons + '<div class="feed-list">' + renderApprovalCards(moderationItems) + '</div></article>';
   }
 
@@ -7245,7 +7424,6 @@
     const activeNeedsSection = '<article class="surface-card"><div class="section-head"><div><p class="section-label">Active Needs</p><h2 class="section-title">Latest community requests</h2></div></div><div class="feed-list">' + renderRequestCards(workspace.requests) + '</div></article>';
     const aiMatchingSection = '<article class="surface-card"><p class="section-label">AI Matching Story</p><h2 class="section-title">How ResourceFlow explains the next step</h2><div class="feed-list">' + renderWorkflowCards(buildMatchingSteps(workspace)) + '</div></article>';
     const routeGroupsSection = '<article class="surface-card"><p class="section-label">Route Groups</p><h2 class="section-title">Map-linked response clusters</h2><div class="feed-list">' + renderRouteGroups(workspace) + '</div></article>';
-    const notificationsSection = renderNotificationInbox(buildNotifications(workspace, session), "Community");
     const requestFormSection = '<article class="surface-card"><p class="section-label">Community Request Form</p><h2 class="section-title">Raise a support request</h2><form id="communityRequestForm" class="form-grid" data-testid="community-request-form"><label><span>Request title</span><input class="text-input" name="title" type="text" placeholder="Emergency food kits for affected streets" required></label><div class="grid-2"><label><span>Category</span><select class="text-select" name="category" required><option value="">Choose category</option><option>Food</option><option>Medical</option><option>Shelter</option><option>Education</option><option>Logistics</option></select></label><label><span>District</span><input class="text-input" name="district" type="text" placeholder="Chennai" required></label></div><div class="grid-2"><label><span>Location address</span><input class="text-input" name="location" type="text" placeholder="Velachery, Chennai" required></label><label><span>Estimated people affected</span><input class="text-input" name="beneficiaries" type="number" min="1" step="1" placeholder="40" required></label></div><div class="grid-2"><label><span>Urgency</span><select class="text-select" name="priority" required><option value="Critical">Critical</option><option value="High">High</option><option value="Medium" selected>Medium</option><option value="Low">Low</option></select></label><label><span>Need summary</span><input class="text-input" name="shortSummary" type="text" placeholder="Families need food, blankets, and safe shelter." required></label></div><label><span>Detailed context</span><textarea class="text-area" name="summary" placeholder="Describe the situation, road access, vulnerable groups, and immediate needs." required></textarea></label><button class="primary-button" type="submit" data-testid="submit-community-request">Submit Request</button></form><div id="communityRequestStatus" class="notice-box">Submitted requests are added to the tracker below and become part of the visible feed immediately.</div></article>';
     const responseStorySection = '<article class="surface-card"><p class="section-label">Response Story</p><h2 class="section-title">What changes after a request is entered</h2><div class="feed-list">' + renderListCards(["The request enters the lifecycle as Pending and appears in the community tracker immediately.", "Operations can review the mapped location, urgency, district, and people affected.", "The AI story updates as volunteers, donations, and assignments are attached.", "Admins can later use the same request in reports, exports, and public impact summaries."]) + '</div></article>';
     const donationBreakdownSection = '<article class="surface-card"><p class="section-label">Donation Breakdown</p><h2 class="section-title">What support is already visible</h2><div class="feed-list">' + renderDonationBreakdownCards(workspace) + '</div></article>';
@@ -7254,7 +7432,7 @@
       renderHero({ eyebrow: "Community Portal", title: "A public-facing response board that stays calm and readable.", copy: workspace.summary, primary: '<button class="primary-button" type="button" data-action="seed-demo" data-scenario="flood" data-testid="overview-load-demo">Load Flood Demo</button>', secondary: '<a class="ghost-button" href="./donations.html" data-testid="overview-donate">Donation Portal</a>', sideCards: [miniCard("Workspace", workspace.label || "No demo loaded", "A single community lane that shows urgent needs, support, and progress."), miniCard("Visible Spaces", "Community, Donations, AI Prediction", "Each portal stays visually separate while sharing one response story.")] }),
       renderActionTiles([{ label: "I Need Help", copy: "Raise an urgent community request", href: "#communityRequestForm", tone: "brand" }, { label: "I Want to Donate", copy: "Open money and item support", href: "./donations.html", tone: "outline" }, { label: "Track Requests", copy: "See live request movement", href: "#communityTrackerSection", tone: "muted" }, { label: "AI Prediction", copy: "Open the forecasting and matching view", href: "./insights.html", tone: "outline", testId: "overview-open-ai" }]),
       renderMetrics(workspaceMetrics(workspace)),
-      renderWeightedColumns([{ weight: 2, markup: lifecycleSection }, { weight: 2, markup: districtSection }, { weight: 4, markup: mapSection }, { weight: 4, markup: trackerSection }, { weight: 4, markup: activeNeedsSection }, { weight: 3, markup: aiMatchingSection }, { weight: 2, markup: routeGroupsSection }, { weight: 2, markup: notificationsSection }, { weight: 4, markup: requestFormSection }, { weight: 3, markup: renderRequestLookupSection(workspace, session) }, { weight: 4, markup: renderTrackedRequestSection(workspace, session) }, { weight: 2, markup: responseStorySection }, { weight: 2, markup: donationBreakdownSection }, { weight: 2, markup: completionTrendSection }])
+      renderWeightedColumns([{ weight: 2, markup: lifecycleSection }, { weight: 2, markup: districtSection }, { weight: 4, markup: mapSection }, { weight: 4, markup: trackerSection }, { weight: 4, markup: activeNeedsSection }, { weight: 3, markup: aiMatchingSection }, { weight: 2, markup: routeGroupsSection }, { weight: 4, markup: requestFormSection }, { weight: 3, markup: renderRequestLookupSection(workspace, session) }, { weight: 4, markup: renderTrackedRequestSection(workspace, session) }, { weight: 2, markup: responseStorySection }, { weight: 2, markup: donationBreakdownSection }, { weight: 2, markup: completionTrendSection }])
     ].join("");
   }
 
@@ -7267,7 +7445,6 @@
     const moderationSection = renderAdminModerationSection(workspace);
     const analyticsSection = '<article class="surface-card"><p class="section-label">Analytics Upgrade</p><h2 class="section-title">District comparison, donation mix, and completion trend</h2><div class="feed-list">' + renderAnalyticsCards(buildAdminAnalytics(workspace)) + '</div></article>';
     const suspiciousSection = '<article class="surface-card"><p class="section-label">Suspicious Activity</p><h2 class="section-title">Flagged or risky items requiring escalation</h2><div class="feed-list">' + renderApprovalCards(buildSuspiciousActivityCards(workspace)) + '</div></article>';
-    const notificationsSection = renderNotificationInbox(buildNotifications(workspace, session), "Admin");
     const usageGuardSection = '<article class="surface-card"><p class="section-label">Firebase Usage Guard</p><h2 class="section-title">Safe usage inside the no-cost tier</h2><div class="feed-list">' + buildUsageGuardCards() + '</div></article>';
     const aiActionSection = '<article class="surface-card"><p class="section-label">AI Action History</p><h2 class="section-title">What the copilot changed and why</h2><div class="feed-list">' + renderNotificationCards(buildAiActionHistory(workspace)) + '</div></article>';
     const outreachSection = '<article class="surface-card"><p class="section-label">Outreach Center</p><form id="adminOutreachForm" class="form-grid" data-testid="outreach-center-form"><label><span>Subject</span><input class="text-input" name="subject" type="text" placeholder="Volunteer briefing for evening flood response"></label><label><span>Message</span><textarea class="text-area" name="message" placeholder="Share timing, district, safety notes, and reporting instructions."></textarea></label><label><span>Recipients</span><input class="text-input" name="recipients" type="text" placeholder="Community, Volunteer, Donation portal"></label><button class="primary-button" type="button" data-action="save-outreach" data-testid="save-outreach-draft">Save Draft</button></form></article>';
@@ -7304,7 +7481,6 @@
         { weight: 3, markup: moderationSection },
         { weight: 2, markup: suspiciousSection },
         { weight: 2, markup: analyticsSection },
-        { weight: 2, markup: notificationsSection },
         { weight: 2, markup: usageGuardSection },
         { weight: 2, markup: aiActionSection },
         { weight: 6, markup: volunteerRecordsSection },
@@ -7364,7 +7540,12 @@
 
   function canUseWorkspaceBackendSync() {
     const config = window.RESOURCEFLOW_FIREBASE_CONFIG || {};
-    return Boolean(config.enabled && !config.forceLocalWorkspace && config.lifecycleBackendEnabled);
+    return Boolean(
+      config.enabled
+      && !config.forceLocalWorkspace
+      && config.lifecycleBackendEnabled
+      && config.secureBackendEnabled
+    );
   }
 
   function saveWorkspace(workspace, options) {
@@ -7380,6 +7561,9 @@
       WORKSPACE_SYNC_RUNTIME.pendingSerialized = "";
       WORKSPACE_SYNC_RUNTIME.reason = "";
       WORKSPACE_SYNC_RUNTIME.lastSyncedSerialized = serialized;
+      if (navigator.onLine && loadOfflineQueue().length) {
+        flushOfflineQueue({ silent: true });
+      }
     }
   }
 

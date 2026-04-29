@@ -661,6 +661,36 @@ html.rf-theme-dark .rf-top-link.is-active {
   justify-content: flex-end;
 }
 
+.header-notification-button {
+  position: relative;
+  min-width: 52px;
+  min-height: 52px;
+  padding: 0 14px;
+  border-radius: 18px;
+}
+
+.header-notification-button .rf-symbol {
+  font-size: 1.35rem;
+}
+
+.notification-count-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  box-shadow: 0 8px 16px rgba(194, 89, 52, 0.26);
+}
+
 .button-short-label {
   display: none;
 }
@@ -2237,6 +2267,78 @@ html.rf-theme-dark .ai-drawer {
   margin-top: 12px;
 }
 
+.notification-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 12, 18, 0.32);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease;
+  z-index: 105;
+}
+
+.notification-drawer {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  bottom: 16px;
+  width: min(420px, calc(100vw - 32px));
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 30px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 24px 56px rgba(3, 22, 50, 0.18);
+  transform: translateX(calc(100% + 24px));
+  transition: transform 220ms ease;
+  z-index: 106;
+}
+
+html.rf-theme-dark .notification-drawer {
+  background: rgba(26, 31, 38, 0.96);
+}
+
+.notification-shell.is-open .notification-drawer {
+  transform: translateX(0);
+}
+
+.notification-shell.is-open .notification-drawer-backdrop {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.notification-drawer-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.notification-drawer-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.notification-close-button {
+  min-height: 44px;
+}
+
+.notification-drawer-body {
+  min-height: 0;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.notification-drawer-body .surface-card {
+  margin: 0;
+}
+
 body.rf-ai-open {
   overflow: hidden;
 }
@@ -2481,6 +2583,15 @@ html.rf-theme-dark .rf-mobile-link.is-action {
     bottom: 92px;
   }
 
+  .notification-drawer {
+    top: 12px;
+    right: 12px;
+    bottom: 92px;
+    width: calc(100vw - 24px);
+    border-radius: 24px;
+    padding: 16px;
+  }
+
   .ai-drawer-header {
     flex-direction: column;
   }
@@ -2495,6 +2606,15 @@ html.rf-theme-dark .rf-mobile-link.is-action {
   }
 
   .demo-drawer-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .notification-drawer-header {
+    flex-direction: column;
+  }
+
+  .notification-drawer-actions {
     width: 100%;
     justify-content: flex-start;
   }
@@ -2551,6 +2671,10 @@ html.rf-theme-dark .rf-mobile-link.is-action {
 
   .rf-header-toolset {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .header-notification-button {
+    width: 100%;
   }
 
   .portal-launcher-toggle {
@@ -2700,6 +2824,15 @@ html.rf-theme-dark .rf-mobile-link.is-action {
   }
 
   .demo-drawer {
+    top: 8px;
+    right: 8px;
+    bottom: 84px;
+    width: calc(100vw - 16px);
+    border-radius: 20px;
+    padding: 14px;
+  }
+
+  .notification-drawer {
     top: 8px;
     right: 8px;
     bottom: 84px;
