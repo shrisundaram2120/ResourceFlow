@@ -590,7 +590,10 @@
 
   function cloneScenarioItems(items) {
     return Array.isArray(items) ? items.map(function (item) {
-      return Object.assign({}, item);
+      if (Array.isArray(item)) {
+        return item.slice();
+      }
+      return item && typeof item === "object" ? Object.assign({}, item) : item;
     }) : [];
   }
 
@@ -2518,8 +2521,47 @@
       return '<div class="empty-box">No records to show yet.</div>';
     }
     return items.map(function (item) {
-      return '<article class="feed-card"><p class="card-copy">' + escapeHtml(item) + "</p></article>";
+      const card = normalizeListCard(item);
+      const head = card.title
+        ? '<div class="feed-card-head"><div><strong>' + escapeHtml(card.title) + '</strong>' + (card.meta ? '<p class="feed-meta">' + escapeHtml(card.meta) + '</p>' : "") + '</div>' + (card.status ? renderStatus(card.status) : "") + '</div>'
+        : "";
+      return '<article class="feed-card">' + head + '<p class="card-copy">' + escapeHtml(card.copy || "No details available.") + "</p></article>";
     }).join("");
+  }
+
+  function normalizeListCard(item) {
+    if (item == null || typeof item !== "object") {
+      return { title: "", meta: "", status: "", copy: safeText(item, 600) };
+    }
+    if (Array.isArray(item)) {
+      return { title: "", meta: "", status: "", copy: item.map(function (value) { return safeText(value, 120); }).filter(Boolean).join(", ") };
+    }
+    const reconstructed = reconstructIndexedText(item);
+    if (reconstructed) {
+      return { title: "", meta: "", status: "", copy: reconstructed };
+    }
+    const title = safeText(item.title || item.subject || item.name || item.label || "", 160);
+    const meta = safeText(item.meta || item.recipients || item.audience || item.district || item.date || item.createdAt || "", 180);
+    const status = safeText(item.status || item.stage || item.state || "", 80);
+    const copy = safeText(item.copy || item.message || item.text || item.summary || item.note || item.description || item.detail || "", 700);
+    return {
+      title: title,
+      meta: meta,
+      status: status,
+      copy: copy || (title ? meta : safeText(JSON.stringify(item), 700))
+    };
+  }
+
+  function reconstructIndexedText(item) {
+    const keys = Object.keys(item || {});
+    if (!keys.length || !keys.every(function (key) { return /^\d+$/.test(key); })) {
+      return "";
+    }
+    return safeText(keys.sort(function (left, right) {
+      return Number(left) - Number(right);
+    }).map(function (key) {
+      return item[key];
+    }).join(""), 700);
   }
 
   function renderNotificationCards(items) {
@@ -4111,7 +4153,7 @@
 
     root.querySelectorAll("[data-action='mark-all-notifications-read']").forEach(function (button) {
       button.addEventListener("click", function () {
-        markAllNotificationsRead(buildNotifications(loadWorkspace(), getSession()));
+        markAllNotificationsRead(buildNotifications(getWorkspace(), getSession()));
         renderApp(document.getElementById("portalApp"));
       });
     });
