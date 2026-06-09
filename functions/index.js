@@ -151,13 +151,10 @@ exports.generateWorkspaceAnalysis = onCall({ region: region }, async (request) =
   const workspace = await loadWorkspaceState();
   const prompt = buildWorkspacePrompt(workspace, request.data && request.data.prompt);
   const response = await fetch(
-    "https://generativelanguage.googleapis.com/v1beta/models/" +
-      encodeURIComponent(process.env.GEMINI_MODEL || "gemini-2.5-flash") +
-      ":generateContent?key=" +
-      encodeURIComponent(process.env.GEMINI_API_KEY),
+    geminiGenerateContentUrl(),
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: geminiRequestHeaders(),
       body: JSON.stringify({
         contents: [
           {
@@ -180,11 +177,12 @@ exports.generateWorkspaceAnalysis = onCall({ region: region }, async (request) =
   }
 
   const payload = await response.json();
-  const text = extractGeminiText(payload);
+  const structured = extractCopilotResponse(payload);
   return {
     ok: true,
     model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
-    text: text
+    text: structured.text,
+    actions: structured.actions
   };
 });
 
@@ -212,13 +210,10 @@ exports.chatResourceFlowCopilot = onCall({ region: region }, async (request) => 
 
   const prompt = buildCopilotPrompt(workspace, portalRole, message, history);
   const response = await fetch(
-    "https://generativelanguage.googleapis.com/v1beta/models/" +
-      encodeURIComponent(process.env.GEMINI_MODEL || "gemini-2.5-flash") +
-      ":generateContent?key=" +
-      encodeURIComponent(process.env.GEMINI_API_KEY),
+    geminiGenerateContentUrl(),
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: geminiRequestHeaders(),
       body: JSON.stringify({
         contents: [
           {
@@ -1239,6 +1234,7 @@ function buildWorkspacePrompt(workspace, requestedPrompt) {
 
 function buildCopilotPrompt(workspace, portalRole, message, history) {
   const safeHistory = Array.isArray(history) ? history : [];
+  const wantsActions = wantsCopilotAction(message);
   return [
     "You are ResourceFlow Copilot, an NGO disaster-response chatbot inside a coordination platform.",
     "Answer briefly, clearly, and operationally.",
@@ -1259,8 +1255,118 @@ function buildCopilotPrompt(workspace, portalRole, message, history) {
       meta: workspace.meta || {}
     }, null, 2),
     "User question: " + safeText(message, 2000),
-    "Answer in this structure:\n1. Recommendation\n2. Why it matters now\n3. Next action"
+    "Answer in this structure:\n1. Recommendation\n2. Why it matters now\n3. Next action",
+    wantsActions ? 'If the user asks you to operate the workspace, append ACTIONS_JSON: [{"type":"assign_task","requestId":"...","requestTitle":"...","assignmentId":"...","assignmentTitle":"...","volunteerName":"...","donationDonor":"...","targetStatus":"...","recipients":"...","reason":"..."}]' : "",
+    wantsActions ? "Allowed action types are: assign_task, update_request_status, update_assignment_status, recommend_donation_use, generate_outreach_draft." : "",
+    wantsActions ? "Only include ACTIONS_JSON if the visible workspace data supports the action." : ""
   ].filter(Boolean).join("\n\n");
+}
+
+function wantsCopilotAction(message) {
+  return /(assign|reassign|shift|move|update|change|set|advance|mark|complete|start|draft|write|generate outreach|send outreach|route|use donation|recommend donation|manage|operate|handle|take action|approve|review)/i.test(safeText(message, 2000));
+}
+
+function geminiGenerateContentUrl() {
+  return "https://generativelanguage.googleapis.com/v1beta/models/" +
+    encodeURIComponent(process.env.GEMINI_MODEL || "gemini-2.5-flash") +
+    ":generateContent";
+}
+
+function geminiRequestHeaders() {
+  return {
+    "Content-Type": "application/json",
+    "x-goog-api-key": process.env.GEMINI_API_KEY
+  };
+}
+
+function extractCopilotResponse(payload) {
+  const rawText = extractGeminiText(payload);
+  const envelope = extractCopilotActionEnvelope(rawText);
+  if (envelope) {
+    return envelope;
+  }
+  return {
+    text: safeText(rawText, 6000),
+    actions: []
+  };
+}
+
+function extractCopilotActionEnvelope(text) {
+  const raw = safeText(text, 12000);
+  const marker = "ACTIONS_JSON:";
+  const markerIndex = raw.lastIndexOf(marker);
+  if (markerIndex === -1) {
+    return null;
+  }
+  const answerText = safeText(raw.slice(0, markerIndex).trim(), 6000);
+  const actionText = safeText(raw.slice(markerIndex + marker.length).trim(), 4000);
+  return {
+    text: answerText || safeText(raw, 6000),
+    actions: normalizeCopilotActionPlan(parseJsonLikeResponse(actionText))
+  };
+}
+
+function parseJsonLikeResponse(text) {
+  const raw = safeText(text, 12000).trim();
+  if (!raw) {
+    return null;
+  }
+  const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+  try {
+    return JSON.parse(cleaned);
+  } catch (error) {
+    const start = cleaned.indexOf("[");
+    const end = cleaned.lastIndexOf("]");
+    if (start === -1 || end <= start) {
+      return null;
+    }
+    try {
+      return JSON.parse(cleaned.slice(start, end + 1));
+    } catch (nestedError) {
+      return null;
+    }
+  }
+}
+
+function normalizeCopilotActionPlan(actions) {
+  const list = Array.isArray(actions) ? actions : actions ? [actions] : [];
+  return list.map(normalizeCopilotAction).filter(function (item) {
+    return item && item.type;
+  }).slice(0, 6);
+}
+
+function normalizeCopilotAction(action) {
+  if (!action || typeof action !== "object") {
+    return null;
+  }
+  const type = normalizeCopilotActionType(action.type || action.action || action.name);
+  if (!type) {
+    return null;
+  }
+  return {
+    type: type,
+    requestId: safeText(action.requestId || action.request_id || "", 80),
+    requestTitle: safeText(action.requestTitle || action.request_title || action.title || "", 160),
+    assignmentId: safeText(action.assignmentId || action.assignment_id || "", 80),
+    assignmentTitle: safeText(action.assignmentTitle || action.assignment_title || action.task || "", 160),
+    volunteerName: safeText(action.volunteerName || action.volunteer || "", 120),
+    donationDonor: safeText(action.donationDonor || action.donor || "", 120),
+    targetStatus: safeText(action.targetStatus || action.status || "", 80),
+    recipients: safeText(action.recipients || "", 160),
+    reason: safeText(action.reason || action.summary || "", 260)
+  };
+}
+
+function normalizeCopilotActionType(value) {
+  const type = safeText(value, 80).toLowerCase().replace(/[^a-z0-9_]+/g, "_").replace(/^_+|_+$/g, "");
+  if (type === "assign" || type === "assign_request" || type === "assign_volunteer" || type === "match_volunteer" || type === "dispatch_task") return "assign_task";
+  if (type === "update_request" || type === "advance_request" || type === "review_request") return "update_request_status";
+  if (type === "update_assignment" || type === "advance_assignment" || type === "volunteer_status") return "update_assignment_status";
+  if (type === "recommend_donation" || type === "use_donation" || type === "map_donation") return "recommend_donation_use";
+  if (type === "draft_outreach" || type === "generate_outreach" || type === "send_outreach" || type === "message_outreach") return "generate_outreach_draft";
+  return ["assign_task", "update_request_status", "update_assignment_status", "recommend_donation_use", "generate_outreach_draft"].indexOf(type) >= 0
+    ? type
+    : "";
 }
 
 function extractGeminiText(payload) {

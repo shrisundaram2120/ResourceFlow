@@ -10,11 +10,10 @@ window.RESOURCEFLOW_FIREBASE_CONFIG = {
   collectionId: "resourceflow",
   workspaceId: "resourceflow-demo",
   functionsRegion: "us-central1",
-  secureBackendEnabled: false,
+  secureBackendEnabled: true,
   // Shared portal features now use Firebase Auth + Firestore instead of browser-only storage.
   forceLocalWorkspace: false,
   googleMapsApiKey: "",
-  geminiApiKey: "",
   geminiModel: "gemini-2.5-flash",
   enableAuth: true,
   enableAppCheck: false,

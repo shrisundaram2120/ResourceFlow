@@ -3102,7 +3102,6 @@
 
   function aiEngineLabel() {
     if (AI_RUNTIME.engine === "gemini-secure") return "Gemini secure backend";
-    if (AI_RUNTIME.engine === "gemini-direct") return "Gemini direct";
     return "Local boosted engine";
   }
 
@@ -4657,21 +4656,14 @@
       try {
         return await requestSecureCopilotResponse(message, session, workspace, history);
       } catch (error) {
-        console.warn("Secure AI backend unavailable, trying direct/local fallback.", error);
-      }
-    }
-    if (safeText(config.geminiApiKey, 240)) {
-      try {
-        return await requestDirectGeminiResponse(message, session, workspace, history);
-      } catch (error) {
-        console.warn("Direct Gemini request failed, falling back to local response.", error);
+        console.warn("Secure AI backend unavailable, falling back to local response.", error);
       }
     }
     const localFallback = buildLocalCopilotResponse(message, workspace, session, history);
     return {
       engine: "local-boosted",
       sourceLabel: "Local boosted engine",
-      notice: "Gemini is not configured yet, so the local boosted engine is answering from the visible workspace.",
+      notice: "Secure Gemini backend is unavailable, so the local boosted engine is answering from the visible workspace.",
       text: localFallback.text,
       actions: localFallback.actions || []
     };
@@ -4703,157 +4695,6 @@
       text: text,
       actions: normalizeAiActionPlan(result && result.data && result.data.actions)
     };
-  }
-
-  async function requestDirectGeminiResponse(message, session, workspace, history) {
-    const config = window.RESOURCEFLOW_FIREBASE_CONFIG || {};
-    const prompt = buildCopilotPrompt(workspace, session, message, history);
-    const response = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/" +
-        encodeURIComponent(config.geminiModel || "gemini-2.5-flash") +
-        ":generateContent?key=" +
-        encodeURIComponent(config.geminiApiKey),
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          systemInstruction: {
-            parts: [
-              {
-                text: buildGeminiSystemInstruction(session)
-              }
-            ]
-          },
-          contents: buildGeminiConversationContents(history, prompt),
-          generationConfig: {
-            temperature: 0.88,
-            topP: 0.95,
-            maxOutputTokens: 1800
-          }
-        })
-      }
-    );
-    if (!response.ok) {
-      throw new Error("Gemini direct request failed.");
-    }
-    const payload = await response.json();
-    const structured = extractGeminiStructuredPayload(payload);
-    if (!structured || !structured.text) {
-      throw new Error("Gemini returned an empty response.");
-    }
-    return {
-      engine: "gemini-direct",
-      sourceLabel: "Gemini",
-      notice: "Gemini answered directly from the configured browser key.",
-      text: structured.text,
-      actions: structured.actions
-    };
-  }
-
-  function buildGeminiSystemInstruction(session) {
-    const roleLabel = (ROLE_CONFIG[session.role] || ROLE_CONFIG.user).label;
-    return [
-      "You are Gemini inside ResourceFlow, a multi-role response coordination platform.",
-      "Sound natural, calm, and human.",
-      "Do not answer like a rigid rule engine or JSON bot unless the user explicitly asks for structure.",
-      "Use clear operational reasoning with simple language.",
-      "Respect the current signed-in role: " + roleLabel + ".",
-      "If the user asks you to operate the workspace, explain the action briefly first and only then provide action payloads if needed."
-    ].join(" ");
-  }
-
-  function buildGeminiConversationContents(history, prompt) {
-    const conversation = [];
-    (Array.isArray(history) ? history.slice(-6) : []).forEach(function (entry) {
-      const text = safeText(entry && entry.text, 1600);
-      if (!text) {
-        return;
-      }
-      conversation.push({
-        role: entry && entry.speaker === "assistant" ? "model" : "user",
-        parts: [{ text: text }]
-      });
-    });
-    conversation.push({
-      role: "user",
-      parts: [{ text: prompt }]
-    });
-    return conversation;
-  }
-
-  function extractGeminiStructuredPayload(payload) {
-    const rawText = extractGeminiTextClient(payload);
-    if (!rawText) {
-      return null;
-    }
-    const envelope = extractGeminiActionEnvelope(rawText);
-    if (envelope) {
-      return envelope;
-    }
-    const parsed = parseJsonLikeResponse(rawText);
-    if (!parsed || typeof parsed !== "object") {
-      return {
-        text: safeText(rawText, 6000),
-        actions: []
-      };
-    }
-    return {
-      text: formatStructuredCopilotAnswer(parsed.answer || parsed),
-      actions: normalizeAiActionPlan(parsed.actions)
-    };
-  }
-
-  function extractGeminiActionEnvelope(text) {
-    const raw = safeText(text, 12000);
-    const marker = "ACTIONS_JSON:";
-    const markerIndex = raw.lastIndexOf(marker);
-    if (markerIndex === -1) {
-      return null;
-    }
-    const answerText = safeText(raw.slice(0, markerIndex).trim(), 6000);
-    const actionText = safeText(raw.slice(markerIndex + marker.length).trim(), 4000);
-    const parsedActions = parseJsonLikeResponse(actionText);
-    return {
-      text: answerText || safeText(raw, 6000),
-      actions: normalizeAiActionPlan(parsedActions)
-    };
-  }
-
-  function parseJsonLikeResponse(text) {
-    const raw = safeText(text, 12000).trim();
-    if (!raw) {
-      return null;
-    }
-    const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
-    try {
-      return JSON.parse(cleaned);
-    } catch (error) {
-      const start = cleaned.indexOf("{");
-      const end = cleaned.lastIndexOf("}");
-      if (start === -1 || end <= start) {
-        return null;
-      }
-      try {
-        return JSON.parse(cleaned.slice(start, end + 1));
-      } catch (nestedError) {
-        return null;
-      }
-    }
-  }
-
-  function formatStructuredCopilotAnswer(answer) {
-    if (!answer) {
-      return "";
-    }
-    if (typeof answer === "string") {
-      return safeText(answer, 6000);
-    }
-    return formatCopilotSections(
-      safeText(answer.recommendation || answer.summary || answer.recommend || "", 1200),
-      safeText(answer.whyNow || answer.why_now || answer.context || answer.why || "", 1800),
-      safeText(answer.nextAction || answer.next_action || answer.action || "", 1400),
-      Array.isArray(answer.visibleSignals || answer.visible_signals) ? (answer.visibleSignals || answer.visible_signals) : []
-    ) || safeText(answer.text || "", 6000);
   }
 
   function normalizeAiActionPlan(actions) {
@@ -5969,20 +5810,6 @@
       "Workspace snapshot:\n" + JSON.stringify(snapshot, null, 2),
       "User question: " + message
     ].filter(Boolean).join("\n\n");
-  }
-
-  function extractGeminiTextClient(payload) {
-    const candidates = payload && payload.candidates;
-    if (!Array.isArray(candidates) || !candidates.length) {
-      return "";
-    }
-    const parts = candidates[0] && candidates[0].content && candidates[0].content.parts;
-    if (!Array.isArray(parts)) {
-      return "";
-    }
-    return parts.map(function (part) {
-      return safeText(part && part.text, 4000);
-    }).filter(Boolean).join("\n").trim();
   }
 
   async function ensureFirebaseFunctionsClient(config) {
@@ -7610,6 +7437,7 @@
   }
 
   async function flushWorkspaceBackendSync() {
+    const config = window.RESOURCEFLOW_FIREBASE_CONFIG || {};
     const serialized = WORKSPACE_SYNC_RUNTIME.pendingSerialized;
     if (!canUseWorkspaceBackendSync() || !serialized) {
       return;

@@ -1,4 +1,4 @@
-﻿(function () {
+(function () {
   const STORAGE_KEY = "resourceflow-state-v5";
   const DEMO_AUTH_KEY = "resourceflow-demo-auth-v1";
   const PORTAL_SELECTION_KEY = "resourceflow-portal-selection-v2";
@@ -23,7 +23,6 @@
   const WORKFLOW_SEQUENCE = ["pending", "assigned", "in-progress", "delivered", "closed"];
   const SCENARIO_OPTIONS = ["mixed", "flood", "cyclone", "medical", "shelter", "food"];
   const UI_LANGUAGE_OPTIONS = ["English", "Hinglish", "HindiRoman"];
-  const GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models/";
   const ZONE_DISTANCE = {
     North: { North: 0, Central: 1, East: 2, West: 2, South: 3 },
     South: { South: 0, Central: 1, East: 2, West: 2, North: 3 },
@@ -7061,9 +7060,7 @@
     setText("#satellitePrompt", aidSignals.satellitePrompt);
     setText("#geminiLiveStatus", hasSecureBackend()
       ? (state.geminiBusy ? "Secure Gemini backend is analyzing the current workspace..." : "Secure Gemini backend is connected and ready.")
-      : (getFirebaseConfig().geminiApiKey
-        ? (state.geminiBusy ? "Gemini is analyzing the current workspace..." : "Client Gemini mode is configured.")
-        : "Spark-safe local strategy engine is ready. It uses built-in analytics when no Gemini key is configured."));
+      : "Spark-safe local strategy engine is ready. It uses built-in analytics when secure backend Functions are unavailable.");
 
     const verificationTrail = document.getElementById("verificationTrail");
     if (verificationTrail) {
@@ -7793,40 +7790,13 @@
           prompt: prompt
         });
         text = result.text || "";
-      } else if (config.geminiApiKey) {
-        const response = await fetch(
-          GEMINI_API_BASE + encodeURIComponent(config.geminiModel || "gemini-2.5-flash") + ":generateContent?key=" + encodeURIComponent(config.geminiApiKey),
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-              contents: [
-                {
-                  role: "user",
-                  parts: [{ text: prompt }]
-                }
-              ],
-              generationConfig: {
-                temperature: 0.4,
-                maxOutputTokens: 900
-              }
-            })
-          }
-        );
-        if (!response.ok) {
-          throw new Error("Gemini request failed with status " + response.status);
-        }
-        const payload = await response.json();
-        text = extractGeminiText(payload);
       } else {
         text = buildLocalAnalysisText();
       }
       outputNode.textContent = text || "Gemini returned no text for this request.";
       trackEvent("resourceflow_gemini_analysis", {
         model: config.geminiModel || "local-strategy-engine",
-        backend: hasSecureBackend() ? "functions" : (config.geminiApiKey ? "client" : "local")
+        backend: hasSecureBackend() ? "functions" : "local"
       });
     } catch (error) {
       console.warn("Gemini request failed.", error);
@@ -7858,19 +7828,6 @@
       "Executive brief:",
       insights.executiveBrief
     ].join("\n");
-  }
-
-  function extractGeminiText(payload) {
-    if (!payload || !Array.isArray(payload.candidates) || !payload.candidates.length) {
-      return "";
-    }
-    const candidate = payload.candidates[0];
-    if (!candidate.content || !Array.isArray(candidate.content.parts)) {
-      return "";
-    }
-    return candidate.content.parts.map(function (part) {
-      return part.text || "";
-    }).join("\n").trim();
   }
 
   function buildLocalAnalysisText() {

@@ -1371,7 +1371,6 @@
 
   function aiEngineLabel() {
     if (AI_RUNTIME.engine === "gemini-secure") return "Gemini secure backend";
-    if (AI_RUNTIME.engine === "gemini-direct") return "Gemini direct";
     return "Local boosted engine";
   }
 
@@ -1701,20 +1700,13 @@
       try {
         return await requestSecureCopilotResponse(message, session, workspace, history);
       } catch (error) {
-        console.warn("Secure AI backend unavailable, trying direct/local fallback.", error);
-      }
-    }
-    if (safeText(config.geminiApiKey, 240)) {
-      try {
-        return await requestDirectGeminiResponse(message, session, workspace, history);
-      } catch (error) {
-        console.warn("Direct Gemini request failed, falling back to local response.", error);
+        console.warn("Secure AI backend unavailable, falling back to local response.", error);
       }
     }
     return {
       engine: "local-boosted",
       sourceLabel: "Local boosted engine",
-      notice: "Gemini is not configured yet, so the local boosted engine is answering from the visible workspace.",
+      notice: "Secure Gemini backend is unavailable, so the local boosted engine is answering from the visible workspace.",
       text: buildLocalCopilotResponse(message, workspace, session).text
     };
   }
@@ -1742,46 +1734,6 @@
       engine: "gemini-secure",
       sourceLabel: "Gemini secure backend",
       notice: "Secure Gemini backend responded with a live coordination recommendation.",
-      text: text
-    };
-  }
-
-  async function requestDirectGeminiResponse(message, session, workspace, history) {
-    const config = window.RESOURCEFLOW_FIREBASE_CONFIG || {};
-    const response = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/" +
-        encodeURIComponent(config.geminiModel || "gemini-2.5-flash") +
-        ":generateContent?key=" +
-        encodeURIComponent(config.geminiApiKey),
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [
-            {
-              role: "user",
-              parts: [{ text: buildCopilotPrompt(workspace, session, message, history) }]
-            }
-          ],
-          generationConfig: {
-            temperature: 0.3,
-            maxOutputTokens: 700
-          }
-        })
-      }
-    );
-    if (!response.ok) {
-      throw new Error("Gemini direct request failed.");
-    }
-    const payload = await response.json();
-    const text = extractGeminiTextClient(payload);
-    if (!text) {
-      throw new Error("Gemini returned an empty response.");
-    }
-    return {
-      engine: "gemini-direct",
-      sourceLabel: "Gemini direct",
-      notice: "Gemini answered directly from the configured browser key.",
       text: text
     };
   }
@@ -1864,20 +1816,6 @@
       "Workspace snapshot:\n" + JSON.stringify(snapshot, null, 2),
       "User question: " + message
     ].join("\n\n");
-  }
-
-  function extractGeminiTextClient(payload) {
-    const candidates = payload && payload.candidates;
-    if (!Array.isArray(candidates) || !candidates.length) {
-      return "";
-    }
-    const parts = candidates[0] && candidates[0].content && candidates[0].content.parts;
-    if (!Array.isArray(parts)) {
-      return "";
-    }
-    return parts.map(function (part) {
-      return safeText(part && part.text, 4000);
-    }).filter(Boolean).join("\n").trim();
   }
 
   async function ensureFirebaseFunctionsClient(config) {
