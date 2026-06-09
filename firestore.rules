@@ -9,16 +9,20 @@ service cloud.firestore {
       return signedIn() && request.auth.token.email == "acshrisundaram@gmail.com";
     }
 
-    function currentProfileRole() {
-      return signedIn() && exists(/databases/$(database)/documents/resourceflowUsers/$(request.auth.uid))
-        ? get(/databases/$(database)/documents/resourceflowUsers/$(request.auth.uid)).data.role
-        : "volunteer";
+    function currentClaimRole() {
+      return signedIn() && request.auth.token.role is string
+        ? request.auth.token.role
+        : "user";
+    }
+
+    function isAdmin() {
+      return isAdminEmail() || currentClaimRole() == "admin";
     }
 
     function canManageWorkspace() {
       return signedIn() && (
         isAdminEmail()
-        || currentProfileRole() in ["admin", "coordinator", "government"]
+        || currentClaimRole() in ["admin", "coordinator", "government"]
       );
     }
 
@@ -173,17 +177,15 @@ service cloud.firestore {
       allow create: if signedIn()
         && request.auth.uid == userId
         && validProfileShape(userId)
-        && request.resource.data.role in ["user", "volunteer", "government", "coordinator", "admin"];
+        && request.resource.data.role == "user";
       allow update: if validProfileShape(userId) && (
         (signedIn()
           && request.auth.uid == userId
-          && (
-            request.resource.data.role == resource.data.role
-            || request.resource.data.role in ["user", "volunteer", "government", "coordinator", "admin"]
-          ))
-        || canManageWorkspace()
+          && request.resource.data.role == resource.data.role
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["requestedRole", "updatedAt", "updatedBy"]))
+        || isAdmin()
       );
-      allow delete: if canManageWorkspace();
+      allow delete: if isAdmin();
     }
 
     match /resourceflowVolunteerProfiles/{volunteerId} {

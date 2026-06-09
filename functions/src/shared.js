@@ -5,10 +5,10 @@ const ALLOWED_ZONES = ["North", "South", "East", "West", "Central"];
 
 function normalizeRole(value) {
   const role = String(value || "").trim().toLowerCase();
-  if (role === "admin" || role === "coordinator" || role === "volunteer") {
+  if (role === "admin" || role === "coordinator" || role === "government" || role === "volunteer" || role === "user") {
     return role;
   }
-  return "volunteer";
+  return "user";
 }
 
 function safeText(value, limit) {
@@ -117,7 +117,7 @@ function sanitizeClientError(input, actor) {
 
 function assertManager(auth) {
   const role = normalizeRole(auth && auth.token ? auth.token.role : "");
-  return role === "admin" || role === "coordinator";
+  return role === "admin" || role === "coordinator" || role === "government";
 }
 
 function assertAdmin(auth) {

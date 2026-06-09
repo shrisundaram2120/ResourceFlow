@@ -330,6 +330,14 @@
     lastSyncedSerialized: "",
     reason: ""
   };
+  const AUTH_RUNTIME = {
+    bound: false,
+    ready: false,
+    user: null,
+    role: "",
+    email: "",
+    displayName: ""
+  };
 
   function init() {
     const root = document.getElementById("portalApp");
@@ -339,8 +347,45 @@
     clearLegacyCachesOnce();
     applyTheme(loadTheme());
     bindWorkspaceAutomation(root);
+    bindPortalAuth(root);
     renderApp(root);
     observeInteractiveTestIds();
+  }
+
+  function bindPortalAuth(root) {
+    const config = window.RESOURCEFLOW_FIREBASE_CONFIG || {};
+    if (AUTH_RUNTIME.bound || detectDemoRole() || !config.enabled || !config.enableAuth) {
+      return;
+    }
+    AUTH_RUNTIME.bound = true;
+    ensureFirebaseAuthClient(config).then(function () {
+      window.firebase.auth().onAuthStateChanged(async function (user) {
+        AUTH_RUNTIME.ready = true;
+        AUTH_RUNTIME.user = user || null;
+        AUTH_RUNTIME.email = user && user.email ? safeText(user.email, 160) : "";
+        AUTH_RUNTIME.displayName = user && user.displayName ? safeText(user.displayName, 120) : "";
+        AUTH_RUNTIME.role = "user";
+        if (user && typeof user.getIdTokenResult === "function") {
+          try {
+            const token = await user.getIdTokenResult();
+            AUTH_RUNTIME.role = normalizePortalRole(token && token.claims ? token.claims.role : "") || "user";
+            localStorage.removeItem(PORTAL_SELECTION_KEY);
+          } catch (error) {
+            console.warn("Could not resolve portal auth claims.", error);
+          }
+        }
+        renderApp(root);
+      });
+    }).catch(function (error) {
+      AUTH_RUNTIME.ready = true;
+      console.warn("Portal auth initialization skipped.", error);
+      renderApp(root);
+    });
+  }
+
+  function isPortalAuthPending() {
+    const config = window.RESOURCEFLOW_FIREBASE_CONFIG || {};
+    return Boolean(config.enabled && config.enableAuth && AUTH_RUNTIME.bound && !AUTH_RUNTIME.ready && !detectDemoRole());
   }
 
   function bindWorkspaceAutomation(root) {
@@ -440,6 +485,10 @@
     const page = normalizePage((document.body && document.body.dataset.page) || "overview");
     const session = getSession();
     if (!session.hasSession) {
+      if (isPortalAuthPending()) {
+        root.innerHTML = '<main id="portalMain" class="rf-main"><section class="surface-card access-restricted"><p class="section-label">Workspace Access</p><h1>Verifying your ResourceFlow access</h1><p class="section-copy">Please wait while Firebase confirms your approved role.</p></section></main>';
+        return;
+      }
       window.location.replace("./index.html");
       return;
     }
@@ -3856,8 +3905,15 @@
         if (!role) {
           return;
         }
-        localStorage.setItem(PORTAL_SELECTION_KEY, role);
-        localStorage.setItem(PORTAL_HANDOFF_KEY, JSON.stringify({ role: role }));
+        if (detectDemoRole()) {
+          localStorage.setItem(PORTAL_SELECTION_KEY, role);
+        } else {
+          localStorage.removeItem(PORTAL_SELECTION_KEY);
+        }
+        localStorage.setItem(PORTAL_HANDOFF_KEY, JSON.stringify({
+          requestedRole: role,
+          createdAt: Date.now()
+        }));
         document.body.classList.remove("rf-sidebar-open");
         window.location.assign(href);
       });
@@ -5822,6 +5878,15 @@
     return window.firebase.app().functions(config.functionsRegion || "us-central1");
   }
 
+  async function ensureFirebaseAuthClient(config) {
+    await loadScript("https://www.gstatic.com/firebasejs/" + FIREBASE_SDK_VERSION + "/firebase-app-compat.js");
+    await loadScript("https://www.gstatic.com/firebasejs/" + FIREBASE_SDK_VERSION + "/firebase-auth-compat.js");
+    if (!window.firebase.apps.length) {
+      window.firebase.initializeApp(buildFirebaseInitConfig(config));
+    }
+    return window.firebase.auth();
+  }
+
   function buildFirebaseInitConfig(config) {
     return {
       apiKey: config.apiKey,
@@ -5933,19 +5998,22 @@
   }
 
   function getSession() {
-    const selected = normalizePortal(localStorage.getItem(PORTAL_SELECTION_KEY));
     const handoff = loadJson(PORTAL_HANDOFF_KEY, {});
     const entryProfile = loadJson(ENTRY_PROFILE_KEY, {});
     const demoRole = detectDemoRole();
-    const hasSession = Boolean(selected || normalizePortal(handoff.role) || demoRole || safeText(entryProfile.email || "", 160));
-    const role = selected || normalizePortal(handoff.role) || detectDemoRole() || "user";
+    const requestedRole = normalizePortal(handoff.requestedRole || handoff.role || entryProfile.requestedRole);
+    const selected = demoRole ? normalizePortal(localStorage.getItem(PORTAL_SELECTION_KEY)) : "";
+    const approvedRole = AUTH_RUNTIME.user ? normalizePortalRole(AUTH_RUNTIME.role) : "";
+    const hasSession = Boolean(selected || requestedRole || demoRole || AUTH_RUNTIME.user || safeText(entryProfile.email || "", 160));
+    const role = selected || demoRole || approvedRole || "user";
     const profiles = loadJson(PORTAL_PROFILE_KEY, {});
     const portalProfile = profiles[role] && typeof profiles[role] === "object" ? profiles[role] : {};
     return {
       hasSession: hasSession,
       role: role,
-      name: safeText(portalProfile.fullName || portalProfile.displayName || entryProfile.displayName || "ResourceFlow User", 120),
-      email: safeText(entryProfile.email || loadDemoEmail() || "", 160),
+      requestedRole: requestedRole || role,
+      name: safeText(portalProfile.fullName || portalProfile.displayName || AUTH_RUNTIME.displayName || entryProfile.displayName || "ResourceFlow User", 120),
+      email: safeText(AUTH_RUNTIME.email || entryProfile.email || loadDemoEmail() || "", 160),
       profile: portalProfile,
       summary: (ROLE_CONFIG[role] || ROLE_CONFIG.user).description
     };
@@ -6830,6 +6898,12 @@
     if (portal === "government" || portal === "ngo" || portal === "employee") return "government";
     if (portal === "admin") return "admin";
     return "";
+  }
+
+  function normalizePortalRole(value) {
+    const role = safeText(value, 40).toLowerCase();
+    if (role === "coordinator") return "government";
+    return normalizePortal(role);
   }
 
   function applyTheme(mode) {

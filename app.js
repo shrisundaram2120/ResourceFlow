@@ -390,10 +390,10 @@
       if (!state.demoSession && state.selectedPortalRole) {
         const entryProfile = loadEntryProfile();
         state.userProfile = Object.assign({}, entryProfile, {
-          role: normalizeRole(entryProfile.role || state.selectedPortalRole || "user"),
+          role: entryProfile.email ? "user" : "guest",
           requestedRole: normalizeRole(entryProfile.requestedRole || state.selectedPortalRole || "user")
         });
-        state.role = normalizeRole(state.selectedPortalRole || state.userProfile.role || "user");
+        state.role = entryProfile.email ? "user" : "guest";
         state.authResolved = true;
       }
       loadOnboardingState();
@@ -1369,10 +1369,10 @@
       } else if (state.selectedPortalRole) {
         const entryProfile = loadEntryProfile();
         state.userProfile = Object.assign({}, entryProfile, {
-          role: normalizeRole(entryProfile.role || state.selectedPortalRole || "user"),
+          role: entryProfile.email ? "user" : "guest",
           requestedRole: normalizeRole(entryProfile.requestedRole || state.selectedPortalRole || "user")
         });
-        state.role = normalizeRole(state.selectedPortalRole || state.userProfile.role || "user");
+        state.role = entryProfile.email ? "user" : "guest";
       } else {
         state.role = "guest";
         state.userProfile = null;
@@ -1446,20 +1446,20 @@
   function loadSelectedPortal() {
     try {
       var urlRole = "";
-      var handoffRole = "";
+      var handoffRequestedRole = "";
       if (window.location && window.location.search && typeof URLSearchParams === "function") {
         urlRole = normalizeRole(new URLSearchParams(window.location.search).get("portal"));
       }
       const handoff = loadPortalHandoff();
-      handoffRole = handoff && handoff.role ? normalizeRole(handoff.role) : "";
+      handoffRequestedRole = handoff && handoff.requestedRole ? normalizeRole(handoff.requestedRole) : "";
       const stored = urlRole && urlRole !== "guest"
         ? urlRole
-        : (localStorage.getItem(PORTAL_SELECTION_KEY) || handoffRole);
+        : (state.demoSession ? localStorage.getItem(PORTAL_SELECTION_KEY) : handoffRequestedRole);
       state.selectedPortalRole = normalizeRole(stored);
       if (state.selectedPortalRole === "guest") {
         state.selectedPortalRole = "";
       }
-      if (urlRole && urlRole !== "guest" && state.selectedPortalRole) {
+      if (state.demoSession && urlRole && urlRole !== "guest" && state.selectedPortalRole) {
         localStorage.setItem(PORTAL_SELECTION_KEY, state.selectedPortalRole);
       }
     } catch (error) {
@@ -1479,12 +1479,12 @@
         localStorage.removeItem(PORTAL_HANDOFF_KEY);
         return null;
       }
-      const role = normalizeRole(parsed.role || "");
-      if (!role || role === "guest") {
+      const requestedRole = normalizeRole(parsed.requestedRole || parsed.role || "");
+      if (!requestedRole || requestedRole === "guest") {
         return null;
       }
       return {
-        role: role,
+        requestedRole: requestedRole,
         createdAt: createdAt
       };
     } catch (error) {
@@ -1514,18 +1514,22 @@
     try {
       const raw = localStorage.getItem(ENTRY_PROFILE_KEY);
       const parsed = raw ? JSON.parse(raw) : {};
-      return parsed && typeof parsed === "object" ? parsed : {};
+      if (parsed && typeof parsed === "object") {
+        delete parsed.role;
+        return parsed;
+      }
+      return {};
     } catch (error) {
       return {};
     }
   }
 
   function activeAccessRole() {
-    if (state.selectedPortalRole) {
-      return normalizeRole(state.selectedPortalRole);
-    }
     if (state.demoSession) {
       return normalizeRole(state.role || "guest");
+    }
+    if (state.userProfile && state.userProfile.role) {
+      return normalizeRole(state.userProfile.role);
     }
     if (state.user) {
       return "user";
@@ -1547,7 +1551,7 @@
 
   function persistSelectedPortal() {
     try {
-      if (state.selectedPortalRole) {
+      if (state.demoSession && state.selectedPortalRole) {
         localStorage.setItem(PORTAL_SELECTION_KEY, state.selectedPortalRole);
       } else {
         localStorage.removeItem(PORTAL_SELECTION_KEY);
@@ -1651,7 +1655,7 @@
         }
         state.demoSession = null;
         persistDemoSession();
-        state.role = normalizeRole(state.selectedPortalRole || state.role || "user");
+        state.role = "user";
         renderAuthUi();
         renderAll();
         maybeHandlePostAuthRouting();
@@ -1672,10 +1676,10 @@
         } else if (state.selectedPortalRole) {
           const entryProfile = loadEntryProfile();
           state.userProfile = Object.assign({}, entryProfile, {
-            role: normalizeRole(entryProfile.role || state.selectedPortalRole || "user"),
+            role: entryProfile.email ? "user" : "guest",
             requestedRole: normalizeRole(entryProfile.requestedRole || state.selectedPortalRole || "user")
           });
-          state.role = normalizeRole(state.selectedPortalRole || state.userProfile.role || "user");
+          state.role = entryProfile.email ? "user" : "guest";
         } else {
           state.role = "guest";
           state.userProfile = null;
@@ -1699,29 +1703,33 @@
       const profileRef = db.collection("resourceflowUsers").doc(user.uid);
       const snapshot = await profileRef.get();
       const existing = snapshot.exists && snapshot.data() ? snapshot.data() : {};
-      const capabilityRole = resolveRoleForEmail(user.email || "");
-      const preferredRole = normalizeRole(state.selectedPortalRole || state.pendingRequestedRole || existing.role || "user");
-      const requestedRole = normalizeRole(state.pendingRequestedRole || existing.requestedRole || preferredRole || "user");
+      const requestedRole = normalizeRole(state.pendingRequestedRole || state.selectedPortalRole || existing.requestedRole || "user");
       const claimedRole = await resolveRoleFromClaims(user);
-      const baseRole = preferredRole === "admin" && capabilityRole !== "admin"
-        ? normalizeRole(existing.role || "user")
-        : preferredRole;
-      const currentRole = hasSecureBackend()
-        ? (claimedRole !== "guest" ? claimedRole : baseRole)
-        : baseRole;
+      const currentRole = claimedRole !== "guest" ? claimedRole : "user";
       const profile = {
         uid: user.uid,
         email: safeText(user.email || "", 140),
         displayName: safeText(user.displayName || deriveNameFromEmail(user.email || "ResourceFlow User"), 80),
         photoURL: safeText(user.photoURL || "", 300),
         location: safeText(existing.location || state.pendingSignupLocation || "", 120),
-        role: currentRole,
         requestedRole: requestedRole,
         updatedAt: new Date().toISOString(),
         updatedBy: currentActor()
       };
-      await profileRef.set(profile, { merge: true });
-      state.userProfile = profile;
+      if (!snapshot.exists) {
+        profile.role = "user";
+      }
+      const writeProfile = snapshot.exists
+        ? {
+            requestedRole: requestedRole,
+            updatedAt: profile.updatedAt,
+            updatedBy: profile.updatedBy
+          }
+        : profile;
+      await profileRef.set(writeProfile, { merge: true });
+      state.userProfile = Object.assign({}, existing, profile, {
+        role: currentRole
+      });
       state.role = currentRole;
       state.pendingRequestedRole = "";
       state.pendingSignupLocation = "";
@@ -2050,8 +2058,14 @@
     const normalized = normalizeRole(role);
     state.selectedPortalRole = normalized;
     state.pendingPortalRole = normalized;
+    state.pendingRequestedRole = normalized;
     persistSelectedPortal();
     renderPortalSelection();
+    if (state.user) {
+      syncUserProfile(state.user).catch(function (error) {
+        console.warn("Could not save requested role during portal selection.", error);
+      });
+    }
     redirectToPortal(normalized);
   }
 
@@ -2085,10 +2099,10 @@
     }
     if (footnoteNode) {
       footnoteNode.textContent = normalized === "signup"
-        ? "New users begin as volunteers. Coordinator and admin requests appear in the admin review flow until approved."
+        ? "New users begin as community users. Requested portal roles appear in the admin review flow until approved."
         : (normalized === "reset"
           ? "Reset links are sent through Firebase Authentication if the provider is enabled in your project."
-          : "Use your email and password to enter the shared workspace. New accounts begin as volunteers unless an admin approves a higher role.");
+          : "Use your email and password to enter the shared workspace. Access changes only after an admin approves the requested role.");
     }
     if (statusNode) {
       statusNode.textContent = normalized === "signup"
@@ -2270,9 +2284,9 @@
       '<label class="auth-signup-only">Full Name<input id="authDisplayNameInput" name="displayName" type="text" placeholder="Shri Sundaram"></label>',
       '<label>Email<input id="authEmailInput" name="email" type="email" placeholder="you@example.com" required></label>',
       '<label class="auth-password-wrap">Password<input id="authPasswordInput" name="password" type="password" placeholder="Enter your password" required></label>',
-      '<label class="auth-signup-only">Requested Role<select id="authRoleRequestInput" name="requestedRole"><option value="volunteer">Volunteer</option><option value="coordinator">Coordinator</option><option value="admin">Admin</option></select></label>',
+      '<label class="auth-signup-only">Requested Role<select id="authRoleRequestInput" name="requestedRole"><option value="user">Community User</option><option value="volunteer">Volunteer</option><option value="government">Government</option><option value="coordinator">Coordinator</option><option value="admin">Admin</option></select></label>',
       '<div class="demo-login-stats auth-signup-only">',
-      '<div><span>Approval model</span><strong>Volunteer starts instantly</strong></div>',
+      '<div><span>Approval model</span><strong>Community access starts instantly</strong></div>',
       '<div><span>Elevated roles</span><strong>Admin reviews requests</strong></div>',
       '</div>',
       '<div class="button-row auth-primary-actions">',
@@ -2338,8 +2352,8 @@
 
   function openEmailAuthDialog(role, mode) {
     ensureEmailAuthModal();
-    state.pendingPortalRole = normalizeRole(role || state.pendingPortalRole || "volunteer");
-    state.pendingRequestedRole = normalizeRole(state.pendingRequestedRole || state.pendingPortalRole || "volunteer");
+    state.pendingPortalRole = normalizeRole(role || state.pendingPortalRole || "user");
+    state.pendingRequestedRole = normalizeRole(state.pendingRequestedRole || state.pendingPortalRole || "user");
     const overlay = document.getElementById("emailAuthOverlay");
     if (!overlay) {
       return;
@@ -2406,7 +2420,7 @@
     }
     if (footnoteNode) {
       footnoteNode.textContent = normalized === "signup"
-        ? "New users begin as volunteers. Coordinator and admin requests appear in the admin review flow until approved."
+        ? "New users begin as community users. Requested portal roles appear in the admin review flow until approved."
         : (normalized === "reset"
           ? "Reset links are sent through Firebase Authentication if the email provider is enabled in your project."
           : "If you already have an account, sign in normally. Use Google sign-in only if you prefer it over email/password.");
@@ -2423,7 +2437,7 @@
     const email = textValue(formData, "email");
     const password = textValue(formData, "password");
     const displayName = textValue(formData, "displayName") || deriveNameFromEmail(email);
-    const requestedRole = normalizeRole(textValue(formData, "requestedRole") || state.pendingRequestedRole || state.pendingPortalRole || "volunteer");
+    const requestedRole = normalizeRole(textValue(formData, "requestedRole") || state.pendingRequestedRole || state.pendingPortalRole || "user");
     state.pendingRequestedRole = requestedRole;
     try {
       if (mode === "signup") {
@@ -2947,8 +2961,8 @@
       return false;
     }
     const handoff = loadPortalHandoff();
-    if (!state.selectedPortalRole && handoff && handoff.role) {
-      state.selectedPortalRole = normalizeRole(handoff.role);
+    if (!state.selectedPortalRole && handoff && handoff.requestedRole) {
+      state.selectedPortalRole = normalizeRole(handoff.requestedRole);
       persistSelectedPortal();
     }
     if (!hasActiveSession()) {
@@ -2986,8 +3000,8 @@
       return;
     }
     state.pendingPortalRole = "";
-    if (!roleCanAccessPage(preferredRole, page)) {
-      redirectToPortal(preferredRole);
+    if (!roleCanAccessPage(activeAccessRole(), page)) {
+      redirectToPortal(activeAccessRole());
     }
   }
 
@@ -3775,7 +3789,7 @@
       return normalizeRole(token && token.claims ? token.claims.role : "");
     } catch (error) {
       console.warn("Could not resolve role from claims.", error);
-      return "volunteer";
+      return "guest";
     }
   }
 
@@ -3789,13 +3803,13 @@
       return;
     }
     await state.user.getIdToken(true);
-    state.role = await resolveRoleFromClaims(state.user);
+    const claimedRole = await resolveRoleFromClaims(state.user);
+    state.role = claimedRole !== "guest" ? claimedRole : "user";
     renderAll();
   }
 
   function currentAdminCapability() {
-    return resolveRoleForEmail(state.user && state.user.email ? state.user.email : "") === "admin"
-      || state.role === "admin";
+    return activeAccessRole() === "admin";
   }
 
   function ensureWorkspaceAccess(message) {
@@ -7605,8 +7619,8 @@
           uid: doc.id,
           email: safeText(data.email || "", 140),
           displayName: safeText(data.displayName || "ResourceFlow User", 80),
-          role: normalizeRole(data.role || "volunteer"),
-          requestedRole: normalizeRole(data.requestedRole || "volunteer"),
+          role: normalizeRole(data.role || "user"),
+          requestedRole: normalizeRole(data.requestedRole || "user"),
           updatedAt: safeIso(data.updatedAt || new Date().toISOString())
         };
       });
@@ -7652,28 +7666,10 @@
   }
 
   async function updateUserRoleDirect(uid, email, role) {
-    if (!currentAdminCapability()) {
-      throw new Error("Only the configured admin email can change roles in Spark mode.");
-    }
-    const db = getFirestoreDb();
-    if (!db) {
-      throw new Error("Firestore is not connected.");
-    }
-    await db.collection("resourceflowUsers").doc(uid).set({
-      uid: uid,
-      email: safeText(email || "", 140),
-      role: normalizeRole(role),
-      requestedRole: normalizeRole(role),
-      updatedAt: new Date().toISOString(),
-      updatedBy: currentActor()
-    }, { merge: true });
-    state.data = registerActivity(
-      state.data,
-      "admin",
-      "Role updated for " + (email || uid) + " to " + normalizeRole(role) + ".",
-      currentActor()
-    );
-    await persist();
+    void uid;
+    void email;
+    void role;
+    throw new Error("Role changes must use the secure backend setUserRole Function.");
   }
 
   function bindAdminRoleForms() {
@@ -7698,7 +7694,7 @@
               role: select.value
             });
           } else {
-            await updateUserRoleDirect(uid, email, select.value);
+            throw new Error("Secure backend is required for role changes.");
           }
           await loadAdminSnapshot(true);
           if (state.user && state.user.uid === uid) {
@@ -9755,12 +9751,12 @@
       '<strong>' + escapeHtml(user.displayName || user.email || "Workspace user") + "</strong>",
       '<p class="card-meta">' + escapeHtml(user.email || user.uid) + "</p>",
       '<div class="chip-row">',
-      renderChip("role: " + titleCase(user.role || "volunteer")),
-      renderChip("requested: " + titleCase(user.requestedRole || "volunteer")),
+      renderChip("role: " + titleCase(user.role || "user")),
+      renderChip("requested: " + titleCase(user.requestedRole || "user")),
       renderChip(formatTime(user.updatedAt)),
       "</div>",
       '<form class="admin-role-form button-row" data-uid="' + escapeHtml(user.uid) + '" data-email="' + escapeHtml(user.email || "") + '">',
-      '<select name="role"><option' + (user.role === "volunteer" ? " selected" : "") + '>volunteer</option><option' + (user.role === "coordinator" ? " selected" : "") + '>coordinator</option><option' + (user.role === "admin" ? " selected" : "") + '>admin</option></select>',
+      '<select name="role"><option' + (user.role === "user" ? " selected" : "") + '>user</option><option' + (user.role === "volunteer" ? " selected" : "") + '>volunteer</option><option' + (user.role === "government" ? " selected" : "") + '>government</option><option' + (user.role === "coordinator" ? " selected" : "") + '>coordinator</option><option' + (user.role === "admin" ? " selected" : "") + '>admin</option></select>',
       '<button class="primary-button" type="submit">Update Role</button>',
       '</form>',
       "</div>"

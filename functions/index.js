@@ -53,17 +53,29 @@ exports.syncMyClaims = onCall({ region: region }, async (request) => {
   const profileRef = db.collection("resourceflowUsers").doc(request.auth.uid);
   const profileSnap = await profileRef.get();
   const profile = profileSnap.exists && profileSnap.data() ? profileSnap.data() : {};
-  const existingClaim = decodeRoleClaim(request.auth);
-  const profileRole = normalizeRole(profile.role || "volunteer");
+  const claimedRole = decodeRoleClaim(request.auth);
+  const requestedRole = normalizeRole(profile.requestedRole || claimedRole || "user");
 
-  if (existingClaim !== profileRole && profileRole === "volunteer") {
-    await auth.setCustomUserClaims(request.auth.uid, { role: profileRole });
+  if (!profileSnap.exists) {
+    const userRecord = await auth.getUser(request.auth.uid);
+    await profileRef.set({
+      uid: request.auth.uid,
+      email: safeText(userRecord.email || request.auth.token.email || "", 140),
+      displayName: safeText(userRecord.displayName || "ResourceFlow User", 80),
+      photoURL: safeText(userRecord.photoURL || "", 300),
+      location: "",
+      role: "user",
+      requestedRole: requestedRole,
+      updatedAt: new Date().toISOString(),
+      updatedBy: safeText(request.auth.token.email || request.auth.uid, 140)
+    }, { merge: true });
   }
 
   return {
     ok: true,
-    role: profileRole,
-    claimedRole: profileRole
+    role: claimedRole,
+    requestedRole: requestedRole,
+    claimedRole: claimedRole
   };
 });
 
@@ -417,8 +429,8 @@ exports.getAdminSnapshot = onCall({ region: region }, async (request) => {
         uid: doc.id,
         email: safeText(data.email, 140),
         displayName: safeText(data.displayName, 80),
-        role: normalizeRole(data.role || "volunteer"),
-        requestedRole: normalizeRole(data.requestedRole || "volunteer"),
+        role: normalizeRole(data.role || "user"),
+        requestedRole: normalizeRole(data.requestedRole || "user"),
         updatedAt: safeIso(data.updatedAt || new Date().toISOString())
       };
     }),
@@ -462,7 +474,7 @@ function ensureSignedIn(request) {
 function ensureManager(request) {
   ensureSignedIn(request);
   if (!assertManager(request.auth)) {
-    throw new HttpsError("permission-denied", "Coordinator or admin access is required.");
+    throw new HttpsError("permission-denied", "Government, coordinator, or admin access is required.");
   }
 }
 

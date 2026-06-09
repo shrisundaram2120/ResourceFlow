@@ -318,7 +318,6 @@
           activatePortalSelection(credential.user, {
             displayName: displayName,
             location: location,
-            role: resolveDefaultRole(email),
             requestedRole: resolveDefaultRole(email)
           });
         } else {
@@ -518,7 +517,7 @@
 
   function buildPortalProfile(portal, values) {
     const base = {
-      role: portal,
+      requestedRole: portal,
       updatedAt: new Date().toISOString()
     };
     if (portal === "user") {
@@ -633,17 +632,14 @@
       throw new Error("Sign in first, then choose your portal.");
     }
 
-    const desiredRole = portal;
     const requestedRole = portal;
-    localStorage.setItem(PORTAL_SELECTION_KEY, desiredRole);
     const localProfile = buildEntryProfile(state.user, {
-      role: desiredRole,
       requestedRole: requestedRole,
       location: extras.location || extras.district || extras.officeLocation || ""
     });
-    persistPortalHandoff(desiredRole);
+    persistPortalHandoff(requestedRole);
     persistEntryProfile(localProfile);
-    window.location.assign(portalRouteWithSelection(desiredRole));
+    window.location.assign(portalRouteWithSelection(requestedRole));
   }
 
   async function completePortalAccess(selectedPortal, extraProfile) {
@@ -682,8 +678,8 @@
     const displayName = safeValue(extra.displayName || user.displayName || profileDraft.displayName || deriveName(email));
     const location = safeValue(extra.location || profileDraft.location || "");
     const defaultRole = resolveDefaultRole(email);
-    const role = normalizePortal(extra.role || defaultRole);
-    const requestedRole = normalizePortal(extra.requestedRole || role || defaultRole);
+    const role = "user";
+    const requestedRole = normalizePortal(extra.requestedRole || profileDraft.requestedRole || defaultRole) || "user";
     const nextProfile = {
       uid: safeValue(user.uid),
       email: email,
@@ -707,7 +703,9 @@
     if (!guard || !uid || !profile || typeof guard.writeCache !== "function") {
       return;
     }
-    guard.writeCache("entry-profile:" + uid, profile);
+    const safeProfile = Object.assign({}, profile);
+    delete safeProfile.role;
+    guard.writeCache("entry-profile:" + uid, safeProfile);
   }
 
   function readCachedEntryProfile(uid) {
@@ -715,7 +713,11 @@
     if (!guard || !uid || typeof guard.readCache !== "function") {
       return null;
     }
-    return guard.readCache("entry-profile:" + uid, 21600000);
+    const cached = guard.readCache("entry-profile:" + uid, 21600000);
+    if (cached && typeof cached === "object") {
+      delete cached.role;
+    }
+    return cached;
   }
 
   function canWriteProfile(nextProfile) {
@@ -769,9 +771,18 @@
       await ensureFirestoreReady();
       if (state.db && canWriteProfile(nextProfile)) {
         const profileRef = state.db.collection("resourceflowUsers").doc(user.uid);
-        await profileRef.set(nextProfile, { merge: true });
+        const profileSnap = await profileRef.get();
+        const existingProfile = profileSnap.exists && profileSnap.data ? (profileSnap.data() || {}) : {};
+        const writableProfile = profileSnap.exists
+          ? {
+              requestedRole: nextProfile.requestedRole,
+              updatedAt: nextProfile.updatedAt,
+              updatedBy: nextProfile.updatedBy
+            }
+          : Object.assign({}, nextProfile, { role: "user" });
+        await profileRef.set(writableProfile, { merge: true });
         markProfileWrite();
-        cacheEntryProfile(user.uid, nextProfile);
+        cacheEntryProfile(user.uid, Object.assign({}, existingProfile, nextProfile, { role: normalizeProfileRole(existingProfile.role || "user") }));
       }
     } catch (error) {
       console.warn("Entry profile sync fallback to local profile.", error);
@@ -930,16 +941,18 @@
 
   function persistEntryProfile(profile) {
     try {
-      localStorage.setItem(ENTRY_PROFILE_KEY, JSON.stringify(profile || {}));
+      const safeProfile = Object.assign({}, profile || {});
+      delete safeProfile.role;
+      localStorage.setItem(ENTRY_PROFILE_KEY, JSON.stringify(safeProfile));
     } catch (error) {
       console.warn("Could not save entry profile.", error);
     }
   }
 
-  function persistPortalHandoff(role) {
+  function persistPortalHandoff(requestedRole) {
     try {
       localStorage.setItem(PORTAL_HANDOFF_KEY, JSON.stringify({
-        role: normalizePortal(role) || "user",
+        requestedRole: normalizePortal(requestedRole) || "user",
         createdAt: Date.now()
       }));
     } catch (error) {
@@ -950,7 +963,12 @@
   function loadEntryProfile() {
     try {
       const raw = localStorage.getItem(ENTRY_PROFILE_KEY);
-      return raw ? JSON.parse(raw) : {};
+      const parsed = raw ? JSON.parse(raw) : {};
+      if (parsed && typeof parsed === "object") {
+        delete parsed.role;
+        return parsed;
+      }
+      return {};
     } catch (error) {
       return {};
     }
@@ -1030,6 +1048,11 @@
   function normalizePortal(value) {
     const next = String(value || "").trim().toLowerCase();
     return PORTAL_ROUTES[next] ? next : "";
+  }
+
+  function normalizeProfileRole(value) {
+    const next = String(value || "").trim().toLowerCase();
+    return ["user", "volunteer", "government", "coordinator", "admin"].indexOf(next) >= 0 ? next : "user";
   }
 
   function portalLabel(role) {

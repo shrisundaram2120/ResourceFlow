@@ -15,12 +15,14 @@ const {
 test("normalizeRole keeps supported roles", () => {
   assert.equal(normalizeRole("admin"), "admin");
   assert.equal(normalizeRole("coordinator"), "coordinator");
+  assert.equal(normalizeRole("government"), "government");
   assert.equal(normalizeRole("volunteer"), "volunteer");
+  assert.equal(normalizeRole("user"), "user");
 });
 
 test("normalizeRole falls back safely", () => {
-  assert.equal(normalizeRole("owner"), "volunteer");
-  assert.equal(normalizeRole(""), "volunteer");
+  assert.equal(normalizeRole("owner"), "user");
+  assert.equal(normalizeRole(""), "user");
 });
 
 test("normalizeZone keeps allowed zones and defaults invalid values", () => {
@@ -93,6 +95,7 @@ test("sanitizeClientError preserves page and actor context", () => {
 test("assertManager and assertAdmin read custom claims safely", () => {
   assert.equal(assertManager({ token: { role: "admin" } }), true);
   assert.equal(assertManager({ token: { role: "coordinator" } }), true);
+  assert.equal(assertManager({ token: { role: "government" } }), true);
   assert.equal(assertManager({ token: { role: "volunteer" } }), false);
   assert.equal(assertAdmin({ token: { role: "admin" } }), true);
   assert.equal(assertAdmin({ token: { role: "coordinator" } }), false);
