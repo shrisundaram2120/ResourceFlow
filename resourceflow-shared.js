@@ -1,5 +1,12 @@
 (function () {
-  const FIREBASE_SDK_VERSION = "10.12.5";
+  const _U = window.ResourceFlowUtils;
+  const FIREBASE_SDK_VERSION = _U.FIREBASE_SDK_VERSION;
+  const safeText = _U.safeText;
+  const safeInteger = _U.safeInteger;
+  const safeIso = _U.safeIso;
+  const escapeHtml = _U.escapeHtml;
+  const titleCase = _U.titleCase;
+  const loadScript = _U.loadScript;
   const FIREBASE_SCRIPTS = [
     "https://www.gstatic.com/firebasejs/" + FIREBASE_SDK_VERSION + "/firebase-app-compat.js",
     "https://www.gstatic.com/firebasejs/" + FIREBASE_SDK_VERSION + "/firebase-auth-compat.js",
@@ -1613,30 +1620,6 @@
     }
   }
 
-  function loadScript(url) {
-    return new Promise(function (resolve, reject) {
-      const existing = document.querySelector('script[data-shared-src="' + url + '"]');
-      if (existing) {
-        if (existing.dataset.loaded === "true") {
-          resolve();
-          return;
-        }
-        existing.addEventListener("load", resolve, { once: true });
-        existing.addEventListener("error", reject, { once: true });
-        return;
-      }
-      const script = document.createElement("script");
-      script.src = url;
-      script.async = true;
-      script.dataset.sharedSrc = url;
-      script.onload = function () {
-        script.dataset.loaded = "true";
-        resolve();
-      };
-      script.onerror = reject;
-      document.head.appendChild(script);
-    });
-  }
 
 function metricCard(label, value, text) {
   return [
@@ -1721,23 +1704,6 @@ function metricCard(label, value, text) {
     return "submitted";
   }
 
-  function safeText(value, limit) {
-    return String(value || "").replace(/\s+/g, " ").trim().slice(0, limit || 180);
-  }
-
-  function safeInteger(value, fallback) {
-    const numeric = Number(value);
-    if (!Number.isFinite(numeric)) {
-      return typeof fallback === "number" ? fallback : 0;
-    }
-    return Math.max(0, Math.round(numeric));
-  }
-
-  function safeIso(value) {
-    const date = new Date(value || new Date().toISOString());
-    return Number.isNaN(date.getTime()) ? new Date().toISOString() : date.toISOString();
-  }
-
   function valueOf(field) {
     return field && typeof field.value !== "undefined" ? field.value : "";
   }
@@ -1806,21 +1772,6 @@ function metricCard(label, value, text) {
     } catch (error) {
       return date.toISOString().slice(0, 10);
     }
-  }
-
-  function titleCase(value) {
-    return String(value || "").replace(/\b\w/g, function (character) {
-      return character.toUpperCase();
-    });
-  }
-
-  function escapeHtml(value) {
-    return String(value || "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#39;");
   }
 
   function getFirebaseConfig() {

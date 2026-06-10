@@ -1,10 +1,22 @@
 ﻿(function () {
   const STORAGE_KEY = "resourceflow-state-v5";
-  const DEMO_AUTH_KEY = "resourceflow-demo-auth-v1";
-  const PORTAL_SELECTION_KEY = "resourceflow-portal-selection-v2";
-  const PORTAL_PROFILE_KEY = "resourceflow-portal-profile-v2";
-  const ENTRY_PROFILE_KEY = "resourceflow-entry-profile-v1";
-  const PORTAL_HANDOFF_KEY = "resourceflow-portal-handoff-v1";
+  const _U = window.ResourceFlowUtils;
+  const DEMO_AUTH_KEY = _U.DEMO_AUTH_KEY;
+  const PORTAL_SELECTION_KEY = _U.PORTAL_SELECTION_KEY;
+  const PORTAL_PROFILE_KEY = _U.PORTAL_PROFILE_KEY;
+  const ENTRY_PROFILE_KEY = _U.ENTRY_PROFILE_KEY;
+  const PORTAL_HANDOFF_KEY = _U.PORTAL_HANDOFF_KEY;
+  const safeText = _U.safeText;
+  const escapeHtml = _U.escapeHtml;
+  const titleCase = _U.titleCase;
+  const safeInteger = _U.safeInteger;
+  const safeIso = _U.safeIso;
+  const safeOptionalIso = _U.safeOptionalIso;
+  const formatTimestamp = _U.formatTimestamp;
+  const uid = _U.uid;
+  const isoMinutesAgo = _U.isoMinutesAgo;
+  const loadScript = _U.loadScript;
+  const downloadBlob = _U.downloadBlob;
   const REQUEST_DRAFT_KEY = "resourceflow-request-draft-v1";
   const VOLUNTEER_DRAFT_KEY = "resourceflow-volunteer-draft-v1";
   const ONBOARDING_KEY = "resourceflow-onboarding-v1";
@@ -4083,30 +4095,6 @@
     }
   }
 
-  function loadScript(url) {
-    return new Promise(function (resolve, reject) {
-      const existing = document.querySelector('script[data-src="' + url + '"]');
-      if (existing) {
-        if (existing.dataset.loaded === "true") {
-          resolve();
-          return;
-        }
-        existing.addEventListener("load", resolve, { once: true });
-        existing.addEventListener("error", reject, { once: true });
-        return;
-      }
-      const script = document.createElement("script");
-      script.src = url;
-      script.async = true;
-      script.dataset.src = url;
-      script.onload = function () {
-        script.dataset.loaded = "true";
-        resolve();
-      };
-      script.onerror = reject;
-      document.head.appendChild(script);
-    });
-  }
   function bindGlobalActions() {
     if (window.__resourceFlowAccessLinksBound !== true) {
       window.__resourceFlowAccessLinksBound = true;
@@ -10256,15 +10244,6 @@
     downloadBlob(blob, "resourceflow-analysis-pack.md");
   }
 
-  function downloadBlob(blob, filename) {
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = filename;
-    anchor.click();
-    URL.revokeObjectURL(url);
-  }
-
   function highlightActiveNav() {
     const page = document.body.dataset.page;
     document.querySelectorAll("[data-nav]").forEach(function (node) {
@@ -10476,44 +10455,6 @@
     return safeText(value || "Core route", 40) || "Core route";
   }
 
-  function safeOptionalIso(value) {
-    if (!value) {
-      return "";
-    }
-    return safeIso(value);
-  }
-
-  function safeText(value, limit) {
-    return String(value || "")
-      .replace(/\s+/g, " ")
-      .trim()
-      .slice(0, limit || MAX_TEXT_FIELD);
-  }
-
-  function safeInteger(value, min, max, fallback) {
-    const numeric = Number(value);
-    if (!Number.isFinite(numeric)) {
-      return fallback;
-    }
-    return Math.min(max, Math.max(min, Math.round(numeric)));
-  }
-
-  function safeIso(value) {
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) {
-      return new Date().toISOString();
-    }
-    return date.toISOString();
-  }
-
-  function formatTimestamp(value) {
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) {
-      return "n/a";
-    }
-    return date.toLocaleString();
-  }
-
   function formatFileSize(bytes) {
     const size = Number(bytes || 0);
     if (size >= 1024 * 1024) {
@@ -10550,24 +10491,6 @@
       && (!Array.isArray(next.history) || next.history.length === 0);
   }
 
-  function escapeHtml(value) {
-    return String(value)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/\"/g, "&quot;")
-      .replace(/'/g, "&#39;");
-  }
-
-  function titleCase(value) {
-    return String(value)
-      .split(" ")
-      .map(function (item) {
-        return item.charAt(0).toUpperCase() + item.slice(1);
-      })
-      .join(" ");
-  }
-
   function formatTime(value) {
     const timestamp = new Date(safeIso(value)).getTime();
     const diff = Math.max(1, Math.round((Date.now() - timestamp) / 60000));
@@ -10579,14 +10502,6 @@
       return hours + " hr ago";
     }
     return Math.round(hours / 24) + " day ago";
-  }
-
-  function uid() {
-    return "rf-" + Math.random().toString(36).slice(2, 10);
-  }
-
-  function isoMinutesAgo(minutes) {
-    return new Date(Date.now() - minutes * 60000).toISOString();
   }
 
   window.ResourceFlowTestAPI = {
