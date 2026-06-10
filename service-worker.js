@@ -21,6 +21,8 @@ self.addEventListener("activate", function (event) {
       clients.forEach(function (client) {
         client.navigate(client.url);
       });
+    }).catch(function (error) {
+      console.warn("Service worker activation cleanup failed.", error);
     })
   );
 });
