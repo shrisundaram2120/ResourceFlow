@@ -745,9 +745,9 @@ html.rf-theme-dark .rf-top-link.is-active {
 }
 
 .primary-button {
-  background: var(--brand);
-  color: #fff;
-  border-color: var(--brand);
+  background: #3B5998;
+  color: #FFFFFF;
+  border-color: #3B5998;
   box-shadow: 0 14px 28px rgba(3, 22, 50, 0.18);
 }
 

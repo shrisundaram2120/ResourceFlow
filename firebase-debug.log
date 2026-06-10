@@ -1,0 +1,51 @@
+[debug] [2026-06-10T09:48:55.549Z] ----------------------------------------------------------------------
+[debug] [2026-06-10T09:48:55.551Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\admin\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js emulators:start
+[debug] [2026-06-10T09:48:55.551Z] CLI Version:   15.19.1
+[debug] [2026-06-10T09:48:55.551Z] Platform:      win32
+[debug] [2026-06-10T09:48:55.551Z] Node Version:  v24.15.0
+[debug] [2026-06-10T09:48:55.552Z] Time:          Wed Jun 10 2026 15:18:55 GMT+0530 (India Standard Time)
+[debug] [2026-06-10T09:48:55.552Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-06-10T09:48:57.238Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-06-10T09:48:57.238Z] > authorizing via signed-in user (acshrisundaram@gmail.com)
+[debug] [2026-06-10T09:48:57.255Z] Error: EPERM: operation not permitted, open 'C:\Users\admin\.config\configstore\firebase-tools.json.183444138'
+    at Object.openSync (node:fs:561:18)
+    at writeFile.writeFileSync [as sync] (C:\Users\admin\AppData\Roaming\npm\node_modules\firebase-tools\node_modules\write-file-atomic\index.js:205:13)
+    at set all (C:\Users\admin\AppData\Roaming\npm\node_modules\firebase-tools\node_modules\configstore\index.js:61:20)
+    at Configstore.set (C:\Users\admin\AppData\Roaming\npm\node_modules\firebase-tools\node_modules\configstore\index.js:91:12)
+    at session (C:\Users\admin\AppData\Roaming\npm\node_modules\firebase-tools\lib\track.js:181:39)
+    at emulatorSession (C:\Users\admin\AppData\Roaming\npm\node_modules\firebase-tools\lib\track.js:160:12)
+    at trackEmulator (C:\Users\admin\AppData\Roaming\npm\node_modules\firebase-tools\lib\track.js:72:21)
+    at Command.<anonymous> (C:\Users\admin\AppData\Roaming\npm\node_modules\firebase-tools\lib\command.js:101:48)
+    at Command.listener [as _actionHandler] (C:\Users\admin\AppData\Roaming\npm\node_modules\firebase-tools\node_modules\commander\index.js:413:31)
+    at Command._parseCommand (C:\Users\admin\AppData\Roaming\npm\node_modules\firebase-tools\node_modules\commander\index.js:914:14)
+[error] 
+[error] Error: An unexpected error has occurred.
+[debug] [2026-06-10T09:48:57.261Z] Could not find VSCode notification endpoint: FetchError: request to http://localhost:40001/vscode/notify failed, reason: . If you are not running the Firebase SQL Connect VSCode extension, this is expected and not an issue.
+[info] i  emulators: Shutting down emulators. {"metadata":{"emulator":{"name":"hub"},"message":"Shutting down emulators."}}
+[debug] [2026-06-10T09:48:57.264Z] Could not find VSCode notification endpoint: FetchError: request to http://localhost:40001/vscode/notify failed, reason: . If you are not running the Firebase SQL Connect VSCode extension, this is expected and not an issue.
+[debug] [2026-06-10T09:48:57.271Z] Error: EPERM: operation not permitted, open 'C:\Users\admin\.config\configstore\firebase-tools.json.4122405483'
+    at Object.openSync (node:fs:561:18)
+    at writeFile.writeFileSync [as sync] (C:\Users\admin\AppData\Roaming\npm\node_modules\firebase-tools\node_modules\write-file-atomic\index.js:205:13)
+    at set all (C:\Users\admin\AppData\Roaming\npm\node_modules\firebase-tools\node_modules\configstore\index.js:61:20)
+    at Configstore.set (C:\Users\admin\AppData\Roaming\npm\node_modules\firebase-tools\node_modules\configstore\index.js:91:12)
+    at session (C:\Users\admin\AppData\Roaming\npm\node_modules\firebase-tools\lib\track.js:181:39)
+    at emulatorSession (C:\Users\admin\AppData\Roaming\npm\node_modules\firebase-tools\lib\track.js:160:12)
+    at trackEmulator (C:\Users\admin\AppData\Roaming\npm\node_modules\firebase-tools\lib\track.js:72:21)
+    at C:\Users\admin\AppData\Roaming\npm\node_modules\firebase-tools\lib\command.js:150:53
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+[error] 
+[error] Error: An unexpected error has occurred.
+[debug] [2026-06-10T09:48:57.550Z] Error: EPERM: operation not permitted, open 'C:\Users\admin\.config\configstore\firebase-tools.json.491662530'
+    at Object.openSync (node:fs:561:18)
+    at writeFile.writeFileSync [as sync] (C:\Users\admin\AppData\Roaming\npm\node_modules\firebase-tools\node_modules\write-file-atomic\index.js:205:13)
+    at set all (C:\Users\admin\AppData\Roaming\npm\node_modules\firebase-tools\node_modules\configstore\index.js:61:20)
+    at Configstore.delete (C:\Users\admin\AppData\Roaming\npm\node_modules\firebase-tools\node_modules\configstore\index.js:101:12)
+    at process.<anonymous> (C:\Users\admin\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\cli.js:65:45)
+    at process.emit (node:events:521:24)
+    at process.exit (node:internal/process/per_thread:236:15)
+    at Timeout._onTimeout (C:\Users\admin\AppData\Roaming\npm\node_modules\firebase-tools\lib\errorOut.js:20:17)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+[error] 
+[error] Error: An unexpected error has occurred.

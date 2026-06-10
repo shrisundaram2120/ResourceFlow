@@ -23,7 +23,8 @@ const auth = admin.auth();
 const region = process.env.FUNCTIONS_REGION || "us-central1";
 const callableOptions = {
   region: region,
-  enforceAppCheck: process.env.ENFORCE_APP_CHECK === "true"
+  enforceAppCheck: process.env.ENFORCE_APP_CHECK === "true",
+  cors: true
 };
 const workspaceCollection = process.env.DEFAULT_WORKSPACE_COLLECTION || "resourceflow";
 const workspaceId = process.env.DEFAULT_WORKSPACE_ID || "resourceflow-demo";
