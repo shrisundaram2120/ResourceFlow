@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1A362D">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <title>ResourceFlow | Admin Dashboard - TEST</title>
+  <link rel="stylesheet" href="./portal.css?v=20260610-fix4">
+</head>
+<body class="portal-body" data-page="admin">
+  <a class="skip-link" href="#portalMain">Skip to content</a>
+  <div id="portalApp" class="rf-app"></div>
+  <h1 id="test-status">TESTING...</h1>
+
+  <script>
+    // EARLY TEST LOGS BEFORE ANYTHING ELSE
+    const testStatus = document.getElementById('test-status');
+    function logToPage(msg) {
+      const p = document.createElement('p');
+      p.textContent = msg;
+      testStatus.appendChild(p);
+      console.log('[TEST]', msg);
+    }
+    logToPage('Page loaded!');
+    logToPage('document.body.dataset.page: ' + (document.body ? document.body.dataset.page : 'NO BODY'));
+    logToPage('Location.href: ' + window.location.href);
+    
+    // Block all redirects temporarily
+    const originalAssign = window.location.assign;
+    window.location.assign = function(url) {
+      logToPage('!!! INTERCEPTED location.assign to: ' + url);
+      console.trace('location.assign called!');
+      // Don't actually redirect for testing
+      // originalAssign.apply(window.location, arguments);
+    };
+    const originalReplace = window.location.replace;
+    window.location.replace = function(url) {
+      logToPage('!!! INTERCEPTED location.replace to: ' + url);
+      console.trace('location.replace called!');
+      // Don't actually redirect for testing
+      // originalReplace.apply(window.location, arguments);
+    };
+  </script>
+
+  <script src="./firebase-config.js?v=20260610-fix4"></script>
+  <script src="./portal.js?v=20260610-fix4"></script>
+  <script src="./resourceflow-shared.js?v=20260610-fix4"></script>
+</body>
+</html>

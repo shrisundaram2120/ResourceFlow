@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test Page</title>
+  <style>body { font-family: Arial, sans-serif; padding: 40px; }</style>
+</head>
+<body class="portal-body" data-page="admin">
+  <h1>Test Page</h1>
+  <div id="results"></div>
+  <script>
+    const resultsDiv = document.getElementById('results');
+    function log(message) {
+      const p = document.createElement('p');
+      p.textContent = message;
+      resultsDiv.appendChild(p);
+      console.log(message);
+    }
+    log('document.body:', document.body);
+    log('document.body.dataset.page:', document.body ? document.body.dataset.page : 'NO BODY');
+    log('Location:', window.location.href);
+  </script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Debug</title>
+</head>
+<body class="portal-body" data-page="admin">
+  <h1>Debug Page - data-page Check</h1>
+  <div id="results"></div>
+  <script>
+    const resultsDiv = document.getElementById('results');
+    function log(msg) {
+      const p = document.createElement('p');
+      p.textContent = msg;
+      resultsDiv.appendChild(p);
+      console.log(msg);
+    }
+    log('=== DEBUG START ===');
+    log('document.body:', document.body);
+    log('document.body.dataset:', document.body ? document.body.dataset : 'NO BODY');
+    log('document.body.dataset.page:', document.body ? document.body.dataset.page : 'NO BODY');
+    log('=== DEBUG END ===');
+  </script>
+</body>
+</html>
