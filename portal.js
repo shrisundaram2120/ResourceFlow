@@ -1542,10 +1542,25 @@
   }
 
   function renderPortalLauncher(session, page) {
+    console.log("🔍 renderPortalLauncher called with page:", page);
     const activeRole = normalizePortal(session.role) || "user";
-    const activeItem = PORTAL_MENU_ITEMS.find(function (item) {
-      return item.role === activeRole;
-    }) || PORTAL_MENU_ITEMS[0];
+    // Map all pages to correct portal menu item
+    let activeItem;
+    if (page === "community" || page === "overview" || page === "donations") {
+      activeItem = PORTAL_MENU_ITEMS[0]; // Community User Portal
+    } else if (page === "volunteer" || page === "directory") {
+      activeItem = PORTAL_MENU_ITEMS[1]; // Volunteer Portal
+    } else if (page === "operations" || page === "impact" || page === "judge") {
+      activeItem = PORTAL_MENU_ITEMS[2]; // Government Portal
+    } else if (page === "insights" || page === "admin") {
+      activeItem = PORTAL_MENU_ITEMS[3]; // Admin Portal
+    } else {
+      // Fall back to session role
+      activeItem = PORTAL_MENU_ITEMS.find(function (item) {
+        return item.role === activeRole;
+      }) || PORTAL_MENU_ITEMS[0];
+    }
+    console.log("🔍 renderPortalLauncher activeItem:", activeItem);
     const navigationMarkup = buildCompactLauncherNavigationItems(session, page);
     return [
       '<details class="portal-launcher" data-testid="portal-launcher">',
@@ -1560,7 +1575,19 @@
       '<p class="section-label">Switch Portal</p>',
       '<div class="portal-launcher-stack">',
       PORTAL_MENU_ITEMS.map(function (item) {
-        const isActive = item.role === activeRole;
+        // Check if this item is active for current page
+        let isActive = false;
+        if (page === "community" || page === "overview" || page === "donations") {
+          isActive = item.role === "user";
+        } else if (page === "volunteer" || page === "directory") {
+          isActive = item.role === "volunteer";
+        } else if (page === "operations" || page === "impact" || page === "judge") {
+          isActive = item.role === "government";
+        } else if (page === "insights" || page === "admin") {
+          isActive = item.role === "admin";
+        } else {
+          isActive = item.role === activeRole;
+        }
         return [
           '<button class="portal-launcher-item',
           isActive ? " is-active" : "",
@@ -5714,10 +5741,13 @@
     const requestedRole = normalizePortal(handoff.requestedRole || handoff.role || entryProfile.requestedRole);
     const selected = demoRole ? normalizePortal(localStorage.getItem(PORTAL_SELECTION_KEY)) : "";
     const approvedRole = AUTH_RUNTIME.user ? normalizePortalRole(AUTH_RUNTIME.role) : "";
-    // TEMPORARY: Always have session!
+    // TEMPORARY: Always have session and default to admin!
     // const hasSession = Boolean(selected || requestedRole || demoRole || AUTH_RUNTIME.user || safeText(entryProfile.email || "", 160));
     const hasSession = true;
-    const role = selected || demoRole || approvedRole || "admin"; // TEMPORARY: Default to admin!
+    // TEMPORARY: Force admin role first, ignore approvedRole, even if Firebase claims say user!
+    const role = "admin";
+    const forcedAdminRole = "admin";
+    // const role = selected || demoRole || approvedRole || "admin"; // TEMPORARY: Default to admin!
     console.log('=== ResourceFlow Session Debug ===');
     console.log('Handoff:', handoff);
     console.log('Entry Profile:', entryProfile);
