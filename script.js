@@ -1,5 +1,14 @@
 const STORAGE_KEY = "resourceflow-state-v1";
 
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 const sampleRequests = [
   {
     id: crypto.randomUUID(),
@@ -499,8 +508,8 @@ function renderAnalytics() {
       row.className = "bar-row";
       row.innerHTML = `
         <div class="bar-head">
-          <span>${category}</span>
-          <span>${count}</span>
+          <span>${escapeHtml(category)}</span>
+          <span>${escapeHtml(String(count))}</span>
         </div>
         <div class="bar-track">
           <div class="bar-fill" style="width: ${(count / maxValue) * 100}%"></div>

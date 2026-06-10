@@ -6,7 +6,9 @@ service cloud.firestore {
     }
 
     function isAdminEmail() {
-      return signedIn() && request.auth.token.email == "acshrisundaram@gmail.com";
+      return signedIn()
+        && request.auth.token.email is string
+        && request.auth.token.email.lower() == "acshrisundaram@gmail.com";
     }
 
     function currentClaimRole() {
@@ -167,8 +169,8 @@ service cloud.firestore {
     }
 
     match /resourceflow/{workspaceId} {
-      allow read: if true;
-      allow create, update: if signedIn() && validWorkspacePayload();
+      allow read: if signedIn();
+      allow create, update: if canManageWorkspace() && validWorkspacePayload();
       allow delete: if canManageWorkspace();
     }
 

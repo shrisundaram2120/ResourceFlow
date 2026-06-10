@@ -6,7 +6,9 @@ service firebase.storage {
     }
 
     function isAdminEmail() {
-      return signedIn() && request.auth.token.email == "acshrisundaram@gmail.com";
+      return signedIn()
+        && request.auth.token.email is string
+        && request.auth.token.email.lower() == "acshrisundaram@gmail.com";
     }
 
     function currentProfileRole() {
