@@ -3,9 +3,12 @@ const assert = require("node:assert/strict");
 const {
   assertAdmin,
   assertManager,
+  decodeRoleClaim,
   normalizeSkills,
   normalizeRole,
   safeInteger,
+  safeIso,
+  safeText,
   normalizeZone,
   sanitizeNotificationPayload,
   sanitizeVolunteerRecord,
@@ -99,4 +102,54 @@ test("assertManager and assertAdmin read custom claims safely", () => {
   assert.equal(assertManager({ token: { role: "volunteer" } }), false);
   assert.equal(assertAdmin({ token: { role: "admin" } }), true);
   assert.equal(assertAdmin({ token: { role: "coordinator" } }), false);
+});
+
+test("safeText trims, collapses whitespace, and respects limit", () => {
+  assert.equal(safeText("  hello   world  ", 180), "hello world");
+  assert.equal(safeText("abcdef", 3), "abc");
+  assert.equal(safeText(null), "");
+  assert.equal(safeText(undefined), "");
+  assert.equal(safeText(123, 10), "123");
+  assert.equal(safeText("  \t\n  multiple   spaces  \n", 50), "multiple spaces");
+});
+
+test("safeText uses default limit when none provided", () => {
+  const longInput = "a".repeat(250);
+  const result = safeText(longInput);
+  assert.equal(result.length, 180);
+});
+
+test("safeIso returns valid ISO string for valid dates", () => {
+  const result = safeIso("2024-06-15T12:00:00Z");
+  assert.equal(result, "2024-06-15T12:00:00.000Z");
+});
+
+test("safeIso returns current time for invalid dates", () => {
+  const before = new Date().toISOString();
+  const result = safeIso("not-a-date");
+  const after = new Date().toISOString();
+  assert.ok(result >= before && result <= after);
+});
+
+test("safeIso handles null and undefined gracefully", () => {
+  // new Date(null) => epoch 1970-01-01 (valid date, returns epoch ISO)
+  assert.equal(safeIso(null), "1970-01-01T00:00:00.000Z");
+  // new Date(undefined) => Invalid Date (falls back to current time)
+  const before = new Date().toISOString();
+  const result = safeIso(undefined);
+  const after = new Date().toISOString();
+  assert.ok(result >= before && result <= after);
+});
+
+test("decodeRoleClaim extracts role from auth token", () => {
+  assert.equal(decodeRoleClaim({ token: { role: "admin" } }), "admin");
+  assert.equal(decodeRoleClaim({ token: { role: "coordinator" } }), "coordinator");
+  assert.equal(decodeRoleClaim({ token: { role: "volunteer" } }), "volunteer");
+});
+
+test("decodeRoleClaim defaults to user for missing or invalid claims", () => {
+  assert.equal(decodeRoleClaim(null), "user");
+  assert.equal(decodeRoleClaim({}), "user");
+  assert.equal(decodeRoleClaim({ token: {} }), "user");
+  assert.equal(decodeRoleClaim({ token: { role: "superuser" } }), "user");
 });
