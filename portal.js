@@ -485,7 +485,11 @@
   }
 
   function renderApp(root) {
+    console.log('=== renderApp starting ===');
+    console.log('document.body:', document.body);
+    console.log('document.body.dataset.page:', document.body ? document.body.dataset.page : 'NO BODY');
     const page = normalizePage((document.body && document.body.dataset.page) || "overview");
+    console.log('renderApp page variable:', page);
     const session = getSession();
     // TEMPORARY: Disable session/permission checks to let site load!
     // if (!session.hasSession) {
@@ -6549,10 +6553,13 @@
 
   function normalizePage(value) {
     const page = safeText(value, 40).toLowerCase();
+    console.log('=== normalizePage called with value:', value, '→', page);
     if (page === "overview") {
       return "community";
     }
-    return PAGE_TITLES[page] ? page : "community";
+    const result = PAGE_TITLES[page] ? page : "community";
+    console.log('normalizePage result:', result);
+    return result;
   }
 
   function normalizePortal(value) {
