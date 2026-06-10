@@ -95,6 +95,7 @@ window.RESOURCEFLOW_FIREBASE_CONFIG = {
       const value = raw ? Number(raw) : 0;
       return Number.isFinite(value) ? value : 0;
     } catch (error) {
+      console.warn("Could not read stored number from localStorage.", error);
       return 0;
     }
   }
@@ -103,7 +104,7 @@ window.RESOURCEFLOW_FIREBASE_CONFIG = {
     try {
       localStorage.setItem(key, String(Math.max(0, Number(value) || 0)));
     } catch (error) {
-      // Ignore localStorage failures so the app can keep running.
+      console.warn("Could not write stored number to localStorage.", error);
     }
   }
 
@@ -193,6 +194,7 @@ window.RESOURCEFLOW_FIREBASE_CONFIG = {
       }
       return parsed.value;
     } catch (error) {
+      console.warn("Could not read cache entry from localStorage.", error);
       return null;
     }
   }
@@ -204,7 +206,7 @@ window.RESOURCEFLOW_FIREBASE_CONFIG = {
         value: value
       }));
     } catch (error) {
-      // Ignore cache failures and keep the live app running.
+      console.warn("Could not write cache entry to localStorage.", error);
     }
     return value;
   }
@@ -213,7 +215,7 @@ window.RESOURCEFLOW_FIREBASE_CONFIG = {
     try {
       localStorage.removeItem(CACHE_PREFIX + key);
     } catch (error) {
-      // Ignore localStorage failures.
+      console.warn("Could not clear cache entry from localStorage.", error);
     }
   }
 
@@ -226,7 +228,7 @@ window.RESOURCEFLOW_FIREBASE_CONFIG = {
         }
       });
     } catch (error) {
-      // Ignore localStorage failures.
+      console.warn("Could not clear cache entries by prefix from localStorage.", error);
     }
   }
 

@@ -192,6 +192,7 @@ function loadState() {
       assignments: Array.isArray(parsed.assignments) ? parsed.assignments : []
     };
   } catch (error) {
+    console.warn("Could not parse saved workspace state.", error);
     return { requests: [], volunteers: [], assignments: [] };
   }
 }

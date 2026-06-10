@@ -621,7 +621,8 @@
         description: "Service worker caching is disabled for stability. The app now loads pages directly from Hosting."
       };
       renderAll(true);
-    }).catch(function () {
+    }).catch(function (error) {
+      console.warn("Service worker cleanup failed during PWA status check.", error);
       pwaStatus = {
         label: "Direct Load",
         description: "The app is loading directly from Hosting without offline caching."

@@ -152,6 +152,7 @@
       const raw = localStorage.getItem(key);
       return raw ? JSON.parse(raw) : null;
     } catch (error) {
+      console.warn("Could not load shared draft from localStorage.", error);
       return null;
     }
   }
@@ -160,7 +161,7 @@
     try {
       localStorage.setItem(key, JSON.stringify(payload || {}));
     } catch (error) {
-      // Ignore draft persistence failures.
+      console.warn("Could not save shared draft to localStorage.", error);
     }
   }
 
@@ -168,7 +169,7 @@
     try {
       localStorage.removeItem(key);
     } catch (error) {
-      // Ignore draft clear failures.
+      console.warn("Could not clear shared draft from localStorage.", error);
     }
   }
 
@@ -1598,6 +1599,7 @@
       const parsed = raw ? JSON.parse(raw) : {};
       return parsed && typeof parsed === "object" && parsed[portal] ? parsed[portal] : {};
     } catch (error) {
+      console.warn("Could not load portal profile from localStorage.", error);
       return {};
     }
   }

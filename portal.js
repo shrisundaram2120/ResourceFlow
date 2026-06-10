@@ -471,14 +471,18 @@
           registrations.forEach(function (registration) {
             registration.unregister();
           });
-        }).catch(function () {});
+        }).catch(function (error) {
+          console.warn("Service worker unregister failed during cache reset.", error);
+        });
       }
       if (window.caches && typeof window.caches.keys === "function") {
         window.caches.keys().then(function (keys) {
           return Promise.all(keys.map(function (key) {
             return window.caches.delete(key);
           }));
-        }).catch(function () {});
+        }).catch(function (error) {
+          console.warn("Cache cleanup failed during cache reset.", error);
+        });
       }
       if (window.sessionStorage) {
         window.sessionStorage.setItem(CACHE_RESET_KEY, "done");
@@ -1519,6 +1523,7 @@
       const raw = localStorage.getItem(key);
       return raw ? JSON.parse(raw) : null;
     } catch (error) {
+      console.warn("Could not load draft from localStorage.", error);
       return null;
     }
   }
@@ -1527,7 +1532,7 @@
     try {
       localStorage.setItem(key, JSON.stringify(payload || {}));
     } catch (error) {
-      // Ignore local storage failures.
+      console.warn("Could not save draft to localStorage.", error);
     }
   }
 
@@ -1535,7 +1540,7 @@
     try {
       localStorage.removeItem(key);
     } catch (error) {
-      // Ignore local storage failures.
+      console.warn("Could not clear draft from localStorage.", error);
     }
   }
 
@@ -5938,6 +5943,7 @@
     try {
       return new Date(value).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     } catch (error) {
+      console.warn("Could not format chat timestamp.", error);
       return "";
     }
   }
@@ -6907,6 +6913,7 @@
     }
     return safeText(value, 240);
   }
+
 
   function ensureInteractiveTestIds(scope) {
     const root = scope || document;

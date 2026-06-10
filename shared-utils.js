@@ -115,6 +115,7 @@
       var raw = localStorage.getItem(key);
       return raw ? JSON.parse(raw) : fallback;
     } catch (error) {
+      console.warn("Could not load JSON from localStorage.", error);
       return fallback;
     }
   }
@@ -123,7 +124,7 @@
     try {
       localStorage.setItem(key, JSON.stringify(value));
     } catch (error) {
-      // Ignore localStorage failures and keep the app responsive.
+      console.warn("Could not save JSON to localStorage.", error);
     }
   }
 

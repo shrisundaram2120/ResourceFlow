@@ -508,6 +508,7 @@
       const parsed = raw ? JSON.parse(raw) : {};
       return parsed && typeof parsed === "object" ? parsed : {};
     } catch (error) {
+      console.warn("Could not load portal profiles from localStorage.", error);
       return {};
     }
   }
@@ -945,6 +946,7 @@
       }
       return {};
     } catch (error) {
+      console.warn("Could not load entry profile from localStorage.", error);
       return {};
     }
   }

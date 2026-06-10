@@ -503,7 +503,9 @@
     });
     try {
       sessionStorage.setItem(DONATION_VIEW_KEY, normalized);
-    } catch (error) {}
+    } catch (error) {
+      console.warn("Could not persist donation view preference.", error);
+    }
   }
 
   function ensureInteractiveTestIds(root) {
@@ -1475,6 +1477,7 @@
         localStorage.setItem(PORTAL_SELECTION_KEY, state.selectedPortalRole);
       }
     } catch (error) {
+      console.warn("Could not restore selected portal.", error);
       state.selectedPortalRole = "";
     }
   }
@@ -1500,6 +1503,7 @@
         createdAt: createdAt
       };
     } catch (error) {
+      console.warn("Could not load portal handoff.", error);
       return null;
     }
   }
@@ -1518,6 +1522,7 @@
       const parsed = raw ? JSON.parse(raw) : {};
       state.portalProfiles = parsed && typeof parsed === "object" ? parsed : {};
     } catch (error) {
+      console.warn("Could not load portal profiles.", error);
       state.portalProfiles = {};
     }
   }
@@ -1532,6 +1537,7 @@
       }
       return {};
     } catch (error) {
+      console.warn("Could not load entry profile.", error);
       return {};
     }
   }
@@ -3696,6 +3702,7 @@
     try {
       return normalizeScenario(localStorage.getItem(DEMO_SCENARIO_KEY) || "flood");
     } catch (error) {
+      console.warn("Could not load demo scenario.", error);
       return "flood";
     }
   }
@@ -4869,6 +4876,7 @@
         await getStorageBucket().ref().child(artifact.path).delete();
       } catch (error) {
         console.warn("Could not delete artifact file from storage.", error);
+        announceNotice("The artifact record was removed but the cloud file could not be deleted.");
       }
     }
     state.data.artifacts = state.data.artifacts.filter(function (item) { return item.id !== id; });
