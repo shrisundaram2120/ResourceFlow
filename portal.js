@@ -1,9 +1,16 @@
 (function () {
-  const PORTAL_SELECTION_KEY = "resourceflow-portal-selection-v2";
-  const PORTAL_PROFILE_KEY = "resourceflow-portal-profile-v2";
-  const PORTAL_HANDOFF_KEY = "resourceflow-portal-handoff-v1";
-  const ENTRY_PROFILE_KEY = "resourceflow-entry-profile-v1";
-  const DEMO_AUTH_KEY = "resourceflow-demo-auth-v1";
+  const _U = window.ResourceFlowUtils;
+  const PORTAL_SELECTION_KEY = _U.PORTAL_SELECTION_KEY;
+  const PORTAL_PROFILE_KEY = _U.PORTAL_PROFILE_KEY;
+  const PORTAL_HANDOFF_KEY = _U.PORTAL_HANDOFF_KEY;
+  const ENTRY_PROFILE_KEY = _U.ENTRY_PROFILE_KEY;
+  const DEMO_AUTH_KEY = _U.DEMO_AUTH_KEY;
+  const safeText = _U.safeText;
+  const escapeHtml = _U.escapeHtml;
+  const loadScript = _U.loadScript;
+  const normalizePortal = _U.normalizePortal;
+  const loadJson = _U.loadJson;
+  const saveJson = _U.saveJson;
   const THEME_KEY = "resourceflow-theme-mode-v2";
   const LANGUAGE_KEY = "resourceflow-language-v1";
   const WORKSPACE_KEY = "resourceflow-demo-workspace-v2";
@@ -20,7 +27,7 @@
   const TOAST_STATE_KEY = "resourceflow-toast-state-v1";
   const REQUEST_LOOKUP_KEY = "resourceflow-request-lookup-v1";
   const ADMIN_MODERATION_FILTER_KEY = "resourceflow-admin-moderation-filter-v1";
-  const FIREBASE_SDK_VERSION = "10.12.5";
+  const FIREBASE_SDK_VERSION = _U.FIREBASE_SDK_VERSION;
   const LANGUAGE_OPTIONS = [
     { value: "en", label: "English" },
     { value: "hinglish", label: "Hinglish" },
@@ -5970,33 +5977,6 @@
     }
   }
 
-  function loadScript(url) {
-    return new Promise(function (resolve, reject) {
-      const existing = document.querySelector('script[data-portal-src="' + url + '"]');
-      if (existing) {
-        if (existing.dataset.loaded === "true") {
-          resolve();
-          return;
-        }
-        existing.addEventListener("load", function () { resolve(); }, { once: true });
-        existing.addEventListener("error", function () { reject(new Error("Could not load " + url)); }, { once: true });
-        return;
-      }
-      const script = document.createElement("script");
-      script.src = url;
-      script.async = true;
-      script.dataset.portalSrc = url;
-      script.onload = function () {
-        script.dataset.loaded = "true";
-        resolve();
-      };
-      script.onerror = function () {
-        reject(new Error("Could not load " + url));
-      };
-      document.head.appendChild(script);
-    });
-  }
-
   function getSession() {
     const handoff = loadJson(PORTAL_HANDOFF_KEY, {});
     const entryProfile = loadJson(ENTRY_PROFILE_KEY, {});
@@ -6891,15 +6871,6 @@
     return PAGE_TITLES[page] ? page : "community";
   }
 
-  function normalizePortal(value) {
-    const portal = safeText(value, 40).toLowerCase();
-    if (portal === "community" || portal === "user") return "user";
-    if (portal === "volunteer") return "volunteer";
-    if (portal === "government" || portal === "ngo" || portal === "employee") return "government";
-    if (portal === "admin") return "admin";
-    return "";
-  }
-
   function normalizePortalRole(value) {
     const role = safeText(value, 40).toLowerCase();
     if (role === "coordinator") return "government";
@@ -6935,23 +6906,6 @@
       }).filter(Boolean).join(", ");
     }
     return safeText(value, 240);
-  }
-
-  function loadJson(key, fallback) {
-    try {
-      const raw = localStorage.getItem(key);
-      return raw ? JSON.parse(raw) : fallback;
-    } catch (error) {
-      return fallback;
-    }
-  }
-
-  function saveJson(key, value) {
-    try {
-      localStorage.setItem(key, JSON.stringify(value));
-    } catch (error) {
-      // Ignore localStorage failures and keep the app responsive.
-    }
   }
 
   function ensureInteractiveTestIds(scope) {
@@ -6996,17 +6950,6 @@
       document.body.appendChild(live);
     }
     live.textContent = message;
-  }
-
-  function safeText(value, limit) {
-    const sanitized = (value == null ? "" : String(value)).replace(/\s+/g, " ").trim();
-    return typeof limit === "number" && limit > 0 ? sanitized.slice(0, limit) : sanitized;
-  }
-
-  function escapeHtml(value) {
-    return safeText(value).replace(/[&<>"']/g, function (match) {
-      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[match];
-    });
   }
 
   function cssEscape(value) {

@@ -1,10 +1,13 @@
 (function () {
-  const PORTAL_SELECTION_KEY = "resourceflow-portal-selection-v2";
-  const PORTAL_PROFILE_KEY = "resourceflow-portal-profile-v2";
-  const DEMO_AUTH_KEY = "resourceflow-demo-auth-v1";
-  const ENTRY_PROFILE_KEY = "resourceflow-entry-profile-v1";
-  const PORTAL_HANDOFF_KEY = "resourceflow-portal-handoff-v1";
-  const FIREBASE_SDK_VERSION = "10.12.5";
+  const _U = window.ResourceFlowUtils;
+  const PORTAL_SELECTION_KEY = _U.PORTAL_SELECTION_KEY;
+  const PORTAL_PROFILE_KEY = _U.PORTAL_PROFILE_KEY;
+  const DEMO_AUTH_KEY = _U.DEMO_AUTH_KEY;
+  const ENTRY_PROFILE_KEY = _U.ENTRY_PROFILE_KEY;
+  const PORTAL_HANDOFF_KEY = _U.PORTAL_HANDOFF_KEY;
+  const FIREBASE_SDK_VERSION = _U.FIREBASE_SDK_VERSION;
+  const loadScript = _U.loadScript;
+  const escapeHtml = _U.escapeHtml;
   const FIREBASE_AUTH_SCRIPTS = [
     "https://www.gstatic.com/firebasejs/" + FIREBASE_SDK_VERSION + "/firebase-app-compat.js",
     "https://www.gstatic.com/firebasejs/" + FIREBASE_SDK_VERSION + "/firebase-auth-compat.js"
@@ -911,34 +914,6 @@
     await state.firestorePromise;
   }
 
-  function loadScript(url) {
-    return new Promise(function (resolve, reject) {
-      const existing = document.querySelector('script[data-auth-src="' + url + '"]');
-      if (existing) {
-        if (existing.dataset.loaded === "true") {
-          resolve();
-          return;
-        }
-        existing.addEventListener("load", function () { resolve(); }, { once: true });
-        existing.addEventListener("error", function () { reject(new Error("Could not load " + url)); }, { once: true });
-        return;
-      }
-
-      const script = document.createElement("script");
-      script.src = url;
-      script.async = true;
-      script.dataset.authSrc = url;
-      script.onload = function () {
-        script.dataset.loaded = "true";
-        resolve();
-      };
-      script.onerror = function () {
-        reject(new Error("Could not load " + url));
-      };
-      document.head.appendChild(script);
-    });
-  }
-
   function persistEntryProfile(profile) {
     try {
       const safeProfile = Object.assign({}, profile || {});
@@ -1066,15 +1041,6 @@
 
   function safeValue(value) {
     return String(value || "").trim();
-  }
-
-  function escapeHtml(value) {
-    return safeValue(value)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#39;");
   }
 
   function deriveName(email) {

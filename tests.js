@@ -495,14 +495,14 @@
     }).join("");
   }
 
-  function escapeHtml(value) {
+  var escapeHtml = window.ResourceFlowUtils ? window.ResourceFlowUtils.escapeHtml : function (value) {
     return String(value)
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
       .replace(/\"/g, "&quot;")
       .replace(/'/g, "&#39;");
-  }
+  };
 
   function clone(value) {
     return JSON.parse(JSON.stringify(value || {}));
