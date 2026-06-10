@@ -136,7 +136,7 @@ exports.saveWorkspaceState = onCall({ region: region }, async (request) => {
 });
 
 exports.processWorkspaceLifecycle = onCall({ region: region }, async (request) => {
-  ensureSignedIn(request);
+  ensureManager(request);
   const actor = safeText(request.auth.token.email || request.auth.uid, 140);
   const incoming = normalizeWorkspaceState(request.data && (request.data.workspace || request.data.state));
   const base = incoming.requests.length || incoming.assignments.length || incoming.volunteers.length || incoming.donations.length
@@ -447,9 +447,8 @@ exports.getAdminSnapshot = onCall({ region: region }, async (request) => {
 });
 
 exports.logClientError = onCall({ region: region }, async (request) => {
-  const actor = request.auth && request.auth.token && request.auth.token.email
-    ? request.auth.token.email
-    : (request.auth ? request.auth.uid : "anonymous");
+  ensureSignedIn(request);
+  const actor = safeText(request.auth.token.email || request.auth.uid, 140);
   const payload = sanitizeClientError(request.data, actor);
   await db.collection("resourceflowErrorLogs").doc(payload.id).set(payload);
   await writeAudit("client-error", {
