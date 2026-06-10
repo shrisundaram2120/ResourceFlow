@@ -15,6 +15,10 @@ service cloud.firestore {
         : "user";
     }
 
+    function validRole(role) {
+      return role in ["user", "volunteer", "government", "coordinator", "admin"];
+    }
+
     function isAdmin() {
       return isAdminEmail() || currentClaimRole() == "admin";
     }
@@ -24,6 +28,12 @@ service cloud.firestore {
         isAdminEmail()
         || currentClaimRole() in ["admin", "coordinator", "government"]
       );
+    }
+
+    function authEmail() {
+      return signedIn() && request.auth.token.email is string
+        ? request.auth.token.email
+        : "";
     }
 
     function validVolunteerProfile() {
@@ -162,59 +172,110 @@ service cloud.firestore {
         && request.resource.data.requestedRole is string
         && request.resource.data.updatedAt is string
         && request.resource.data.updatedBy is string
-        && request.resource.data.role in ["user", "volunteer", "government", "coordinator", "admin"]
-        && request.resource.data.requestedRole in ["user", "volunteer", "government", "coordinator", "admin"];
+        && validRole(request.resource.data.role)
+        && validRole(request.resource.data.requestedRole);
+    }
+
+    function ownProfileCreate(userId) {
+      return signedIn()
+        && request.auth.uid == userId
+        && validProfileShape(userId)
+        && request.resource.data.role == "user"
+        && request.resource.data.email == authEmail();
+    }
+
+    function protectedProfileFieldsLocked(userId) {
+      return request.resource.data.uid == userId
+        && request.resource.data.email == resource.data.email
+        && request.resource.data.role == resource.data.role;
+    }
+
+    function ownProfileUpdate(userId) {
+      return signedIn()
+        && request.auth.uid == userId
+        && validProfileShape(userId)
+        && protectedProfileFieldsLocked(userId)
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(["displayName", "photoURL", "location", "requestedRole", "updatedAt", "updatedBy"]);
+    }
+
+    function ownVolunteerCreate(volunteerId) {
+      return signedIn()
+        && request.auth.uid == volunteerId
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.id == volunteerId
+        && request.resource.data.verified == false
+        && validVolunteerProfile();
+    }
+
+    function ownVolunteerUpdate(volunteerId) {
+      return signedIn()
+        && request.auth.uid == volunteerId
+        && validVolunteerProfile()
+        && request.resource.data.id == resource.data.id
+        && resource.data.ownerUid == request.auth.uid
+        && request.resource.data.ownerUid == resource.data.ownerUid
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.verified == resource.data.verified
+        && request.resource.data.visible == resource.data.visible;
+    }
+
+    function managerVolunteerUpdate() {
+      return canManageWorkspace()
+        && validVolunteerProfile()
+        && request.resource.data.id == resource.data.id
+        && request.resource.data.ownerUid == resource.data.ownerUid
+        && request.resource.data.createdAt == resource.data.createdAt;
+    }
+
+    function ownDonationCreate() {
+      return signedIn()
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.ownerEmail == authEmail()
+        && request.resource.data.status == "submitted"
+        && request.resource.data.verified == false
+        && request.resource.data.archived == false
+        && request.resource.data.flagged == false
+        && request.resource.data.flagReason == ""
+        && validDonationRecord();
+    }
+
+    function managerDonationUpdate() {
+      return canManageWorkspace()
+        && validDonationRecord()
+        && request.resource.data.ownerUid == resource.data.ownerUid
+        && request.resource.data.ownerEmail == resource.data.ownerEmail
+        && request.resource.data.createdAt == resource.data.createdAt;
     }
 
     match /resourceflow/{workspaceId} {
-      allow read: if true;
-      allow create, update: if signedIn() && validWorkspacePayload();
+      allow read: if signedIn();
+      allow create, update: if canManageWorkspace() && validWorkspacePayload();
       allow delete: if canManageWorkspace();
     }
 
     match /resourceflowUsers/{userId} {
       allow read: if signedIn();
-      allow create: if signedIn()
-        && request.auth.uid == userId
-        && validProfileShape(userId)
-        && request.resource.data.role == "user";
-      allow update: if validProfileShape(userId) && (
-        (signedIn()
-          && request.auth.uid == userId
-          && request.resource.data.role == resource.data.role
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["requestedRole", "updatedAt", "updatedBy"]))
-        || isAdmin()
-      );
+      allow create: if ownProfileCreate(userId);
+      allow update: if ownProfileUpdate(userId);
       allow delete: if isAdmin();
     }
 
     match /resourceflowVolunteerProfiles/{volunteerId} {
       allow read: if signedIn();
-      allow create: if signedIn()
-        && request.auth.uid == volunteerId
-        && request.resource.data.ownerUid == request.auth.uid
-        && request.resource.data.id == volunteerId
-        && validVolunteerProfile();
-      allow update: if validVolunteerProfile()
-        && (
-          (signedIn()
-            && request.auth.uid == volunteerId
-            && request.resource.data.ownerUid == request.auth.uid)
-          || canManageWorkspace()
-        );
+      allow create: if ownVolunteerCreate(volunteerId);
+      allow update: if ownVolunteerUpdate(volunteerId) || managerVolunteerUpdate();
       allow delete: if canManageWorkspace();
     }
 
     match /resourceflowDonations/{donationId} {
-      allow create: if signedIn()
-        && request.resource.data.ownerUid == request.auth.uid
-        && validDonationRecord();
+      allow create: if ownDonationCreate();
       allow read: if signedIn()
         && (
           request.auth.uid == resource.data.ownerUid
           || canManageWorkspace()
         );
-      allow update: if canManageWorkspace() && validDonationRecord();
+      allow update: if managerDonationUpdate();
       allow delete: if canManageWorkspace();
     }
 

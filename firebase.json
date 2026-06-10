@@ -16,7 +16,17 @@
     "ignore": [
       "firebase.json",
       "functions/**",
+      "backups/**",
+      "submission/**",
+      "tests.html",
+      "tests.js",
+      "criteria.js",
+      "script.js",
+      "firestore.rules",
+      "firestore.indexes.json",
+      "storage.rules",
       "README.md",
+      ".gitattributes",
       "**/.*",
       "**/node_modules/**"
     ],

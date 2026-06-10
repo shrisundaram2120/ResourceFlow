@@ -21,11 +21,15 @@ admin.initializeApp();
 const db = admin.firestore();
 const auth = admin.auth();
 const region = process.env.FUNCTIONS_REGION || "us-central1";
+const callableOptions = {
+  region: region,
+  enforceAppCheck: process.env.ENFORCE_APP_CHECK === "true"
+};
 const workspaceCollection = process.env.DEFAULT_WORKSPACE_COLLECTION || "resourceflow";
 const workspaceId = process.env.DEFAULT_WORKSPACE_ID || "resourceflow-demo";
 const DEMO_REFRESH_MS = 10 * 60 * 1000;
 
-exports.bootstrapAdmin = onCall({ region: region }, async (request) => {
+exports.bootstrapAdmin = onCall(callableOptions, async (request) => {
   ensureSignedIn(request);
   const email = safeText(request.auth.token.email || "", 140).toLowerCase();
   const targetEmail = safeText(process.env.BOOTSTRAP_ADMIN_EMAIL || "", 140).toLowerCase();
@@ -48,13 +52,20 @@ exports.bootstrapAdmin = onCall({ region: region }, async (request) => {
   };
 });
 
-exports.syncMyClaims = onCall({ region: region }, async (request) => {
+exports.syncMyClaims = onCall(callableOptions, async (request) => {
   ensureSignedIn(request);
   const profileRef = db.collection("resourceflowUsers").doc(request.auth.uid);
   const profileSnap = await profileRef.get();
   const profile = profileSnap.exists && profileSnap.data() ? profileSnap.data() : {};
-  const claimedRole = decodeRoleClaim(request.auth);
+  const hasRoleClaim = request.auth.token && typeof request.auth.token.role === "string";
+  let claimedRole = hasRoleClaim ? decodeRoleClaim(request.auth) : "";
   const requestedRole = normalizeRole(profile.requestedRole || claimedRole || "user");
+  const actor = safeText(request.auth.token.email || request.auth.uid, 140);
+
+  if (!hasRoleClaim) {
+    claimedRole = normalizeRole(profile.role || "user");
+    await auth.setCustomUserClaims(request.auth.uid, { role: claimedRole });
+  }
 
   if (!profileSnap.exists) {
     const userRecord = await auth.getUser(request.auth.uid);
@@ -64,10 +75,16 @@ exports.syncMyClaims = onCall({ region: region }, async (request) => {
       displayName: safeText(userRecord.displayName || "ResourceFlow User", 80),
       photoURL: safeText(userRecord.photoURL || "", 300),
       location: "",
-      role: "user",
+      role: claimedRole,
       requestedRole: requestedRole,
       updatedAt: new Date().toISOString(),
-      updatedBy: safeText(request.auth.token.email || request.auth.uid, 140)
+      updatedBy: actor
+    }, { merge: true });
+  } else if (!hasRoleClaim && normalizeRole(profile.role) !== claimedRole) {
+    await profileRef.set({
+      role: claimedRole,
+      updatedAt: new Date().toISOString(),
+      updatedBy: actor
     }, { merge: true });
   }
 
@@ -79,7 +96,7 @@ exports.syncMyClaims = onCall({ region: region }, async (request) => {
   };
 });
 
-exports.setUserRole = onCall({ region: region }, async (request) => {
+exports.setUserRole = onCall(callableOptions, async (request) => {
   ensureAdmin(request);
   const requestedRole = normalizeRole(request.data && request.data.role);
   const uid = safeText(request.data && request.data.uid, 128);
@@ -97,7 +114,7 @@ exports.setUserRole = onCall({ region: region }, async (request) => {
   };
 });
 
-exports.submitVolunteerRegistration = onCall({ region: region }, async (request) => {
+exports.submitVolunteerRegistration = onCall(callableOptions, async (request) => {
   ensureSignedIn(request);
   const volunteer = sanitizeVolunteerRecord(request.data && request.data.volunteer, {
     uid: request.auth.uid,
@@ -125,7 +142,7 @@ exports.submitVolunteerRegistration = onCall({ region: region }, async (request)
   };
 });
 
-exports.saveWorkspaceState = onCall({ region: region }, async (request) => {
+exports.saveWorkspaceState = onCall(callableOptions, async (request) => {
   ensureManager(request);
   const next = normalizeWorkspaceState(request.data && request.data.state);
   await saveWorkspaceState(next, safeText(request.auth.token.email || request.auth.uid, 140));
@@ -135,8 +152,8 @@ exports.saveWorkspaceState = onCall({ region: region }, async (request) => {
   };
 });
 
-exports.processWorkspaceLifecycle = onCall({ region: region }, async (request) => {
-  ensureSignedIn(request);
+exports.processWorkspaceLifecycle = onCall(callableOptions, async (request) => {
+  ensureManager(request);
   const actor = safeText(request.auth.token.email || request.auth.uid, 140);
   const incoming = normalizeWorkspaceState(request.data && (request.data.workspace || request.data.state));
   const base = incoming.requests.length || incoming.assignments.length || incoming.volunteers.length || incoming.donations.length
@@ -154,7 +171,7 @@ exports.processWorkspaceLifecycle = onCall({ region: region }, async (request) =
   };
 });
 
-exports.generateWorkspaceAnalysis = onCall({ region: region }, async (request) => {
+exports.generateWorkspaceAnalysis = onCall(callableOptions, async (request) => {
   ensureManager(request);
   if (!process.env.GEMINI_API_KEY) {
     throw new HttpsError("failed-precondition", "GEMINI_API_KEY is not configured on the server.");
@@ -198,7 +215,7 @@ exports.generateWorkspaceAnalysis = onCall({ region: region }, async (request) =
   };
 });
 
-exports.chatResourceFlowCopilot = onCall({ region: region }, async (request) => {
+exports.chatResourceFlowCopilot = onCall(callableOptions, async (request) => {
   ensureSignedIn(request);
   if (!process.env.GEMINI_API_KEY) {
     throw new HttpsError("failed-precondition", "GEMINI_API_KEY is not configured on the server.");
@@ -256,7 +273,7 @@ exports.chatResourceFlowCopilot = onCall({ region: region }, async (request) => 
   };
 });
 
-exports.computeSecureRoute = onCall({ region: region }, async (request) => {
+exports.computeSecureRoute = onCall(callableOptions, async (request) => {
   ensureManager(request);
   if (!process.env.MAPS_API_KEY) {
     throw new HttpsError("failed-precondition", "MAPS_API_KEY is not configured on the server.");
@@ -299,7 +316,7 @@ exports.computeSecureRoute = onCall({ region: region }, async (request) => {
   };
 });
 
-exports.queueNotification = onCall({ region: region }, async (request) => {
+exports.queueNotification = onCall(callableOptions, async (request) => {
   ensureManager(request);
   const payload = sanitizeNotificationPayload({
     subject: request.data && request.data.subject,
@@ -403,13 +420,13 @@ exports.auditWorkspaceState = onDocumentWritten(
   }
 );
 
-exports.getAdminSnapshot = onCall({ region: region }, async (request) => {
+exports.getAdminSnapshot = onCall(callableOptions, async (request) => {
   ensureManager(request);
   const workspaceSnap = await getWorkspaceRef().get();
   const workspace = workspaceSnap.exists && workspaceSnap.data() && workspaceSnap.data().state
     ? workspaceSnap.data().state
     : {};
-  const usersSnap = await db.collection("resourceflowUsers").limit(50).get();
+  const usersSnap = await db.collection("resourceflowUsers").orderBy("updatedAt", "desc").limit(20).get();
   const errorsSnap = await db.collection("resourceflowErrorLogs").orderBy("createdAt", "desc").limit(20).get();
   const notificationsSnap = await db.collection("resourceflowNotifications").orderBy("createdAt", "desc").limit(20).get();
   const auditsSnap = await db.collection("resourceflowAudit").orderBy("createdAt", "desc").limit(20).get();
@@ -446,7 +463,7 @@ exports.getAdminSnapshot = onCall({ region: region }, async (request) => {
   };
 });
 
-exports.logClientError = onCall({ region: region }, async (request) => {
+exports.logClientError = onCall(callableOptions, async (request) => {
   const actor = request.auth && request.auth.token && request.auth.token.email
     ? request.auth.token.email
     : (request.auth ? request.auth.uid : "anonymous");

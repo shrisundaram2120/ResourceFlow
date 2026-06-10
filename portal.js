@@ -1794,58 +1794,6 @@
     }
   }
 
-  function renderCommunityPage(workspace) {
-    const lifecycleSection = '<article class="surface-card"><p class="section-label">Live Lifecycle</p><h2 class="section-title">Requests moving from intake to closure</h2>' + renderStatusBoard(workspace.requests) + '</article>';
-    const districtSection = '<article class="surface-card"><p class="section-label">District Comparison</p><h2 class="section-title">Where the visible pressure is building</h2><div class="feed-list">' + renderDistrictComparisonCards(workspace) + '</div></article>';
-    const mapSection = renderMapStage(workspace, {
-      eyebrow: "Live Impact Map",
-      title: "Visible pressure zones and mapped requests",
-      meta: workspace.label || "No demo loaded",
-      location: firstMapLocation(workspace),
-      summary: "Every card in the feed links back to a mappable location so teams can move from overview to action quickly."
-    });
-    const trackerSection = '<article id="communityTrackerSection" class="surface-card"><p class="section-label">Community Request Tracker</p><h2 class="section-title">Requests currently visible to the network</h2><div class="feed-list">' + renderCommunityTracker(workspace.requests) + '</div></article>';
-    const activeNeedsSection = '<article class="surface-card"><div class="section-head"><div><p class="section-label">Active Needs</p><h2 class="section-title">Latest community requests</h2></div></div><div class="feed-list">' + renderRequestCards(workspace.requests) + '</div></article>';
-    const aiMatchingSection = '<article class="surface-card"><p class="section-label">AI Matching Story</p><h2 class="section-title">How ResourceFlow explains the next step</h2><div class="feed-list">' + renderWorkflowCards(buildMatchingSteps(workspace)) + '</div><div class="shared-divider"></div><p class="section-label">Copilot Suggestions</p>' + renderAiSuggestionCards(session, workspace) + '</article>';
-    const routeGroupsSection = '<article class="surface-card"><p class="section-label">Route Groups</p><h2 class="section-title">Map-linked response clusters</h2><div class="feed-list">' + renderRouteGroups(workspace) + '</div></article>';
-    const requestFormSection = '<article class="surface-card"><p class="section-label">Community Request Form</p><h2 class="section-title">Raise a support request</h2><form id="communityRequestForm" class="form-grid" data-testid="community-request-form"><label><span>Request title</span><input class="text-input" name="title" type="text" placeholder="Emergency food kits for affected streets" required></label><div class="grid-2"><label><span>Category</span><select class="text-select" name="category" required><option value="">Choose category</option><option>Food</option><option>Medical</option><option>Shelter</option><option>Education</option><option>Logistics</option></select></label><label><span>District</span><input class="text-input" name="district" type="text" placeholder="Chennai" required></label></div><div class="grid-2"><label><span>Location address</span><input class="text-input" name="location" type="text" placeholder="Velachery, Chennai" required></label><label><span>Estimated people affected</span><input class="text-input" name="beneficiaries" type="number" min="1" step="1" placeholder="40" required></label></div><div class="grid-2"><label><span>Urgency</span><select class="text-select" name="priority" required><option value="Critical">Critical</option><option value="High">High</option><option value="Medium" selected>Medium</option><option value="Low">Low</option></select></label><label><span>Need summary</span><input class="text-input" name="shortSummary" type="text" placeholder="Families need food, blankets, and safe shelter." required></label></div><label><span>Detailed context</span><textarea class="text-area" name="summary" placeholder="Describe the situation, road access, vulnerable groups, and immediate needs." required></textarea></label><button class="primary-button" type="submit" data-testid="submit-community-request">Submit Request</button></form><div id="communityRequestStatus" class="notice-box">Submitted requests are added to the tracker below and become part of the visible feed immediately.</div></article>';
-    const responseStorySection = '<article class="surface-card"><p class="section-label">Response Story</p><h2 class="section-title">What changes after a request is entered</h2><div class="feed-list">' + renderListCards(["The request enters the lifecycle as Pending and appears in the community tracker immediately.", "Operations can review the mapped location, urgency, district, and people affected.", "The AI story updates as volunteers, donations, and assignments are attached.", "Admins can later use the same request in reports, exports, and public impact summaries."]) + '</div></article>';
-    const donationBreakdownSection = '<article class="surface-card"><p class="section-label">Donation Breakdown</p><h2 class="section-title">What support is already visible</h2><div class="feed-list">' + renderDonationBreakdownCards(workspace) + '</div></article>';
-    const completionTrendSection = '<article class="surface-card"><p class="section-label">Completion Trend</p><h2 class="section-title">Progress across the active request lifecycle</h2><div class="feed-list">' + renderAnalyticsCards(buildLifecycleAnalytics(workspace)) + '</div></article>';
-    return [
-      renderHero({
-        eyebrow: "Community Portal",
-        title: "A public-facing response board that stays calm and readable.",
-        copy: workspace.summary,
-        primary: '<button class="primary-button" type="button" data-action="seed-demo" data-scenario="flood" data-testid="overview-load-demo">Load Flood Demo</button>',
-        secondary: '<a class="ghost-button" href="./donations.html" data-testid="overview-donate">Donation Portal</a>',
-        sideCards: [
-          miniCard("Workspace", workspace.label || "No demo loaded", "A single community lane that shows urgent needs, support, and progress."),
-          miniCard("Visible Spaces", "Community, Donations, AI Prediction", "Each portal stays visually separate while sharing one response story.")
-        ]
-      }),
-      renderActionTiles([
-        { label: "I Need Help", copy: "Raise an urgent community request", href: "#communityRequestForm", tone: "brand" },
-        { label: "I Want to Donate", copy: "Open money and item support", href: "./donations.html", tone: "outline" },
-        { label: "Track Requests", copy: "See live request movement", href: "#communityTrackerSection", tone: "muted" },
-        { label: "AI Prediction", copy: "Open the forecasting and matching view", href: "./insights.html", tone: "outline", testId: "overview-open-ai" }
-      ]),
-      renderMetrics(workspaceMetrics(workspace)),
-      renderWeightedColumns([
-        { weight: 2, markup: lifecycleSection },
-        { weight: 2, markup: districtSection },
-        { weight: 4, markup: mapSection },
-        { weight: 4, markup: trackerSection },
-        { weight: 4, markup: activeNeedsSection },
-        { weight: 3, markup: aiMatchingSection },
-        { weight: 2, markup: routeGroupsSection },
-        { weight: 5, markup: requestFormSection },
-        { weight: 2, markup: responseStorySection },
-        { weight: 2, markup: donationBreakdownSection },
-        { weight: 2, markup: completionTrendSection }
-      ], "portal-weighted-flow")
-    ].join("");
-  }
 
   function renderOverviewPage(workspace) {
     return renderCommunityPage(workspace);
@@ -2119,59 +2067,6 @@
     ].join("");
   }
 
-  function renderAdminPage(workspace) {
-    const governanceSection = '<article class="surface-card"><p class="section-label">Governance Pulse</p><h2 class="section-title">Audit events, review queue, and outreach drafts</h2><div class="feed-list">' + renderListCards(workspace.audit) + '</div><div id="adminVolunteerStatusBoard" class="shared-metric-grid" style="margin-top:16px;"><div class="empty-box">Volunteer activity status cards will appear here.</div></div><div id="adminDonationStatusBoard" class="shared-metric-grid" style="margin-top:16px;"><div class="empty-box">Donation workflow status cards will appear here.</div></div></article>';
-    const snapshotSection = '<article class="surface-card"><p class="section-label">Live Snapshot</p><h2 class="section-title">Shared backend summary</h2><div id="sharedAdminStatus" class="notice-box">Admin dashboard is checking the shared backend.</div><div id="adminSharedSummary" class="shared-metric-grid"><div class="empty-box">Admin metrics will appear here after sign-in.</div></div></article>';
-    const volunteerRecordsSection = '<article class="surface-card"><p class="section-label">Volunteer Directory Records</p><h2 class="section-title">Shared volunteer visibility</h2><div id="adminVolunteerRecords" class="record-grid"><div class="empty-box">Shared volunteer management is loading.</div></div></article>';
-    const donationRecordsSection = '<article class="surface-card"><p class="section-label">Donation Records</p><h2 class="section-title">Money and item support from the backend</h2><div id="adminDonationRecords" class="record-grid"><div class="empty-box">Shared donation management is loading.</div></div></article>';
-    const moderationSection = '<article class="surface-card"><p class="section-label">Moderation Center</p><h2 class="section-title">Verification, approvals, and blocked work</h2><div class="feed-list">' + renderApprovalCards(buildModerationQueue(workspace)) + '</div></article>';
-    const analyticsSection = '<article class="surface-card"><p class="section-label">Analytics Upgrade</p><h2 class="section-title">District comparison, donation mix, and completion trend</h2><div class="feed-list">' + renderAnalyticsCards(buildAdminAnalytics(workspace)) + '</div></article>';
-    const usageGuardSection = '<article class="surface-card"><p class="section-label">Firebase Usage Guard</p><h2 class="section-title">Safe usage inside the no-cost tier</h2><div class="feed-list">' + buildUsageGuardCards() + '</div></article>';
-    const aiActionSection = '<article class="surface-card"><p class="section-label">AI Action History</p><h2 class="section-title">What the copilot changed and why</h2><div class="feed-list">' + renderNotificationCards(buildAiActionHistory(workspace)) + '</div></article>';
-    const outreachSection = '<article class="surface-card"><p class="section-label">Outreach Center</p><form id="adminOutreachForm" class="form-grid" data-testid="outreach-center-form"><label><span>Subject</span><input class="text-input" name="subject" type="text" placeholder="Volunteer briefing for evening flood response"></label><label><span>Message</span><textarea class="text-area" name="message" placeholder="Share timing, district, safety notes, and reporting instructions."></textarea></label><label><span>Recipients</span><input class="text-input" name="recipients" type="text" placeholder="Community, Volunteer, Donation portal"></label><button class="primary-button" type="button" data-action="save-outreach" data-testid="save-outreach-draft">Save Draft</button></form></article>';
-    const draftsSection = '<article class="surface-card"><p class="section-label">Outreach Drafts</p><div id="adminOutreachDrafts" class="feed-list">' + renderListCards(workspace.outreach) + '</div></article>';
-    const timelineSection = '<article class="surface-card"><p class="section-label">Assignment Timeline</p><h2 class="section-title">Per-request lifecycle and handoff</h2><div class="feed-list">' + renderRequestTimelineCards(workspace) + '</div></article>';
-    const roleManagementSection = '<section class="surface-card"><p class="section-label">User Role Management</p><h2 class="section-title">Who can access which portal right now</h2><div class="table-shell"><table><thead><tr><th>Name</th><th>Role</th><th>Current Access</th><th>Status</th></tr></thead><tbody>' + renderRoleRows() + '</tbody></table></div></section>';
-    return [
-      renderHero({
-        eyebrow: "Admin Dashboard",
-        title: "Governance, live snapshot, and outreach in one admin control room.",
-        copy: "The admin lane combines local demo intelligence with shared Firestore-backed volunteer and donation management.",
-        primary: '<button class="primary-button" type="button" data-action="seed-demo" data-scenario="flood" data-testid="admin-load-demo">Load Demo</button>',
-        secondary: '<a class="ghost-button" href="./impact.html" data-testid="admin-open-impact">Public Impact</a>',
-        sideCards: [
-          miniCard("Governance Pulse", "Audit events, review queue, outreach drafts", "These cards stay high-contrast in light and dark mode."),
-          miniCard("Visible Spaces", "Community, Volunteer, Donations, AI Prediction", "The portal menu keeps navigation compact while the live feed and widgets stay visible.")
-        ]
-      }),
-      renderActionTiles([
-        { label: "AI Prediction", copy: "Open the explainable forecasting workspace", href: "./insights.html", tone: "outline", testId: "admin-open-ai" },
-        { label: "Public Impact", copy: "Switch to the NGO and judge story view", href: "./impact.html", tone: "muted", testId: "admin-open-impact-tile" },
-        { label: "Print Report", copy: "Generate a printable admin summary", action: "print-report", tone: "outline", testId: "admin-print-report" }
-      ]),
-      renderMetrics([
-        metric("Live Snapshot", String(workspace.requests.length), "Requests currently visible in the workspace feed."),
-        metric("Assignments", String(workspace.assignments.length), "Assignment stats linked to the active scenario."),
-        metric("Completion Rate", String(buildCompletionRate(workspace)) + "%", "Closed or delivered request progress in the active scenario."),
-        metric("Donation Records", String(workspace.donations.length), "Local scenario donation records plus shared backend entries below."),
-        metric("Beneficiaries", String(totalBeneficiaries(workspace)), "Projected people supported by the loaded scenario.")
-      ]),
-      renderWeightedColumns([
-        { weight: 5, markup: governanceSection },
-        { weight: 3, markup: snapshotSection },
-        { weight: 6, markup: volunteerRecordsSection },
-        { weight: 8, markup: donationRecordsSection },
-        { weight: 3, markup: moderationSection },
-        { weight: 2, markup: analyticsSection },
-        { weight: 2, markup: usageGuardSection },
-        { weight: 2, markup: aiActionSection },
-        { weight: 3, markup: outreachSection },
-        { weight: 2, markup: draftsSection },
-        { weight: 2, markup: timelineSection },
-        { weight: 3, markup: roleManagementSection }
-      ], "portal-weighted-flow")
-    ].join("");
-  }
 
   function renderImpactPage(workspace) {
     const walkthroughSection = '<section class="surface-card"><p class="section-label">Demo Walkthrough</p><h2 class="section-title">One-click story for judges and partners</h2><div class="feed-list">' + renderDemoWalkthroughCards(workspace) + '</div></section>';
@@ -3188,112 +3083,6 @@
     }).slice(0, 4);
   }
 
-  function buildNotifications(workspace, session) {
-    const notices = [];
-    const latestRequest = workspace.requests[0];
-    const latestAssignment = workspace.assignments[0];
-    const latestDonation = workspace.donations[0];
-    const volunteerSnapshot = session && session.role === "volunteer" ? buildVolunteerSnapshot(session, workspace) : null;
-    (workspace.audit || []).slice(0, 12).forEach(function (entry) {
-      const line = safeText(entry, 260);
-      const normalized = line.toLowerCase();
-      if (!line) {
-        return;
-      }
-      if (normalized.indexOf("shift") !== -1 || normalized.indexOf("reassign") !== -1) {
-        notices.push({
-          title: "Assignment shifted",
-          meta: "Lifecycle automation",
-          status: "Shifted",
-          copy: line
-        });
-        return;
-      }
-      if (normalized.indexOf("completed") !== -1 || normalized.indexOf("delivered") !== -1) {
-        notices.push({
-          title: "Completion update",
-          meta: "Volunteer / delivery progress",
-          status: "Completed",
-          copy: line
-        });
-        return;
-      }
-      if (normalized.indexOf("in progress") !== -1) {
-        notices.push({
-          title: "Field work in progress",
-          meta: "Live assignment update",
-          status: "In Progress",
-          copy: line
-        });
-        return;
-      }
-      if (normalized.indexOf("matched") !== -1 || normalized.indexOf("assigned") !== -1) {
-        notices.push({
-          title: "Assignment created",
-          meta: "AI / operator matching",
-          status: "Assigned",
-          copy: line
-        });
-        return;
-      }
-      if (normalized.indexOf("pending") !== -1 || normalized.indexOf("submitted") !== -1 || normalized.indexOf("broadcast") !== -1) {
-        notices.push({
-          title: "New pending request",
-          meta: "Request intake",
-          status: "Pending",
-          copy: line
-        });
-      }
-    });
-
-    if (latestRequest) {
-      notices.push({
-        title: latestRequest.title,
-        meta: latestRequest.district + " · " + normalizeRequestStatus(latestRequest.status),
-        status: normalizeRequestStatus(latestRequest.status),
-        copy: "Latest request now visible in the lifecycle with " + String(latestRequest.beneficiaries || 0) + " people affected."
-      });
-    }
-    if (latestAssignment) {
-      notices.push({
-        title: latestAssignment.title,
-        meta: latestAssignment.volunteer + " · " + latestAssignment.district,
-        status: normalizeAssignmentStatus(latestAssignment.status),
-        copy: "Assignment created for " + latestAssignment.location + " and ready for route follow-up."
-      });
-    }
-    if (latestDonation) {
-      notices.push({
-        title: latestDonation.donor + " donation",
-        meta: formatDonationLine(latestDonation),
-        status: normalizeDonationLifecycle(latestDonation.status),
-        copy: "Donation tracking is now connected to the response story and admin review board."
-      });
-    }
-    if (volunteerSnapshot) {
-      notices.push({
-        title: "Volunteer growth update",
-        meta: volunteerSnapshot.ngoGroup + " · " + volunteerSnapshot.reliability + "% reliable",
-        status: volunteerSnapshot.activeTasks && volunteerSnapshot.activeTasks[0]
-          ? normalizeAssignmentStatus(volunteerSnapshot.activeTasks[0].status)
-          : (volunteerSnapshot.completed ? "Completed" : "Accepted"),
-        copy: "You have " + volunteerSnapshot.activeTasks.length + " active task(s) and " + volunteerSnapshot.completed + " completed task(s) visible in your lane."
-      });
-    }
-    if (!notices.length) {
-      return [{
-        title: "No live notifications yet",
-        meta: "Load a scenario",
-        status: "Pending",
-        copy: "Requests, assignments, and donations will appear here once the workspace is active."
-      }];
-    }
-    return notices.filter(function (item, index, list) {
-      return list.findIndex(function (candidate) {
-        return candidate.title === item.title && candidate.copy === item.copy;
-      }) === index;
-    }).slice(0, 6);
-  }
 
   function buildRouteGroups(workspace) {
     const grouped = {};
@@ -3547,60 +3336,7 @@
     return items;
   }
 
-  function buildSuspiciousActivityCards(workspace) {
-    const cards = [];
-    (workspace.requests || []).filter(function (request) {
-      return normalizeRequestStatus(request.status) === "Pending" && priorityScore(request.priority) >= 0.82;
-    }).slice(0, 2).forEach(function (request) {
-      cards.push({
-        title: "Critical request waiting",
-        meta: request.district + " · " + safeText(request.category, 80),
-        status: "Flagged",
-        copy: request.title + " is still pending while carrying critical urgency and should be reviewed immediately.",
-        actions: [
-          { label: "Approve", action: "bulk-approve-request", requestId: request.id, tone: "primary-button compact-button", testId: "moderation-approve-request" },
-          { label: "Flag", action: "toggle-suspicious-request", requestId: request.id, flaggedState: request.flagged ? "false" : "true", tone: "ghost-button compact-button", testId: "moderation-flag-request" }
-        ]
-      });
-    });
-    (workspace.donations || []).filter(function (donation) {
-      const lifecycle = normalizeDonationLifecycle(donation.status);
-      return lifecycle === "Submitted" && (!safeText(donation.linkedRequestId || donation.linkedRequestTitle, 160) || Number(donation.amount || 0) >= 5000 || !safeText(donation.contact || donation.donorEmail, 160));
-    }).slice(0, 3).forEach(function (donation) {
-      cards.push({
-        title: safeText(donation.donorName || donation.donor, 120) + " donation check",
-        meta: formatDonationLine(donation),
-        status: donation.flagged ? "Flagged" : "Submitted",
-        copy: donation.flagged
-          ? safeText(donation.flagReason || "This donation has been flagged for moderator review.", 220)
-          : "This donation should be linked, verified, or flagged before it continues through dispatch.",
-        actions: [
-          { label: "Verify", action: "bulk-approve-donation", donationId: donation.id, tone: "primary-button compact-button", testId: "moderation-verify-donation" },
-          { label: donation.flagged ? "Unflag" : "Flag", action: "toggle-suspicious-donation", donationId: donation.id, flaggedState: donation.flagged ? "false" : "true", tone: "ghost-button compact-button", testId: "moderation-flag-donation" }
-        ]
-      });
-    });
-    return cards.slice(0, 5);
-  }
 
-  function buildModerationFilters(workspace) {
-    const requests = workspace.requests || [];
-    const donations = workspace.donations || [];
-    const flaggedCount = requests.filter(function (request) { return request.flagged; }).length
-      + donations.filter(function (donation) { return donation.flagged; }).length;
-    const pendingCount = requests.filter(function (request) { return normalizeRequestStatus(request.status) === "Pending"; }).length
-      + donations.filter(function (donation) { return normalizeDonationLifecycle(donation.status) === "Submitted"; }).length;
-    return {
-      filter: loadModerationFilter(),
-      counts: {
-        all: pendingCount + flaggedCount,
-        pending: pendingCount,
-        flagged: flaggedCount,
-        requests: requests.filter(function (request) { return normalizeRequestStatus(request.status) === "Pending" || request.flagged; }).length,
-        donations: donations.filter(function (donation) { return normalizeDonationLifecycle(donation.status) === "Submitted" || donation.flagged; }).length
-      }
-    };
-  }
 
   function buildAdminAnalytics(workspace) {
     const deliveredAssignments = workspace.assignments.filter(function (assignment) {
@@ -4600,41 +4336,6 @@
     });
   }
 
-  function submitCommunityRequest(form) {
-    const data = new FormData(form);
-    const workspace = getManagedWorkspace({ reason: "submit-request" });
-    const session = getSession();
-    const request = {
-      id: "REQ-" + Math.floor(Math.random() * 900 + 100),
-      title: safeText(data.get("title"), 140),
-      category: safeText(data.get("category"), 80),
-      district: safeText(data.get("district"), 80),
-      location: safeText(data.get("location"), 140),
-      beneficiaries: Number(data.get("beneficiaries") || 40),
-      priority: safeText(data.get("priority"), 40) || "Medium",
-      status: "Pending",
-      summary: safeText(data.get("shortSummary"), 180) || safeText(data.get("summary"), 280),
-      ai: "The AI is broadcasting this request to Admin and Government, then matching the best volunteers and donation gaps.",
-      requestedAt: nowIso(),
-      createdAt: nowIso(),
-      updatedAt: nowIso(),
-      requester: safeText(session.name || "Community user", 120),
-      blocked: false,
-      source: "live",
-      origin: "live",
-      priorityLane: "live",
-      broadcastTo: ["admin", "government"],
-      complexity: inferTaskComplexity(safeText(data.get("priority"), 40) || "Medium"),
-      estimatedDurationMinutes: estimatedDurationMinutes(safeText(data.get("priority"), 40) || "Medium", "live")
-    };
-    workspace.requests.unshift(request);
-    workspace.systemNotice = "New community request added to the live tracker and broadcasted as Pending.";
-    workspace.audit.unshift("A community request was submitted for " + safeText(data.get("district"), 80) + " and routed into the lifecycle board.");
-    saveWorkspace(workspace);
-    clearDraft(COMMUNITY_DRAFT_KEY);
-    runWorkspaceAutomation({ reason: "submit-request" });
-    renderApp(document.getElementById("portalApp"));
-  }
 
   function saveOutreachDraft() {
     const form = document.getElementById("adminOutreachForm");
@@ -6342,14 +6043,6 @@
     });
   }
 
-  function saveWorkspace(workspace, options) {
-    const nextWorkspace = enrichWorkspace(workspace);
-    const serialized = JSON.stringify(nextWorkspace);
-    localStorage.setItem(WORKSPACE_KEY, serialized);
-    if (!(options && options.skipBackendSync)) {
-      scheduleWorkspaceBackendSync(serialized, options && options.reason);
-    }
-  }
 
   function scheduleWorkspaceBackendSync(serialized, reason) {
     const config = window.RESOURCEFLOW_FIREBASE_CONFIG || {};
@@ -6367,51 +6060,6 @@
     }, 900);
   }
 
-  async function flushWorkspaceBackendSync() {
-    const config = window.RESOURCEFLOW_FIREBASE_CONFIG || {};
-    const serialized = WORKSPACE_SYNC_RUNTIME.pendingSerialized;
-    if (!config.enabled || config.forceLocalWorkspace || !config.lifecycleBackendEnabled || !serialized) {
-      return;
-    }
-    if (WORKSPACE_SYNC_RUNTIME.inflight) {
-      return;
-    }
-    if (serialized === WORKSPACE_SYNC_RUNTIME.lastSyncedSerialized) {
-      return;
-    }
-    WORKSPACE_SYNC_RUNTIME.inflight = true;
-    try {
-      const functions = await ensureFirebaseFunctionsClient(config);
-      const callable = functions.httpsCallable("processWorkspaceLifecycle");
-      const result = await callable({
-        workspace: JSON.parse(serialized),
-        reason: WORKSPACE_SYNC_RUNTIME.reason || "workspace-save"
-      });
-      const state = result && result.data && result.data.state ? enrichWorkspace(result.data.state) : null;
-      const nextSerialized = state ? JSON.stringify(state) : serialized;
-      WORKSPACE_SYNC_RUNTIME.lastSyncedSerialized = nextSerialized;
-      WORKSPACE_SYNC_RUNTIME.pendingSerialized = nextSerialized;
-      if (state && nextSerialized !== localStorage.getItem(WORKSPACE_KEY)) {
-        localStorage.setItem(WORKSPACE_KEY, nextSerialized);
-        window.dispatchEvent(new CustomEvent("resourceflow:workspace-synced"));
-      }
-    } catch (error) {
-      console.warn("Workspace backend sync skipped.", error);
-      WORKSPACE_SYNC_RUNTIME.lastSyncedSerialized = serialized;
-    } finally {
-      WORKSPACE_SYNC_RUNTIME.inflight = false;
-      if (
-        WORKSPACE_SYNC_RUNTIME.pendingSerialized &&
-        WORKSPACE_SYNC_RUNTIME.pendingSerialized !== WORKSPACE_SYNC_RUNTIME.lastSyncedSerialized &&
-        !WORKSPACE_SYNC_RUNTIME.timerId
-      ) {
-        WORKSPACE_SYNC_RUNTIME.timerId = window.setTimeout(function () {
-          WORKSPACE_SYNC_RUNTIME.timerId = 0;
-          flushWorkspaceBackendSync();
-        }, 1500);
-      }
-    }
-  }
 
   function buildScenarioWorkspace(scenario, existingWorkspace) {
     const preset = SCENARIO_PRESETS[scenario] || SCENARIO_PRESETS.flood;
@@ -7019,10 +6667,6 @@
 
   function formatCurrency(value) {
     return "₹" + Number(value || 0).toLocaleString("en-IN");
-  }
-
-  function formatCurrency(value) {
-    return "Rs " + Number(value || 0).toLocaleString("en-IN");
   }
 
   function notificationItem(title, meta, status, copy) {

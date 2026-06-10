@@ -555,7 +555,16 @@
       setAdminMessage(readBudget.message, "error");
     }
     try {
-      const snapshot = await state.db.collection(VOLUNTEER_COLLECTION).orderBy("updatedAt", "desc").limit(limitCount).get();
+      let query = state.db.collection(VOLUNTEER_COLLECTION);
+      if (!isManager()) {
+        query = query.where("visible", "==", true);
+      }
+      let snapshot;
+      try {
+        snapshot = await query.orderBy("updatedAt", "desc").limit(limitCount).get();
+      } catch (queryError) {
+        snapshot = await state.db.collection(VOLUNTEER_COLLECTION).orderBy("updatedAt", "desc").limit(limitCount).get();
+      }
       recordGuard("reads", snapshot.size || limitCount);
       const volunteers = snapshot.docs.map(function (doc) {
         return sanitizeVolunteerProfile(doc.id, doc.data());
@@ -604,11 +613,23 @@
       setDonationMessage(readBudget.message, "error");
     }
     try {
-      const snapshot = await state.db.collection(DONATION_COLLECTION).where("ownerUid", "==", state.user.uid).limit(limitCount).get();
+      let snapshot;
+      try {
+        snapshot = await state.db.collection(DONATION_COLLECTION)
+          .where("ownerUid", "==", state.user.uid)
+          .orderBy("createdAt", "desc")
+          .limit(limitCount)
+          .get();
+      } catch (queryError) {
+        snapshot = await state.db.collection(DONATION_COLLECTION)
+          .where("ownerUid", "==", state.user.uid)
+          .limit(limitCount)
+          .get();
+      }
       recordGuard("reads", snapshot.size || limitCount);
       const donations = snapshot.docs.map(function (doc) {
         return sanitizeDonationRecord(doc.id, doc.data());
-      }).sort(compareByNewest);
+      });
       applyDonationData(donations, "user");
       if (readBudget.state === "warning" && readBudget.message) {
         setDonationMessage(readBudget.message, "error");
@@ -1740,10 +1761,6 @@ function metricCard(label, value, text) {
 
   function valueOf(field) {
     return field && typeof field.value !== "undefined" ? field.value : "";
-  }
-
-  function compareByNewest(left, right) {
-    return String(right.updatedAt || right.createdAt || "").localeCompare(String(left.updatedAt || left.createdAt || ""));
   }
 
   function uniqueCount(values) {

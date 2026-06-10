@@ -184,7 +184,7 @@
   }
 
   function setMode(mode) {
-    state.mode = normalizeRole(mode === "signup" || mode === "reset" ? mode : "signin");
+    state.mode = mode === "signup" || mode === "reset" ? mode : "signin";
     const signupActive = state.mode === "signup";
     const resetActive = state.mode === "reset";
 
@@ -318,7 +318,7 @@
           activatePortalSelection(credential.user, {
             displayName: displayName,
             location: location,
-            requestedRole: resolveDefaultRole(email)
+            requestedRole: "user"
           });
         } else {
           setStatus("Account created successfully. Choose your portal next.", "success");
@@ -677,7 +677,7 @@
     const email = safeValue(user.email || profileDraft.email || "");
     const displayName = safeValue(extra.displayName || user.displayName || profileDraft.displayName || deriveName(email));
     const location = safeValue(extra.location || profileDraft.location || "");
-    const defaultRole = resolveDefaultRole(email);
+    const defaultRole = "user";
     const role = "user";
     const requestedRole = normalizePortal(extra.requestedRole || profileDraft.requestedRole || defaultRole) || "user";
     const nextProfile = {
@@ -1029,20 +1029,10 @@
       : "Authentication could not be completed right now.";
   }
 
-  function resolveDefaultRole(email) {
-    void email;
-    return "user";
-  }
-
   function portalRouteWithSelection(role) {
     const nextRole = normalizePortal(role) || "user";
     const route = PORTAL_ROUTES[nextRole] || "./community.html";
     return route + (route.indexOf("?") >= 0 ? "&" : "?") + "portal=" + encodeURIComponent(nextRole);
-  }
-
-  function normalizeRole(value) {
-    const next = String(value || "").trim().toLowerCase();
-    return next || "signin";
   }
 
   function normalizePortal(value) {

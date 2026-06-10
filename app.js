@@ -7612,7 +7612,11 @@
     const db = getFirestoreDb();
     let users = [];
     if (db) {
-      const usersSnap = await db.collection("resourceflowUsers").limit(50).get();
+      const config = getFirebaseConfig();
+      const userLimit = config.noCostGuard && config.noCostGuard.queryLimits && config.noCostGuard.queryLimits.users
+        ? config.noCostGuard.queryLimits.users
+        : 20;
+      const usersSnap = await db.collection("resourceflowUsers").orderBy("updatedAt", "desc").limit(userLimit).get();
       users = usersSnap.docs.map(function (doc) {
         const data = doc.data() || {};
         return {
@@ -7663,13 +7667,6 @@
         };
       })
     };
-  }
-
-  async function updateUserRoleDirect(uid, email, role) {
-    void uid;
-    void email;
-    void role;
-    throw new Error("Role changes must use the secure backend setUserRole Function.");
   }
 
   function bindAdminRoleForms() {

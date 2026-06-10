@@ -9,17 +9,17 @@ service firebase.storage {
       return signedIn() && request.auth.token.email == "acshrisundaram@gmail.com";
     }
 
-    function currentProfileRole() {
-      return signedIn() && firestore.exists(/databases/(default)/documents/resourceflowUsers/$(request.auth.uid))
-        ? firestore.get(/databases/(default)/documents/resourceflowUsers/$(request.auth.uid)).data.role
-        : "volunteer";
+    function currentClaimRole() {
+      return signedIn() && request.auth.token.role is string
+        ? request.auth.token.role
+        : "user";
     }
 
     function canManageWorkspace() {
-      return isAdminEmail()
-        || (signedIn() && (
-          currentProfileRole() == "admin" || currentProfileRole() == "coordinator"
-        ));
+      return signedIn() && (
+        isAdminEmail()
+        || currentClaimRole() in ["admin", "coordinator", "government"]
+      );
     }
 
     function allowedArtifactType() {
@@ -31,12 +31,27 @@ service firebase.storage {
         );
     }
 
-    match /resourceflow/{workspaceId}/artifacts/{fileName} {
-      allow read: if signedIn();
-      allow create, update: if canManageWorkspace()
+    function validArtifactFileName(fileName) {
+      return fileName.matches("^[A-Za-z0-9._-]+$");
+    }
+
+    function validArtifactUpload(fileName) {
+      return request.resource != null
+        && validArtifactFileName(fileName)
+        && request.resource.size > 0
         && request.resource.size < 10 * 1024 * 1024
         && allowedArtifactType();
+    }
+
+    match /resourceflow/{workspaceId}/artifacts/{fileName} {
+      allow read: if signedIn();
+      allow create: if canManageWorkspace() && validArtifactUpload(fileName);
+      allow update: if false;
       allow delete: if canManageWorkspace();
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
     }
   }
 }
