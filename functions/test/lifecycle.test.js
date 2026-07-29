@@ -29,7 +29,7 @@ const {
 test("normalizeWorkspaceState returns defaults for null input", () => {
   const result = normalizeWorkspaceState(null);
   assert.equal(result.scenario, "none");
-  assert.equal(result.label, "No demo loaded");
+  assert.equal(result.label, "Production workspace");
   assert.deepEqual(result.requests, []);
   assert.deepEqual(result.volunteers, []);
   assert.deepEqual(result.assignments, []);

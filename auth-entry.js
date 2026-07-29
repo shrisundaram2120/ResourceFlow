@@ -70,33 +70,6 @@
     }
   };
 
-  const DEMO_PROFILES = {
-    user: {
-      role: "user",
-      displayName: "Aditi Das",
-      email: "user@resourceflow.demo",
-      title: "Community User"
-    },
-    volunteer: {
-      role: "volunteer",
-      displayName: "Sana Patel",
-      email: "volunteer@resourceflow.demo",
-      title: "Volunteer Responder"
-    },
-    government: {
-      role: "government",
-      displayName: "Ravi Sen",
-      email: "gov@resourceflow.demo",
-      title: "Government Officer"
-    },
-    admin: {
-      role: "admin",
-      displayName: "Shri Sundaram",
-      email: "acshrisundaram@gmail.com",
-      title: "Platform Admin"
-    }
-  };
-
   const state = {
     mode: "signin",
     firebaseReady: false,
@@ -168,7 +141,10 @@
 
     refs.form.addEventListener("submit", handleSubmit);
     refs.googleButton.addEventListener("click", handleGoogleSignIn);
-    refs.demoButton.addEventListener("click", handleDemoPreview);
+    if (refs.demoButton) {
+      refs.demoButton.hidden = true;
+      refs.demoButton.addEventListener("click", handleDemoPreview);
+    }
     refs.signOutButton.addEventListener("click", handleSignOut);
     refs.portalSetupForm.addEventListener("submit", handlePortalSetupSubmit);
     refs.portalSetupBack.addEventListener("click", function () {
@@ -382,16 +358,9 @@
   }
 
   function handleDemoPreview() {
-    state.portalTransitioning = false;
-    state.demoMode = true;
-    state.user = null;
-    showPortalStage({
-      displayName: "Demo visitor",
-      email: "demo@resourceflow.local",
-      role: "user"
-    });
-    refs.portalLead.textContent = "Preview the product quickly with demo data, then choose a portal below.";
-    setPortalStatus("Choose a portal to open the demo workspace.", "success");
+    state.demoMode = false;
+    clearDemoSession();
+    setStatus("Demo preview is disabled in production. Sign in with a real account to continue.", "error");
   }
 
   function openPortalSetup(portal) {
@@ -625,11 +594,8 @@
     document.body.classList.add("portal-transitioning");
 
     if (state.demoMode) {
-      localStorage.setItem(PORTAL_SELECTION_KEY, portal);
-      persistPortalHandoff(portal);
-      persistDemoSession(portal);
-      window.location.assign(portalRouteWithSelection(portal));
-      return;
+      state.demoMode = false;
+      clearDemoSession();
     }
 
     if (!state.user) {
@@ -642,6 +608,11 @@
       location: extras.location || extras.district || extras.officeLocation || ""
     });
     persistPortalHandoff(requestedRole);
+    try {
+      localStorage.setItem(PORTAL_SELECTION_KEY, requestedRole);
+    } catch (error) {
+      console.warn("Could not save portal selection.", error);
+    }
     persistEntryProfile(localProfile);
     window.location.assign(portalRouteWithSelection(requestedRole));
   }
@@ -860,7 +831,9 @@
     state.loading = Boolean(active);
     refs.submit.disabled = state.loading;
     refs.googleButton.disabled = state.loading;
-    refs.demoButton.disabled = state.loading;
+    if (refs.demoButton) {
+      refs.demoButton.disabled = state.loading;
+    }
     refs.signOutButton.disabled = state.loading;
     refs.portalSetupSubmit.disabled = state.loading;
     refs.portalSetupBack.disabled = state.loading;
@@ -926,9 +899,11 @@
   }
 
   function persistPortalHandoff(requestedRole) {
+    const role = normalizePortal(requestedRole) || "user";
     try {
       localStorage.setItem(PORTAL_HANDOFF_KEY, JSON.stringify({
-        requestedRole: normalizePortal(requestedRole) || "user",
+        role: role,
+        requestedRole: role,
         createdAt: Date.now()
       }));
     } catch (error) {
@@ -952,18 +927,11 @@
   }
 
   function persistDemoSession(role) {
-    const profile = DEMO_PROFILES[normalizePortal(role)] || DEMO_PROFILES.user;
+    void role;
     try {
-      localStorage.setItem(DEMO_AUTH_KEY, JSON.stringify({
-        uid: "demo-" + profile.role,
-        role: profile.role,
-        title: profile.title,
-        displayName: profile.displayName,
-        email: profile.email,
-        createdAt: new Date().toISOString()
-      }));
+      localStorage.removeItem(DEMO_AUTH_KEY);
     } catch (error) {
-      console.warn("Could not save demo session.", error);
+      console.warn("Could not clear demo session.", error);
     }
   }
 

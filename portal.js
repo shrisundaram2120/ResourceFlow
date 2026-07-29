@@ -13,7 +13,7 @@
   const saveJson = _U.saveJson;
   const THEME_KEY = "resourceflow-theme-mode-v2";
   const LANGUAGE_KEY = "resourceflow-language-v1";
-  const WORKSPACE_KEY = "resourceflow-demo-workspace-v2";
+  const WORKSPACE_KEY = "resourceflow-production-workspace-v1";
   const CACHE_RESET_KEY = "resourceflow-portal-cache-reset-v1";
   const AI_CHAT_HISTORY_KEY = "resourceflow-ai-chat-v1";
   const DISMISSED_ALERTS_KEY = "resourceflow-dismissed-alerts-v1";
@@ -188,144 +188,28 @@
     { role: "admin", label: "Admin Portal", shortLabel: "Admin", icon: "admin_panel_settings", caption: "Governance, moderation, and exports", href: "./admin.html" }
   ];
 
-  const SCENARIO_PRESETS = {
-    flood: {
-      key: "flood",
-      label: "Flood Response",
-      summary: "A flood warning has escalated into active street-level response across low-lying neighborhoods.",
-      requests: [
-        { id: "REQ-104", title: "Dry ration kits for low-lying streets", category: "Food", district: "Chennai", location: "Velachery, Chennai", lat: 12.9815, lng: 80.218, beneficiaries: 180, priority: "Critical", status: "Assigned", summary: "Families displaced by overnight flooding need ready-to-cook meal kits and drinking water.", ai: "AI matched food handlers and two-wheeler responders because they are within 4 km and available this evening." },
-        { id: "REQ-105", title: "Temporary shelter support at school hall", category: "Shelter", district: "Chennai", location: "Saidapet Government School, Chennai", lat: 13.023, lng: 80.223, beneficiaries: 140, priority: "High", status: "In Progress", summary: "Mats, blankets, and volunteer registration support are needed for the emergency shelter.", ai: "AI prioritized bilingual volunteers with registration support skills for faster intake at the shelter." },
-        { id: "REQ-106", title: "Medical support for senior citizens", category: "Medical", district: "Chennai", location: "Adyar Community Clinic, Chennai", lat: 13.0067, lng: 80.2573, beneficiaries: 65, priority: "Critical", status: "Queued", summary: "Medicine pickup and blood pressure checks are required for seniors isolated by waterlogging.", ai: "AI flagged the request because medicine lead time is short and the available nurse volunteer is nearby." },
-        { id: "REQ-107", title: "School book recovery and child-safe space", category: "Education", district: "Chennai", location: "Perungudi Relief Camp, Chennai", lat: 12.96, lng: 80.241, beneficiaries: 150, priority: "Medium", status: "Submitted", summary: "Children at the relief camp need book kits, mats, and supervised activity support.", ai: "AI recommended education volunteers and book donations to combine relief and child engagement in one trip." }
-      ],
-      assignments: [
-        { id: "ASG-301", title: "Deliver 60 ration kits", volunteer: "Thenmozhi P", district: "Chennai", location: "Velachery, Chennai", status: "Completed", date: "Today 09:20", points: 30 },
-        { id: "ASG-302", title: "Register shelter arrivals", volunteer: "Sana Patel", district: "Chennai", location: "Saidapet Government School, Chennai", status: "In Progress", date: "Today 10:10", points: 22 },
-        { id: "ASG-303", title: "Medicine pickup and escort", volunteer: "Aarav Mehta", district: "Chennai", location: "Adyar Community Clinic, Chennai", status: "Assigned", date: "Today 10:40", points: 26 },
-        { id: "ASG-304", title: "Book kit sorting", volunteer: "Diya Raman", district: "Chennai", location: "Perungudi Relief Camp, Chennai", status: "Assigned", date: "Today 11:20", points: 18 },
-        { id: "ASG-305", title: "Water distribution coordination", volunteer: "Ravi Sen", district: "Chennai", location: "Velachery, Chennai", status: "Completed", date: "Today 12:05", points: 28 }
-      ],
-      volunteers: [
-        { name: "Thenmozhi P", ngo: "Care Bridge", skills: ["first aid", "food distribution"], location: "Velachery, Chennai", availability: "Available", contact: "thenmozhi@example.com" },
-        { name: "Sana Patel", ngo: "Seva Relief Collective", skills: ["registration", "coordination"], location: "Saidapet, Chennai", availability: "On Call", contact: "sana@example.com" },
-        { name: "Aarav Mehta", ngo: "Health on Wheels", skills: ["medical support", "driving"], location: "Adyar, Chennai", availability: "Available", contact: "aarav@example.com" },
-        { name: "Diya Raman", ngo: "Book Aid Network", skills: ["child support", "education"], location: "Perungudi, Chennai", availability: "Available", contact: "diya@example.com" },
-        { name: "Ravi Sen", ngo: "District Relief Cell", skills: ["operations", "water logistics"], location: "Velachery, Chennai", availability: "Active", contact: "ravi@example.com" }
-      ],
-      donations: [
-        { donor: "Shri Sundaram", kind: "money", amount: 1000, paymentMethod: "UPI", note: "Rapid flood response", status: "Submitted" },
-        { donor: "Lakshmi Stores", kind: "item", itemType: "Food", quantity: 60, description: "Dry ration family packs", status: "Scheduled" },
-        { donor: "School Book Trust", kind: "item", itemType: "Books", quantity: 120, description: "Children reading kits", status: "Reviewing" }
-      ],
-      audit: [
-        "3 new community requests were routed into the review queue in the last 15 minutes.",
-        "AI matched 5 assignments using proximity, district coverage, and volunteer readiness.",
-        "Donation tracking linked 3 donor records to active flood-response needs."
-      ],
-      outreach: [
-        "SMS draft ready for Velachery volunteers to confirm evening availability.",
-        "Community notice drafted for shelter intake timings at Saidapet Government School.",
-        "Donation thank-you message queued for Shri Sundaram and Lakshmi Stores."
-      ]
-    },
-    cyclone: {
-      key: "cyclone",
-      label: "Cyclone Preparedness",
-      summary: "A cyclone warning is driving pre-positioning of volunteers, shelter supplies, and district control-room updates.",
-      requests: [
-        { id: "REQ-210", title: "Pre-position shelter kits", category: "Shelter", district: "Nagapattinam", location: "Nagapattinam Collectorate", lat: 10.7672, lng: 79.8428, beneficiaries: 220, priority: "Critical", status: "Assigned", summary: "Before landfall, the district needs shelter kits moved to two evacuation centers.", ai: "AI prioritized logistics volunteers with vehicle access because the movement window closes by evening." },
-        { id: "REQ-211", title: "Fishing harbor warning support", category: "Community Alert", district: "Nagapattinam", location: "Akkaraipettai Harbor", lat: 10.7656, lng: 79.8565, beneficiaries: 90, priority: "High", status: "In Progress", summary: "Field teams are needed to spread evacuation and safe-return notices in person.", ai: "AI suggested bilingual volunteers because the harbor team needs Tamil and Telugu outreach support." },
-        { id: "REQ-212", title: "Emergency medicine staging", category: "Medical", district: "Cuddalore", location: "Cuddalore District Hospital", lat: 11.7444, lng: 79.7684, beneficiaries: 130, priority: "High", status: "Queued", summary: "Medicine packs and glucose supplies need staging ahead of expected outages.", ai: "AI flagged a high-value medicine window and recommended fast deployment before road closures." }
-      ],
-      assignments: [
-        { id: "ASG-401", title: "Move shelter mattresses", volunteer: "Thenmozhi P", district: "Nagapattinam", location: "Nagapattinam Collectorate", status: "Completed", date: "Today 08:15", points: 24 },
-        { id: "ASG-402", title: "Harbor warning outreach", volunteer: "Sana Patel", district: "Nagapattinam", location: "Akkaraipettai Harbor", status: "Assigned", date: "Today 09:45", points: 18 },
-        { id: "ASG-403", title: "Medicine staging support", volunteer: "Aarav Mehta", district: "Cuddalore", location: "Cuddalore District Hospital", status: "In Progress", date: "Today 10:20", points: 21 }
-      ],
-      volunteers: [
-        { name: "Thenmozhi P", ngo: "Care Bridge", skills: ["logistics", "first aid"], location: "Nagapattinam", availability: "Available", contact: "thenmozhi@example.com" },
-        { name: "Sana Patel", ngo: "Seva Relief Collective", skills: ["outreach", "coordination"], location: "Nagapattinam", availability: "On Call", contact: "sana@example.com" },
-        { name: "Aarav Mehta", ngo: "Health on Wheels", skills: ["medical support", "driving"], location: "Cuddalore", availability: "Available", contact: "aarav@example.com" }
-      ],
-      donations: [
-        { donor: "Harbor Traders Forum", kind: "money", amount: 5000, paymentMethod: "Bank Transfer", note: "Cyclone preparedness fund", status: "Submitted" },
-        { donor: "Relief Supplies Hub", kind: "item", itemType: "Clothes", quantity: 200, description: "Raincoats and blankets", status: "Scheduled" }
-      ],
-      audit: [
-        "Cyclone watch level increased from amber to red in 2 coastal districts.",
-        "Shelter stocking is 64% complete against tonight's evacuation plan.",
-        "Volunteer mobility has been constrained by one projected road closure zone."
-      ],
-      outreach: [
-        "Cyclone alert draft sent to 3 harbor communities for confirmation.",
-        "Shelter coordinator reminder prepared for Nagapattinam and Cuddalore teams."
-      ]
-    },
-    medical: {
-      key: "medical",
-      label: "Mobile Medical Camp",
-      summary: "A mobile health camp is coordinating registrations, medicine supply, and volunteer triage support.",
-      requests: [
-        { id: "REQ-310", title: "Registration desk support", category: "Medical", district: "Kolkata", location: "Tangra Community Hall, Kolkata", lat: 22.5492, lng: 88.4049, beneficiaries: 160, priority: "High", status: "Assigned", summary: "Volunteers are needed to manage patient tokens, intake forms, and crowd flow.", ai: "AI matched volunteers with coordination and bilingual skills to reduce intake delays." },
-        { id: "REQ-311", title: "Medicine desk coordination", category: "Medical", district: "Kolkata", location: "Tangra Community Hall, Kolkata", lat: 22.5492, lng: 88.4049, beneficiaries: 160, priority: "High", status: "In Progress", summary: "Doctors need one runner and one record-keeper for medicine dispensation.", ai: "AI paired one logistics volunteer and one data-entry volunteer because both are already on-site." },
-        { id: "REQ-312", title: "Health awareness booklets", category: "Education", district: "Kolkata", location: "Tangra Community Hall, Kolkata", lat: 22.5492, lng: 88.4049, beneficiaries: 160, priority: "Medium", status: "Submitted", summary: "Printed materials and volunteer speakers are required for follow-up awareness sessions.", ai: "AI suggested clubbing booklets with the donation run to avoid a separate last-mile trip." }
-      ],
-      assignments: [
-        { id: "ASG-510", title: "Patient token intake", volunteer: "Thenmozhi P", district: "Kolkata", location: "Tangra Community Hall, Kolkata", status: "In Progress", date: "Today 09:00", points: 19 },
-        { id: "ASG-511", title: "Medicine counter runner", volunteer: "Sana Patel", district: "Kolkata", location: "Tangra Community Hall, Kolkata", status: "Completed", date: "Today 10:40", points: 25 },
-        { id: "ASG-512", title: "Booklet distribution prep", volunteer: "Diya Raman", district: "Kolkata", location: "Tangra Community Hall, Kolkata", status: "Assigned", date: "Today 11:10", points: 16 }
-      ],
-      volunteers: [
-        { name: "Thenmozhi P", ngo: "Care Bridge", skills: ["coordination", "registration"], location: "Tangra, Kolkata", availability: "Active", contact: "thenmozhi@example.com" },
-        { name: "Sana Patel", ngo: "Seva Relief Collective", skills: ["medicine desk", "runner"], location: "Tangra, Kolkata", availability: "Available", contact: "sana@example.com" },
-        { name: "Diya Raman", ngo: "Book Aid Network", skills: ["education", "public speaking"], location: "Kolkata", availability: "On Call", contact: "diya@example.com" }
-      ],
-      donations: [
-        { donor: "Shri Sundaram", kind: "money", amount: 2000, paymentMethod: "UPI", note: "Medical camp supplies", status: "Submitted" },
-        { donor: "HealthCare Partners", kind: "item", itemType: "Food", quantity: 40, description: "Nutrition packs for patients", status: "Reviewing" }
-      ],
-      audit: [
-        "Medical camp throughput is holding steady at 22 registrations per hour.",
-        "The AI matching engine identified one understaffed desk and rerouted a volunteer in 30 seconds."
-      ],
-      outreach: [
-        "Medicine counter volunteer reminder drafted for the afternoon shift.",
-        "Awareness session invite prepared for community WhatsApp groups."
-      ]
-    }
-  };
+  const SCENARIO_PRESETS = {};
 
   const EMPTY_WORKSPACE = {
     scenario: "none",
-    label: "No demo loaded",
-    summary: "Load demo data to see requests, assignments, donations, and AI matching in action.",
+    label: "Production workspace",
+    summary: "No operational data has been submitted yet.",
     requests: [],
     assignments: [],
     volunteers: [],
     donations: [],
     audit: [],
     outreach: [],
-    systemNotice: "Choose a scenario to populate the workspace."
+    systemNotice: "Live workspace is ready for production data."
   };
 
   const REQUEST_STAGES = ["Pending", "Reviewed", "Assigned", "In Progress", "Delivered", "Closed"];
   const DONATION_STAGES = ["Submitted", "Verified", "Packed", "Dispatched", "Delivered"];
   const ASSIGNMENT_STAGES = ["Accepted", "In Progress", "Completed"];
-  const DEMO_REFRESH_MS = 10 * 60 * 1000;
   const AUTOMATION_TICK_MS = 20 * 1000;
   const LIVE_PRIORITY_RANK = 180;
   const DISASTER_PRIORITY_RANK = 240;
   const STANDARD_PRIORITY_RANK = 90;
-  const DEMO_VOLUNTEER_NAMES = ["Arjun Das", "Meera Joseph", "Kavin Raj", "Nila Bose", "Farhan Ali", "Sowmya Devi", "Pranav Sen", "Ishita Paul"];
-  const DEMO_DONOR_NAMES = ["Harbor Traders Forum", "Relief Supplies Hub", "CareLink Trust", "Rapid Aid Circle", "District Women Collective", "Health Basket Network"];
-  const DEMO_LOCATION_HINTS = {
-    Chennai: ["Velachery", "Saidapet", "Adyar", "Perungudi", "Tambaram"],
-    Nagapattinam: ["Nagapattinam Collectorate", "Akkaraipettai Harbor", "Nagore", "Keelaiyur"],
-    Cuddalore: ["Cuddalore District Hospital", "Panruti", "Kurinjipadi"],
-    Kolkata: ["Tangra Community Hall", "Salt Lake", "Park Circus", "Beliaghata"],
-    Default: ["Town Hall", "Community School", "Primary Health Center", "Ward Relief Point"]
-  };
   const WORKSPACE_AUTOMATION_RUNTIME = {
     intervalId: 0,
     storageBound: false
@@ -376,7 +260,6 @@
           try {
             const token = await user.getIdTokenResult();
             AUTH_RUNTIME.role = normalizePortalRole(token && token.claims ? token.claims.role : "") || "user";
-            localStorage.removeItem(PORTAL_SELECTION_KEY);
           } catch (error) {
             console.warn("Could not resolve portal auth claims.", error);
           }
@@ -537,12 +420,6 @@
       railMarkup = renderRail(page, session, workspace);
     } catch (error) {
       console.error("Right rail render failed:", error);
-    }
-
-    try {
-      demoMarkup = renderDemoAssistantShell(workspace);
-    } catch (error) {
-      console.error("Demo shell render failed:", error);
     }
 
     try {
@@ -756,11 +633,7 @@
   }
 
   function randomizeLocationLabel(district, fallbackLocation) {
-    const options = DEMO_LOCATION_HINTS[safeText(district, 80)] || DEMO_LOCATION_HINTS.Default;
-    const label = randomFrom(options) || fallbackLocation || district || "Relief Point";
-    return district && label.toLowerCase().indexOf(String(district).toLowerCase()) === -1
-      ? label + ", " + district
-      : label;
+    return safeText(fallbackLocation || district || "Response point", 180);
   }
 
   function buildShiftAuditLine(assignment, nextVolunteer, request) {
@@ -774,7 +647,7 @@
   function enrichWorkspace(workspace) {
     const next = workspace && typeof workspace === "object" ? workspace : {};
     const requests = cloneScenarioItems(next.requests || []).map(function (item, index) {
-      const source = safeText(item.source || item.origin || (next.scenario && next.scenario !== "none" ? "disaster-demo" : "live"), 40).toLowerCase();
+      const source = safeText(item.source || item.origin || "live", 40).toLowerCase();
       const status = normalizeRequestStatus(item.status || item.priority || "Pending");
       const createdAt = safeText(item.createdAt || item.requestedAt || item.date || nowIso(), 80);
       return Object.assign({}, item, {
@@ -787,8 +660,8 @@
         requester: safeText(item.requester || "Community Network", 120),
         blocked: Boolean(item.blocked),
         source: source === "demo" ? "disaster-demo" : source,
-        origin: safeText(item.origin || (source === "live" ? "live" : "demo"), 20).toLowerCase() || "demo",
-        priorityLane: safeText(item.priorityLane || (source === "live" ? "Live" : source === "disaster-demo" ? "Disaster Demo" : "Standard"), 40),
+        origin: safeText(item.origin || "live", 20).toLowerCase() || "live",
+        priorityLane: safeText(item.priorityLane || "Live", 40),
         broadcastTo: Array.isArray(item.broadcastTo) && item.broadcastTo.length ? item.broadcastTo.slice() : ["admin", "government"],
         complexity: inferTaskComplexity(item.priority || "Medium"),
         estimatedDurationMinutes: Number(item.estimatedDurationMinutes || estimatedDurationMinutes(item.priority || "Medium", source))
@@ -811,8 +684,8 @@
         acceptedAt: safeText(item.acceptedAt || createdAt, 80),
         startedAt: safeText(item.startedAt || (normalizedStatus === "In Progress" || normalizedStatus === "Completed" ? createdAt : ""), 80),
         completedAt: safeText(item.completedAt || (normalizedStatus === "Completed" ? createdAt : ""), 80),
-        origin: safeText(item.origin || (inferredRequest && inferredRequest.origin) || "demo", 20).toLowerCase() || "demo",
-        volunteerOrigin: safeText(item.volunteerOrigin || "demo", 20).toLowerCase() || "demo",
+        origin: safeText(item.origin || (inferredRequest && inferredRequest.origin) || "live", 20).toLowerCase() || "live",
+        volunteerOrigin: safeText(item.volunteerOrigin || "live", 20).toLowerCase() || "live",
         estimatedDurationMinutes: Number(item.estimatedDurationMinutes || ((inferredRequest && inferredRequest.estimatedDurationMinutes) || estimatedDurationMinutes(inferredRequest && inferredRequest.priority, inferredRequest && inferredRequest.source))),
         shiftCount: Number(item.shiftCount || 0),
         shifted: Boolean(item.shifted),
@@ -829,7 +702,7 @@
         completedTasks: completedTasks,
         pointsEarned: pointsEarned,
         attendanceDays: Number(item.attendanceDays || completedTasks || 0),
-        origin: safeText(item.origin || "demo", 20).toLowerCase() || "demo",
+        origin: safeText(item.origin || "live", 20).toLowerCase() || "live",
         activityStatus: safeText(item.activityStatus || normalizedAvailability(item.availability || "available"), 40),
         availability: safeText(item.availability || capitalizeWord(normalizedAvailability(item.activityStatus || "available")), 40)
       });
@@ -840,7 +713,7 @@
         status: normalizeDonationLifecycle(item.status || "Submitted"),
         createdAt: safeText(item.createdAt || item.updatedAt || nowIso(), 80),
         updatedAt: safeText(item.updatedAt || item.createdAt || nowIso(), 80),
-        origin: safeText(item.origin || (next.scenario && next.scenario !== "none" ? "demo" : "live"), 20).toLowerCase() || "demo"
+        origin: safeText(item.origin || "live", 20).toLowerCase() || "live"
       });
     });
     return {
@@ -1641,7 +1514,6 @@
       '<span class="chip">' + escapeHtml(roleData.label) + "</span>",
       session.profile.primarySummary ? '<span class="chip">' + escapeHtml(session.profile.primarySummary) + "</span>" : "",
       "</div>",
-      '<button class="ghost-button sidebar-footer-action" type="button" data-action="seed-demo" data-scenario="flood" data-testid="sidebar-load-demo">' + escapeHtml(copy("loadDemo", "Load Flood Demo")) + '</button>',
       "</section>",
       "</aside>"
     ].join("");
@@ -1657,15 +1529,12 @@
       '<p class="section-label">' + escapeHtml(copy("quickActions", "Quick Actions")) + '</p>',
       '<h3 class="section-title">Fast workspace moves</h3>',
       '<div class="quick-actions">',
-      '<button class="primary-button" type="button" data-action="seed-demo" data-scenario="flood" data-testid="load-demo">' + escapeHtml(copy("loadDemo", "Load Demo")) + '</button>',
-      '<button class="ghost-button" type="button" data-action="seed-demo" data-scenario="cyclone" data-testid="load-cyclone">Cyclone Demo</button>',
-      '<button class="ghost-button" type="button" data-action="seed-demo" data-scenario="medical" data-testid="load-medical">Medical Demo</button>',
       '<a class="ghost-button" href="./donations.html" data-testid="open-donations">' + escapeHtml(copy("donationPortal", "Donation Portal")) + '</a>',
       '<button class="ghost-button" type="button" data-action="export-json" data-testid="export-json">' + escapeHtml(copy("exportJson", "Export JSON")) + '</button>',
       '<button class="ghost-button" type="button" data-action="export-csv" data-testid="export-csv">' + escapeHtml(copy("exportCsv", "Export CSV")) + '</button>',
       '<button class="ghost-button" type="button" data-action="print-report" data-testid="print-report">' + escapeHtml(copy("printReport", "Print Report")) + '</button>',
       "</div>",
-      '<div class="notice-box" style="margin-top:12px;">' + escapeHtml(workspace.systemNotice || "Use the Demo drawer or quick actions to load a response story.") + "</div>",
+      '<div class="notice-box" style="margin-top:12px;">' + escapeHtml(workspace.systemNotice || "Live workspace is ready for production data.") + "</div>",
       "</section>",
       '<section class="surface-card">',
       '<p class="section-label">AI Insights</p>',
@@ -1679,7 +1548,7 @@
       '<section class="surface-card">',
       '<p class="section-label">XGBoost Signal</p>',
       '<h3 class="section-title">What the model would move first</h3>',
-      topPrediction ? renderBoostedSignal(topPrediction) : '<div class="empty-box">Load demo data to activate the boosted triage engine.</div>',
+      topPrediction ? renderBoostedSignal(topPrediction) : '<div class="empty-box">Submit requests to activate the boosted triage engine.</div>',
       '<div class="action-stack" style="margin-top:14px;">',
       '<a class="ghost-button" href="./insights.html" data-testid="open-ai-copilot">Open AI Copilot</a>',
       "</div>",
@@ -1695,7 +1564,7 @@
       '<div class="stack-list">',
       donations.length ? donations.map(function (item) {
         return '<div class="feed-card"><div class="feed-card-head"><div><strong>' + escapeHtml(item.donor) + '</strong><p class="feed-meta">' + escapeHtml(formatDonationLine(item)) + '</p></div>' + renderStatus(item.status || "tracked") + "</div></div>";
-      }).join("") : '<div class="empty-box">Load demo data to see the donation activity widget.</div>',
+      }).join("") : '<div class="empty-box">Donation activity will appear after real donation records are submitted.</div>',
       "</div>",
       "</section>",
       "</aside>"
@@ -1724,26 +1593,8 @@
   }
 
   function renderDemoAssistantShell(workspace) {
-    return [
-      '<section class="demo-shell' + (DEMO_RUNTIME.drawerOpen ? ' is-open' : '') + '">',
-      '<div class="demo-drawer-backdrop" data-action="close-demo-drawer"></div>',
-      '<button class="demo-fab" type="button" data-action="toggle-demo-drawer" data-testid="toggle-demo-drawer" aria-label="Open demo command center" aria-expanded="' + (DEMO_RUNTIME.drawerOpen ? "true" : "false") + '">',
-      '<span class="rf-symbol" aria-hidden="true">deployed_code</span>',
-      '<span class="demo-fab-label">Demo</span>',
-      "</button>",
-      '<aside class="demo-drawer" aria-label="Load demo command center">',
-      '<div class="demo-drawer-header">',
-      '<div><p class="section-label">Demo Command</p><h2 class="section-title">Load a response story from any portal</h2><p class="section-copy">Use this side chamber to switch between flood, cyclone, and medical demos without leaving the current page.</p></div>',
-      '<div class="demo-drawer-actions"><span class="chip">Active: ' + escapeHtml(workspace.label || "No demo selected") + '</span><button class="ghost-button demo-close-button" type="button" data-action="close-demo-drawer" data-testid="close-demo-drawer">Close</button></div>',
-      "</div>",
-      '<div class="demo-drawer-body">',
-      '<section class="surface-card demo-drawer-card"><p class="section-label">' + escapeHtml(copy("scenarioSwitcher", "Scenario Switcher")) + '</p><h3 class="section-title">Choose the live response story</h3><form class="form-grid compact-form" data-demo-scenario-form="drawer" data-testid="demo-drawer-form"><label><span>' + escapeHtml(copy("activeScenario", "Active Scenario")) + '</span><select class="text-select" name="scenario" data-testid="demo-drawer-select">' + renderScenarioOptions(workspace.scenario) + '</select></label><div class="action-stack"><button class="primary-button" type="submit" data-testid="demo-drawer-load-selected">' + escapeHtml(copy("loadScenario", "Load Scenario")) + '</button><button class="ghost-button" type="button" data-action="reset-workspace" data-testid="demo-drawer-clear">' + escapeHtml(copy("clearDemo", "Clear Demo")) + "</button></div></form><div class=\"notice-box\">" + escapeHtml(workspace.systemNotice || "Choose a scenario to populate the workspace.") + "</div></section>",
-      '<section class="surface-card demo-drawer-card"><p class="section-label">' + escapeHtml(copy("quickActions", "Quick Actions")) + '</p><h3 class="section-title">One-tap demo shortcuts</h3><div class="quick-actions"><button class="primary-button" type="button" data-action="seed-demo" data-scenario="flood" data-testid="demo-drawer-flood">Load Flood Demo</button><button class="ghost-button" type="button" data-action="seed-demo" data-scenario="cyclone" data-testid="demo-drawer-cyclone">Load Cyclone Demo</button><button class="ghost-button" type="button" data-action="seed-demo" data-scenario="medical" data-testid="demo-drawer-medical">Load Medical Demo</button></div></section>',
-      '<section class="surface-card demo-drawer-card"><p class="section-label">Live Summary</p><h3 class="section-title">' + escapeHtml(workspace.label || "No demo selected") + '</h3><div class="feed-list"><article class="feed-card"><div class="feed-card-head"><div><strong>' + escapeHtml(String(workspace.requests.length)) + ' requests</strong><p class="feed-meta">Visible request cards in the current story</p></div>' + renderStatus(workspace.requests.length ? "Active" : "Waiting") + '</div></article><article class="feed-card"><div class="feed-card-head"><div><strong>' + escapeHtml(String(workspace.assignments.length)) + ' assignments</strong><p class="feed-meta">Responder matches loaded in the workspace</p></div>' + renderStatus(workspace.assignments.length ? "Assigned" : "Queued") + '</div></article><article class="feed-card"><div class="feed-card-head"><div><strong>' + escapeHtml(String(workspace.donations.length)) + ' donations</strong><p class="feed-meta">Money and item records attached to the story</p></div>' + renderStatus(workspace.donations.length ? "Submitted" : "Waiting") + '</div></article></div></section>',
-      "</div>",
-      "</aside>",
-      "</section>"
-    ].join("");
+    void workspace;
+    return "";
   }
 
   function renderNotificationShell(session, workspace) {
@@ -1770,8 +1621,7 @@
       return item.roles.indexOf(session.role) !== -1;
     }).slice(0, 2);
     const actionItems = [
-      { key: "insights-action", label: "AI", icon: "auto_awesome", href: "./insights.html", active: page === "insights", action: true },
-      { key: "demo-action", label: "Demo", icon: "deployed_code", href: "#demo", active: false, action: true }
+      { key: "insights-action", label: "AI", icon: "auto_awesome", href: "./insights.html", active: page === "insights", action: true }
     ];
     const navItems = items.concat(actionItems);
     return '<nav class="rf-mobile-dock">' + navItems.map(function (item) {
@@ -1812,7 +1662,7 @@
     const mapSection = renderMapStage(workspace, {
       eyebrow: "Live Impact Map",
       title: "Visible pressure zones and mapped requests",
-      meta: workspace.label || "No demo loaded",
+      meta: workspace.label || "Production workspace",
       location: firstMapLocation(workspace),
       summary: "Every card in the feed links back to a mappable location so teams can move from overview to action quickly."
     });
@@ -1829,10 +1679,10 @@
         eyebrow: "Community Portal",
         title: "A public-facing response board that stays calm and readable.",
         copy: workspace.summary,
-        primary: '<button class="primary-button" type="button" data-action="seed-demo" data-scenario="flood" data-testid="overview-load-demo">Load Flood Demo</button>',
+        primary: '<a class="primary-button" href="#communityRequestForm" data-testid="overview-raise-request">Raise Request</a>',
         secondary: '<a class="ghost-button" href="./donations.html" data-testid="overview-donate">Donation Portal</a>',
         sideCards: [
-          miniCard("Workspace", workspace.label || "No demo loaded", "A single community lane that shows urgent needs, support, and progress."),
+          miniCard("Workspace", workspace.label || "Production workspace", "A single community lane that shows urgent needs, support, and progress."),
           miniCard("Visible Spaces", "Community, Donations, AI Prediction", "Each portal stays visually separate while sharing one response story.")
         ]
       }),
@@ -1880,10 +1730,10 @@
         eyebrow: "Community Portal",
         title: "Community response board",
         copy: workspace.summary || "Community requests, donations, and lifecycle updates are visible here.",
-        primary: '<button class="primary-button" type="button" data-action="seed-demo" data-scenario="flood" data-testid="overview-fallback-load-demo">Load Flood Demo</button>',
+        primary: '<a class="primary-button" href="#communityRequestForm" data-testid="overview-fallback-raise-request">Raise Request</a>',
         secondary: '<a class="ghost-button" href="./donations.html" data-testid="overview-fallback-donations">Donation Portal</a>',
         sideCards: [
-          miniCard("Workspace", workspace.label || "No demo loaded", "A simpler safe layout is showing while the full board refreshes."),
+          miniCard("Workspace", workspace.label || "Production workspace", "A simpler safe layout is showing while the full board refreshes."),
           miniCard("Visible Spaces", "Community, Donations, AI Prediction", "You can still submit requests, view needs, and move to other portals.")
         ]
       }),
@@ -1893,7 +1743,7 @@
         { label: "AI Prediction", copy: "Open the forecasting and matching view", href: "./insights.html", tone: "outline", testId: "overview-fallback-ai" }
       ]),
       renderMetrics(workspaceMetrics(workspace)),
-      '<section class="surface-card"><p class="section-label">Latest Community Requests</p><h2 class="section-title">Visible needs and map-linked follow-up</h2><div class="feed-list">' + (requests || '<div class="empty-box">Load demo data to populate the community feed.</div>') + '</div></section>',
+      '<section class="surface-card"><p class="section-label">Latest Community Requests</p><h2 class="section-title">Visible needs and map-linked follow-up</h2><div class="feed-list">' + (requests || '<div class="empty-box">Submitted community requests will appear here.</div>') + '</div></section>',
       '<section class="two-col"><article class="surface-card"><p class="section-label">Community Request Tracker</p><h2 class="section-title">Requests currently visible to the network</h2><div class="feed-list">' + renderCommunityTracker(workspace.requests || []) + '</div></article><article class="surface-card"><p class="section-label">Donation Breakdown</p><h2 class="section-title">Visible support in the current story</h2><div class="feed-list">' + renderDonationBreakdownCards(workspace) + '</div></article></section>',
       '<section class="surface-card"><p class="section-label">Community Request Form</p><h2 class="section-title">Raise a support request</h2><form id="communityRequestForm" class="form-grid" data-testid="community-request-form"><label><span>Request title</span><input class="text-input" name="title" type="text" placeholder="Emergency food kits for affected streets" required></label><div class="grid-2"><label><span>Category</span><select class="text-select" name="category" required><option value="">Choose category</option><option>Food</option><option>Medical</option><option>Shelter</option><option>Education</option><option>Logistics</option></select></label><label><span>District</span><input class="text-input" name="district" type="text" placeholder="Chennai" required></label></div><div class="grid-2"><label><span>Location address</span><input class="text-input" name="location" type="text" placeholder="Velachery, Chennai" required></label><label><span>Estimated people affected</span><input class="text-input" name="beneficiaries" type="number" min="1" step="1" placeholder="40" required></label></div><div class="grid-2"><label><span>Urgency</span><select class="text-select" name="priority" required><option value="Critical">Critical</option><option value="High">High</option><option value="Medium" selected>Medium</option><option value="Low">Low</option></select></label><label><span>Need summary</span><input class="text-input" name="shortSummary" type="text" placeholder="Families need food, blankets, and safe shelter." required></label></div><label><span>Detailed context</span><textarea class="text-area" name="summary" placeholder="Describe the situation, road access, vulnerable groups, and immediate needs." required></textarea></label><button class="primary-button" type="submit" data-testid="submit-community-request-fallback">Submit Request</button></form><div id="communityRequestStatus" class="notice-box">Submitted requests are added to the tracker immediately.</div></section>'
     ].join("");
@@ -1909,11 +1759,10 @@
       '<h1>' + escapeHtml(PAGE_TITLES[page] || "Community Portal") + '</h1>',
       '<p class="section-copy">The full page is refreshing. A safe community board is shown so you can keep working.</p>',
       '<div class="action-stack">',
-      '<button class="primary-button" type="button" data-action="seed-demo" data-scenario="flood" data-testid="recovery-load-demo">Load Flood Demo</button>',
       '<a class="ghost-button" href="./donations.html" data-testid="recovery-open-donations">Donation Portal</a>',
       '</div>',
       '</section>',
-      '<section class="surface-card"><p class="section-label">Visible Requests</p><h2 class="section-title">Community feed</h2><div class="feed-list">' + (topRequests || '<div class="empty-box">Load demo data or submit a request to populate this space.</div>') + '</div></section>'
+      '<section class="surface-card"><p class="section-label">Visible Requests</p><h2 class="section-title">Community feed</h2><div class="feed-list">' + (topRequests || '<div class="empty-box">Submit a request to populate this space.</div>') + '</div></section>'
     ].join("");
   }
 
@@ -1944,7 +1793,7 @@
         title: safeText(session.name || "Volunteer", 80) + "'s response board",
         copy: personal.summary,
         primary: '<a class="primary-button" href="./directory.html" data-testid="open-directory">Open Volunteer Directory</a>',
-        secondary: '<button class="ghost-button" type="button" data-action="seed-demo" data-scenario="flood" data-testid="volunteer-load-demo">Load Demo</button>',
+        secondary: '<a class="ghost-button" href="./insights.html" data-testid="volunteer-open-insights">Open AI Insights</a>',
         sideCards: [
           miniCard("Current District", personal.district, "The top district is derived from the active requests in the current scenario."),
           miniCard("Reliability Score", String(personal.reliability) + "%", "Reliability grows with delivered work, attendance, and sustained activity.")
@@ -1953,8 +1802,7 @@
       renderAlertBanner("volunteer", workspace, "Flash flood warning", "The volunteer lane should make one next action obvious, even on small screens."),
       renderActionTiles([
         { label: "AI Prediction", copy: "See why the system is prioritizing these tasks", href: "./insights.html", tone: "outline", testId: "volunteer-open-ai" },
-        { label: "Volunteer Directory", copy: "Open shared volunteer profiles", href: "./directory.html", tone: "muted", testId: "volunteer-open-directory-tile" },
-        { label: "Load Demo", copy: "Refresh the active volunteer story", action: "seed-demo", scenario: "flood", tone: "brand", testId: "volunteer-load-demo-tile" }
+        { label: "Volunteer Directory", copy: "Open shared volunteer profiles", href: "./directory.html", tone: "muted", testId: "volunteer-open-directory-tile" }
       ]),
       renderMetrics([
         metric("Points", String(personal.points), "Response points earned from completed assignments."),
@@ -1987,7 +1835,7 @@
         title: "Shared volunteer visibility with one searchable directory.",
         copy: "This page uses the real Firestore backend. New volunteer profiles are stored permanently and become visible to every signed-in volunteer.",
         primary: '<a class="primary-button" href="./volunteer.html" data-testid="back-to-volunteer">Volunteer Portal</a>',
-        secondary: '<button class="ghost-button" type="button" data-action="seed-demo" data-scenario="flood" data-testid="directory-load-demo">Load Demo</button>',
+        secondary: '<a class="ghost-button" href="./insights.html" data-testid="directory-open-insights">Open AI Insights</a>',
         sideCards: [
           miniCard("Shared Visibility", "Backend connected", "Profiles saved here are shared across all signed-in volunteers."),
           miniCard("Filters", "Skills, NGO, location", "Use the filters to narrow the directory quickly.")
@@ -2058,8 +1906,8 @@
         eyebrow: "Government Operations",
         title: "National emergency response monitoring with one clear operations board.",
         copy: workspace.summary,
-        primary: '<button class="primary-button" type="button" data-action="seed-demo" data-scenario="flood" data-testid="operations-load-demo">Load Demo</button>',
-        secondary: '<a class="ghost-button" href="./insights.html" data-testid="operations-open-insights">Open AI Insights</a>',
+        primary: '<a class="primary-button" href="./insights.html" data-testid="operations-open-insights">Open AI Insights</a>',
+        secondary: '<a class="ghost-button" href="./community.html" data-testid="operations-open-community">Community Portal</a>',
         sideCards: [
           miniCard("District Summary", topDistrict(workspace) || "No district yet", "The operations board surfaces the district with the highest pressure first."),
           miniCard("Response Status", String(workspace.assignments.length) + " live assignments", "Assignments update in the vertical feed below.")
@@ -2093,7 +1941,7 @@
     const mapSection = renderMapStage(workspace, {
       eyebrow: "AI Heatmap",
       title: "Predicted shortage and district risk view",
-      meta: workspace.label || "No demo loaded",
+      meta: workspace.label || "Production workspace",
       location: firstMapLocation(workspace),
       summary: "The prediction view surfaces where resources may run short before the next response step begins."
     });
@@ -2110,10 +1958,10 @@
         eyebrow: "AI Insights",
         title: "AI prediction and resource forecasting in one explainable view.",
         copy: "Use the insight feed to explain district pressure, volunteer fit, and how the current scenario is unfolding.",
-        primary: '<button class="primary-button" type="button" data-action="seed-demo" data-scenario="medical" data-testid="insights-load-demo">Load Medical Demo</button>',
-        secondary: '<a class="ghost-button" href="./operations.html" data-testid="insights-back-operations">Back To Operations</a>',
+        primary: '<a class="primary-button" href="./operations.html" data-testid="insights-back-operations">Back To Operations</a>',
+        secondary: '<a class="ghost-button" href="./community.html" data-testid="insights-open-community">Community Portal</a>',
         sideCards: [
-          miniCard("Scenario", workspace.label || "No demo loaded", "Insight cards become richer once requests, assignments, and donations exist."),
+          miniCard("Workspace", workspace.label || "Production workspace", "Insight cards become richer once requests, assignments, and donations exist."),
           miniCard("AI Copilot", aiEngineLabel(), "A real chatbot uses Gemini when configured and falls back to the local XGBoost-style engine when not.")
         ]
       }),
@@ -2148,9 +1996,9 @@
       renderHero({
         eyebrow: "Admin Dashboard",
         title: "Governance, live snapshot, and outreach in one admin control room.",
-        copy: "The admin lane combines local demo intelligence with shared Firestore-backed volunteer and donation management.",
-        primary: '<button class="primary-button" type="button" data-action="seed-demo" data-scenario="flood" data-testid="admin-load-demo">Load Demo</button>',
-        secondary: '<a class="ghost-button" href="./impact.html" data-testid="admin-open-impact">Public Impact</a>',
+        copy: "The admin lane combines shared Firestore-backed volunteer, donation, and workspace management.",
+        primary: '<a class="primary-button" href="./impact.html" data-testid="admin-open-impact">Public Impact</a>',
+        secondary: '<a class="ghost-button" href="./insights.html" data-testid="admin-open-insights">Open AI Insights</a>',
         sideCards: [
           miniCard("Governance Pulse", "Audit events, review queue, outreach drafts", "These cards stay high-contrast in light and dark mode."),
           miniCard("Visible Spaces", "Community, Volunteer, Donations, AI Prediction", "The portal menu keeps navigation compact while the live feed and widgets stay visible.")
@@ -2193,10 +2041,10 @@
         eyebrow: "Public Impact",
         title: "A public story of requests, assignments, and measurable outcomes.",
         copy: "This page translates the live workspace into a simple story: who needed help, how the AI matched support, and what changed on the ground.",
-        primary: '<button class="primary-button" type="button" data-action="seed-demo" data-scenario="flood" data-testid="impact-load-demo">Load Demo</button>',
+        primary: '<a class="primary-button" href="./community.html" data-testid="impact-open-community">Community Portal</a>',
         secondary: '<a class="ghost-button" href="./judge.html" data-testid="impact-open-judge">Judge Mode</a>',
         sideCards: [
-          miniCard("Impact Story", workspace.label || "No demo loaded", "Use this page during reviews, live demos, and partner meetings."),
+          miniCard("Impact Story", workspace.label || "Production workspace", "Use this page during reviews, live operations, and partner meetings."),
           miniCard("Public View", String(totalBeneficiaries(workspace)) + " beneficiaries", "Numbers change instantly when the demo scenario changes.")
         ]
       }),
@@ -2213,8 +2061,8 @@
         eyebrow: "Judge Mode",
         title: "A simplified pitch view for problem, AI logic, and proof.",
         copy: "Judge Mode keeps the story focused on disaster coordination, volunteer assignment, donation flow, and public visibility.",
-        primary: '<button class="primary-button" type="button" data-action="seed-demo" data-scenario="cyclone" data-testid="judge-load-demo">Load Cyclone Demo</button>',
-        secondary: '<a class="ghost-button" href="./impact.html" data-testid="judge-open-impact">Impact Page</a>',
+        primary: '<a class="primary-button" href="./impact.html" data-testid="judge-open-impact">Impact Page</a>',
+        secondary: '<a class="ghost-button" href="./community.html" data-testid="judge-open-community">Community Portal</a>',
         sideCards: [
           miniCard("Problem", "Scattered requests and invisible coordination", "ResourceFlow centralizes requests, volunteers, donors, and admins in one response workspace."),
           miniCard("Solution", "Shared visibility + AI matching", "The feed below shows request intake, matching reasons, and quick map links.")
@@ -2357,7 +2205,7 @@
   function renderSatellitePanel(workspace) {
     const target = getSatelliteTarget(workspace);
     if (!target) {
-      return '<div class="empty-box">Load demo data to activate satellite review for the highest-priority location.</div>';
+      return '<div class="empty-box">Submit requests to activate satellite review for the highest-priority location.</div>';
     }
     return [
       '<article class="feed-card">',
@@ -2386,7 +2234,7 @@
 
   function renderBoostedSignal(prediction) {
     if (!prediction) {
-      return '<div class="empty-box">Load demo data to surface the current highest-risk request.</div>';
+      return '<div class="empty-box">Submit requests to surface the current highest-risk request.</div>';
     }
     return [
       '<article class="feed-card">',
@@ -2400,7 +2248,7 @@
 
   function renderBoostedPredictionCards(predictions) {
     if (!predictions.length) {
-      return '<div class="empty-box">Load demo data to calculate boosted request scores.</div>';
+      return '<div class="empty-box">Submit requests to calculate boosted request scores.</div>';
     }
     return predictions.slice(0, 5).map(function (prediction) {
       return [
@@ -2466,7 +2314,7 @@
 
   function renderRequestCards(items) {
     if (!items.length) {
-      return '<div class="empty-box">No active requests yet. Use Load Demo to bring in a fake disaster scenario.</div>';
+      return '<div class="empty-box">No active requests yet. Submit a real request to populate this space.</div>';
     }
     const workspace = getWorkspace();
     const session = getSession();
@@ -2510,7 +2358,7 @@
   }
   function renderVolunteerPreviewCards(items) {
     if (!items.length) {
-      return '<div class="empty-box">Load demo data to preview the volunteer network.</div>';
+      return '<div class="empty-box">Registered volunteers will appear here after sign-in.</div>';
     }
     return items.slice(0, 3).map(function (item) {
       return '<article class="feed-card"><div class="feed-card-head"><div><strong>' + escapeHtml(item.name) + '</strong><p class="feed-meta">' + escapeHtml(item.ngo) + '</p></div>' + renderStatus(item.availability) + '</div><p class="card-copy">' + escapeHtml(item.skills.join(", ")) + ' - ' + escapeHtml(item.location) + '</p><div class="feed-chip-row"><span class="feed-chip">' + escapeHtml(String(item.reliability || 72)) + '% reliable</span></div></article>';
@@ -2562,7 +2410,7 @@
 
   function renderScenarioOptions(selectedScenario) {
     const current = safeText(selectedScenario, 30).toLowerCase();
-    return ['<option value="none"' + (current === "none" ? " selected" : "") + '>No demo selected</option>'].concat(Object.keys(SCENARIO_PRESETS).map(function (key) {
+    return ['<option value="none"' + (current === "none" ? " selected" : "") + '>No scenario selected</option>'].concat(Object.keys(SCENARIO_PRESETS).map(function (key) {
       const preset = SCENARIO_PRESETS[key];
       return '<option value="' + escapeHtml(key) + '"' + (current === key ? " selected" : "") + '>' + escapeHtml(preset.label) + "</option>";
     })).join("");
@@ -2570,7 +2418,7 @@
 
   function renderImpactCards(workspace) {
     if (!workspace.requests.length) {
-      return '<div class="empty-box">Load demo data to turn the impact page into a real story.</div>';
+      return '<div class="empty-box">Submitted requests and completed assignments will turn the impact page into a real story.</div>';
     }
     return ["Requests entered through the community portal and became visible in the live feed.", "The AI matched volunteers based on skills, district, and current availability.", "Assignments were routed with quick map links so field teams could move immediately.", "Donation records gave admins a clear view of money and item support."].map(function (line) {
       return '<article class="feed-card"><p class="card-copy">' + escapeHtml(line) + "</p></article>";
@@ -2807,7 +2655,7 @@
     const points = fallbackAssignments.reduce(function (sum, item) { return sum + Number(item.points || 0); }, 0);
     const reliability = Math.max(68, Math.min(99, computeVolunteerReliability(sharedVolunteer || { name: session.name }, workspace.assignments) + archive.length * 2));
     return {
-      summary: assignments.length ? "You currently have " + activeTasks.length + " active task(s) and " + archive.length + " completed task(s) in the demo workspace." : "No personal assignments are linked yet, so the portal is showing the live volunteer opportunities from the current scenario.",
+      summary: assignments.length ? "You currently have " + activeTasks.length + " active task(s) and " + archive.length + " completed task(s) in the live workspace." : "No personal assignments are linked yet, so the portal is showing the live volunteer opportunities.",
       district: topDistrict(workspace) || "No district yet",
       personalAssignments: assignments.length,
       points: points,
@@ -2833,7 +2681,7 @@
 
   function buildInsightItems(workspace) {
     if (!workspace.requests.length) {
-      return [{ title: "Load demo data", meta: "No active scenario", copy: "Use the quick actions to load a flood, cyclone, or medical demo scenario." }];
+      return [{ title: "No active requests", meta: "Production workspace", copy: "Submit requests and register volunteers to build the live response story." }];
     }
     const topRequest = workspace.requests[0];
     const topPrediction = buildBoostedPredictionRows(workspace)[0] || null;
@@ -3917,12 +3765,9 @@
         if (!role) {
           return;
         }
-        if (detectDemoRole()) {
-          localStorage.setItem(PORTAL_SELECTION_KEY, role);
-        } else {
-          localStorage.removeItem(PORTAL_SELECTION_KEY);
-        }
+        localStorage.setItem(PORTAL_SELECTION_KEY, role);
         localStorage.setItem(PORTAL_HANDOFF_KEY, JSON.stringify({
+          role: role,
           requestedRole: role,
           createdAt: Date.now()
         }));
@@ -4525,10 +4370,10 @@
 
   function createAssignmentFromRequest(request, workspace, options) {
     const config = options && typeof options === "object" ? options : {};
-    const bestVolunteer = config.volunteer || pickBestVolunteerForRequest(request, workspace) || workspace.volunteers[0] || { name: "Volunteer pending", location: request.location, ngo: "ResourceFlow", origin: "demo" };
+    const bestVolunteer = config.volunteer || pickBestVolunteerForRequest(request, workspace) || workspace.volunteers[0] || { name: "Volunteer pending", location: request.location, ngo: "ResourceFlow", origin: "live" };
     const createdAt = nowIso();
     const stage = normalizeAssignmentStatus(config.status || "Accepted");
-    const volunteerOrigin = safeText(config.volunteerOrigin || bestVolunteer.origin || "demo", 20).toLowerCase() || "demo";
+    const volunteerOrigin = safeText(config.volunteerOrigin || bestVolunteer.origin || "live", 20).toLowerCase() || "live";
     return {
       id: "ASG-" + Math.floor(Math.random() * 900 + 100),
       requestId: request.id,
@@ -4545,9 +4390,9 @@
       startedAt: stage === "In Progress" || stage === "Completed" ? createdAt : "",
       completedAt: stage === "Completed" ? createdAt : "",
       estimatedDurationMinutes: Math.max(6, Number(config.estimatedDurationMinutes || request && request.estimatedDurationMinutes || estimatedDurationMinutes(request && request.priority, request && (request.source || request.origin)))),
-      origin: safeText(config.origin || request.origin || request.source || "demo", 30).toLowerCase(),
+      origin: safeText(config.origin || request.origin || request.source || "live", 30).toLowerCase(),
       volunteerOrigin: volunteerOrigin,
-      autoManaged: config.autoManaged == null ? volunteerOrigin === "demo" : Boolean(config.autoManaged),
+      autoManaged: config.autoManaged == null ? false : Boolean(config.autoManaged),
       supportLane: Boolean(config.supportLane),
       shiftCount: Number(config.shiftCount || 0),
       shifted: Boolean(config.shifted),
@@ -4561,12 +4406,18 @@
     const district = safeText(request.district, 80).toLowerCase();
     const keywords = CATEGORY_SKILLS[category] || [];
     const desiredOrigin = safeText(config.origin || "", 20).toLowerCase();
+    const excludedOrigins = Array.isArray(config.excludeOrigins)
+      ? config.excludeOrigins.map(function (item) { return safeText(item, 20).toLowerCase(); })
+      : [];
     const excluded = (config.excludeVolunteerNames || []).map(function (item) { return normalizeSearchQuery(item); });
     const requestLat = finiteNumber(request && request.lat);
     const requestLng = finiteNumber(request && request.lng);
     const candidates = workspace.volunteers.filter(function (volunteer) {
-      const origin = safeText(volunteer.origin || "demo", 20).toLowerCase();
+      const origin = safeText(volunteer.origin || "live", 20).toLowerCase();
       if (desiredOrigin && origin !== desiredOrigin) {
+        return false;
+      }
+      if (excludedOrigins.indexOf(origin) !== -1) {
         return false;
       }
       if (excluded.indexOf(normalizeSearchQuery(volunteer.name)) !== -1) {
@@ -4898,17 +4749,17 @@
     if (!assignment) {
       assignment = createAssignmentFromRequest(request, workspace, {
         volunteer: volunteer,
-        origin: request.source === "live" ? "live" : "demo",
+        origin: "live",
         volunteerOrigin: volunteer && volunteer.origin || "",
         status: action.targetStatus || "Accepted",
-        autoManaged: safeText(volunteer && volunteer.origin || "", 20).toLowerCase() === "demo"
+        autoManaged: false
       });
       workspace.assignments.unshift(assignment);
     }
     if (volunteer) {
       assignment.volunteer = volunteer.name;
-      assignment.volunteerOrigin = safeText(volunteer.origin || "demo", 20).toLowerCase() || "demo";
-      assignment.autoManaged = assignment.volunteerOrigin === "demo";
+      assignment.volunteerOrigin = safeText(volunteer.origin || "live", 20).toLowerCase() || "live";
+      assignment.autoManaged = false;
     }
     assignment.district = request.district;
     assignment.location = request.location;
@@ -5649,7 +5500,7 @@
       : "Load or refresh a scenario so the assistant can compare skills, district fit, and assignment pressure.";
     const nextAction = topPrediction
       ? (topPrediction.recommendation + (bestVolunteer ? (" Recommended responder: " + bestVolunteer.name + ".") : ""))
-      : "Load demo data, then ask again about the best volunteer fit.";
+      : "Add requests and volunteer profiles, then ask again about the best volunteer fit.";
     return formatCopilotSections(recommendation, whyNow, nextAction);
   }
 
@@ -5987,11 +5838,21 @@
     const handoff = loadJson(PORTAL_HANDOFF_KEY, {});
     const entryProfile = loadJson(ENTRY_PROFILE_KEY, {});
     const demoRole = detectDemoRole();
-    const requestedRole = normalizePortal(handoff.requestedRole || handoff.role || entryProfile.requestedRole);
-    const selected = demoRole ? normalizePortal(localStorage.getItem(PORTAL_SELECTION_KEY)) : "";
+    const urlRole = readPortalUrlRole();
+    const handoffRole = normalizePortal(handoff.role || handoff.requestedRole || entryProfile.role);
+    const requestedRole = normalizePortal(handoff.requestedRole || handoffRole || entryProfile.requestedRole);
+    const selected = urlRole || normalizePortal(localStorage.getItem(PORTAL_SELECTION_KEY));
     const approvedRole = AUTH_RUNTIME.user ? normalizePortalRole(AUTH_RUNTIME.role) : "";
-    const hasSession = Boolean(selected || requestedRole || demoRole || AUTH_RUNTIME.user || safeText(entryProfile.email || "", 160));
-    const role = selected || demoRole || approvedRole || "user";
+    const hasIdentity = Boolean(handoffRole || requestedRole || demoRole || AUTH_RUNTIME.user || safeText(entryProfile.email || "", 160));
+    const hasSession = Boolean(hasIdentity && (selected || handoffRole || requestedRole || demoRole || AUTH_RUNTIME.user));
+    const role = selected || handoffRole || demoRole || approvedRole || "user";
+    if (urlRole && urlRole === role) {
+      try {
+        localStorage.setItem(PORTAL_SELECTION_KEY, urlRole);
+      } catch (error) {
+        console.warn("Could not persist selected portal from URL.", error);
+      }
+    }
     const profiles = loadJson(PORTAL_PROFILE_KEY, {});
     const portalProfile = profiles[role] && typeof profiles[role] === "object" ? profiles[role] : {};
     return {
@@ -6003,6 +5864,14 @@
       profile: portalProfile,
       summary: (ROLE_CONFIG[role] || ROLE_CONFIG.user).description
     };
+  }
+
+  function readPortalUrlRole() {
+    try {
+      return normalizePortal(new URLSearchParams(window.location.search).get("portal"));
+    } catch (error) {
+      return "";
+    }
   }
 
   function detectDemoRole() {
@@ -6025,12 +5894,8 @@
   }
 
   function seedWorkspace(scenario) {
-    const nextWorkspace = buildScenarioWorkspace(scenario, getWorkspace());
-    saveWorkspace(nextWorkspace);
-    if (navigator.onLine && loadOfflineQueue().length) {
-      flushOfflineQueue({ silent: true });
-    }
-    setSyncStatus(canUseWorkspaceBackendSync() ? "queued" : "local", canUseWorkspaceBackendSync() ? "Demo workspace changes are queued for secure backend sync." : "Demo workspace loaded locally.");
+    void scenario;
+    setSyncStatus("production", "Demo data loading is disabled in production.");
   }
 
   function resetWorkspace() {
@@ -6400,13 +6265,8 @@
   }
 
   function buildScenarioWorkspace(scenario, existingWorkspace) {
-    const preset = SCENARIO_PRESETS[scenario] || SCENARIO_PRESETS.flood;
-    const cycleId = demoCycleId();
-    const generated = generateDemoScenarioState(preset, cycleId);
-    const workspace = mergeGeneratedScenarioWithLiveData(generated, existingWorkspace);
-    workspace.systemNotice = preset.label + " loaded. Admin and Government queues were refreshed with new pending entries.";
-    workspace.audit.unshift("AI refreshed the " + preset.label + " scenario and reprioritized the live queue.");
-    return enrichWorkspace(workspace);
+    void scenario;
+    return enrichWorkspace(existingWorkspace || EMPTY_WORKSPACE);
   }
 
   function generateDemoScenarioState(preset, cycleId) {
@@ -6457,14 +6317,14 @@
         district: safeText(anchor.district || item.location || "District", 80),
         availability: safeText(item.availability || "Available", 40),
         activityStatus: safeText(item.activityStatus || normalizedAvailability(item.availability || "available"), 40),
-        contact: safeText(item.contact || ("demo." + slugify(item.ngo || item.name || "volunteer") + "@resourceflow.demo"), 180),
+        contact: safeText(item.contact || "", 180),
         lat: Number.isFinite(lat) ? lat : 0,
         lng: Number.isFinite(lng) ? lng : 0,
         reliability: Number(item.reliability || 72 + index * 3),
         pointsEarned: 0,
         completedTasks: 0,
         attendanceDays: 1,
-        origin: "demo",
+        origin: "live",
         demoCycleId: cycleId
       };
     });
@@ -6493,8 +6353,8 @@
         shiftCount: 0,
         shifted: false,
         pointsAwarded: normalizedStatus === "Completed",
-        origin: "demo",
-        volunteerOrigin: "demo",
+        origin: "live",
+        volunteerOrigin: "live",
         source: "disaster-demo",
         demoCycleId: cycleId
       };
@@ -6508,7 +6368,7 @@
         status: normalizeDonationLifecycle(item.status || "Submitted"),
         createdAt: createdAt,
         updatedAt: createdAt,
-        origin: "demo",
+        origin: "live",
         source: "disaster-demo",
         demoCycleId: cycleId
       });
@@ -6637,26 +6497,9 @@
   }
 
   function maybeRefreshDemoWorkspace(workspace, options) {
-    const generatedAt = parseTimestamp(workspace.generatedAt || workspace.lastRefreshedAt);
-    if (!generatedAt || nowMs() - generatedAt < DEMO_REFRESH_MS) {
-      return { changed: false };
-    }
-    const refreshed = buildScenarioWorkspace(workspace.scenario, workspace);
-    workspace.scenario = refreshed.scenario;
-    workspace.label = refreshed.label;
-    workspace.summary = refreshed.summary;
-    workspace.requests = refreshed.requests;
-    workspace.assignments = refreshed.assignments;
-    workspace.volunteers = refreshed.volunteers;
-    workspace.donations = refreshed.donations;
-    workspace.audit = refreshed.audit;
-    workspace.outreach = refreshed.outreach;
-    workspace.systemNotice = refreshed.label + " auto-refreshed with a new 10-minute demo cycle.";
-    workspace.generatedAt = refreshed.generatedAt;
-    workspace.lastRefreshedAt = refreshed.lastRefreshedAt;
-    workspace.demoCycleId = refreshed.demoCycleId;
-    workspace.audit.unshift("AI cleared the old demo cycle and loaded a fresh randomized " + refreshed.label + " workspace.");
-    return { changed: true };
+    void workspace;
+    void options;
+    return { changed: false };
   }
 
   function applyRequestAutomation(workspace) {
@@ -6747,52 +6590,41 @@
 
   function createLifecycleAssignmentsForRequest(request, workspace) {
     const assignments = [];
-    const realVolunteer = pickBestVolunteerForRequest(request, workspace, { origin: "real" });
-    const demoVolunteer = pickBestVolunteerForRequest(request, workspace, {
-      origin: "demo",
-      excludeVolunteerNames: realVolunteer ? [realVolunteer.name] : []
-    });
+    const realVolunteer = pickBestVolunteerForRequest(request, workspace, { origin: "real" })
+      || pickBestVolunteerForRequest(request, workspace, { origin: "live" });
     if (request.source === "live") {
       if (realVolunteer) {
         assignments.push(createAssignmentFromRequest(request, workspace, {
           volunteer: realVolunteer,
           origin: "live",
-          volunteerOrigin: "real",
+          volunteerOrigin: safeText(realVolunteer.origin || "live", 20).toLowerCase() || "live",
           status: "Accepted",
           autoManaged: false
         }));
       }
-      if (demoVolunteer) {
-        assignments.push(createAssignmentFromRequest(request, workspace, {
-          volunteer: demoVolunteer,
-          origin: "live-support",
-          volunteerOrigin: "demo",
-          status: "Accepted",
-          autoManaged: true,
-          supportLane: true
-        }));
-      }
       if (!assignments.length) {
-        const fallbackVolunteer = pickBestVolunteerForRequest(request, workspace);
+        const fallbackVolunteer = pickBestVolunteerForRequest(request, workspace, { excludeOrigins: ["demo"] });
         if (fallbackVolunteer) {
+          const fallbackOrigin = safeText(fallbackVolunteer.origin || "live", 20).toLowerCase() || "live";
           assignments.push(createAssignmentFromRequest(request, workspace, {
             volunteer: fallbackVolunteer,
-            origin: "live-fallback",
-            volunteerOrigin: safeText(fallbackVolunteer.origin || "demo", 20).toLowerCase() || "demo",
+            origin: "live",
+            volunteerOrigin: fallbackOrigin,
             status: "Accepted",
-            autoManaged: safeText(fallbackVolunteer.origin || "demo", 20).toLowerCase() === "demo"
+            autoManaged: false
           }));
         }
       }
     } else {
-      const nearest = pickBestVolunteerForRequest(request, workspace, { origin: "demo" }) || pickBestVolunteerForRequest(request, workspace);
+      const nearest = pickBestVolunteerForRequest(request, workspace, { excludeOrigins: ["demo"] });
       if (nearest) {
+        const nearestOrigin = safeText(nearest.origin || "live", 20).toLowerCase() || "live";
         assignments.push(createAssignmentFromRequest(request, workspace, {
           volunteer: nearest,
-          origin: "demo",
-          volunteerOrigin: safeText(nearest.origin || "demo", 20).toLowerCase() || "demo",
+          origin: "live",
+          volunteerOrigin: nearestOrigin,
           status: "Accepted",
-          autoManaged: safeText(nearest.origin || "demo", 20).toLowerCase() === "demo"
+          autoManaged: false
         }));
       }
     }
@@ -6809,8 +6641,8 @@
     assignment.shiftCount = Number(assignment.shiftCount || 0) + 1;
     assignment.shifted = true;
     assignment.volunteer = nextVolunteer.name;
-    assignment.volunteerOrigin = safeText(nextVolunteer.origin || "demo", 20).toLowerCase() || "demo";
-    assignment.autoManaged = assignment.volunteerOrigin === "demo";
+    assignment.volunteerOrigin = safeText(nextVolunteer.origin || "live", 20).toLowerCase() || "live";
+    assignment.autoManaged = false;
     assignment.status = "Accepted";
     assignment.acceptedAt = nowIso();
     assignment.startedAt = "";
@@ -7312,7 +7144,7 @@
     const session = getSession();
     const lifecycleSection = '<article class="surface-card"><p class="section-label">Live Lifecycle</p><h2 class="section-title">Requests moving from intake to closure</h2>' + renderStatusBoard(workspace.requests) + '</article>';
     const districtSection = '<article class="surface-card"><p class="section-label">District Comparison</p><h2 class="section-title">Where the visible pressure is building</h2><div class="feed-list">' + renderDistrictComparisonCards(workspace) + '</div></article>';
-    const mapSection = renderMapStage(workspace, { eyebrow: "Live Impact Map", title: "Visible pressure zones and mapped requests", meta: workspace.label || "No demo loaded", location: firstMapLocation(workspace), summary: "Every card in the feed links back to a mappable location so teams can move from overview to action quickly." });
+    const mapSection = renderMapStage(workspace, { eyebrow: "Live Impact Map", title: "Visible pressure zones and mapped requests", meta: workspace.label || "Production workspace", location: firstMapLocation(workspace), summary: "Every card in the feed links back to a mappable location so teams can move from overview to action quickly." });
     const trackerSection = '<article id="communityTrackerSection" class="surface-card"><p class="section-label">Community Request Tracker</p><h2 class="section-title">Requests currently visible to the network</h2><div class="feed-list">' + renderCommunityTracker(workspace.requests) + '</div></article>';
     const activeNeedsSection = '<article class="surface-card"><div class="section-head"><div><p class="section-label">Active Needs</p><h2 class="section-title">Latest community requests</h2></div></div><div class="feed-list">' + renderRequestCards(workspace.requests) + '</div></article>';
     const aiMatchingSection = '<article class="surface-card"><p class="section-label">AI Matching Story</p><h2 class="section-title">How ResourceFlow explains the next step</h2><div class="feed-list">' + renderWorkflowCards(buildMatchingSteps(workspace)) + '</div></article>';
@@ -7322,7 +7154,7 @@
     const donationBreakdownSection = '<article class="surface-card"><p class="section-label">Donation Breakdown</p><h2 class="section-title">What support is already visible</h2><div class="feed-list">' + renderDonationBreakdownCards(workspace) + '</div></article>';
     const completionTrendSection = '<article class="surface-card"><p class="section-label">Completion Trend</p><h2 class="section-title">Progress across the active request lifecycle</h2><div class="feed-list">' + renderAnalyticsCards(buildLifecycleAnalytics(workspace)) + '</div></article>';
     return [
-      renderHero({ eyebrow: "Community Portal", title: "A public-facing response board that stays calm and readable.", copy: workspace.summary, primary: '<button class="primary-button" type="button" data-action="seed-demo" data-scenario="flood" data-testid="overview-load-demo">Load Flood Demo</button>', secondary: '<a class="ghost-button" href="./donations.html" data-testid="overview-donate">Donation Portal</a>', sideCards: [miniCard("Workspace", workspace.label || "No demo loaded", "A single community lane that shows urgent needs, support, and progress."), miniCard("Visible Spaces", "Community, Donations, AI Prediction", "Each portal stays visually separate while sharing one response story.")] }),
+      renderHero({ eyebrow: "Community Portal", title: "A public-facing response board that stays calm and readable.", copy: workspace.summary, primary: '<a class="primary-button" href="#communityRequestForm" data-testid="overview-raise-request">Raise Request</a>', secondary: '<a class="ghost-button" href="./donations.html" data-testid="overview-donate">Donation Portal</a>', sideCards: [miniCard("Workspace", workspace.label || "Production workspace", "A single community lane that shows urgent needs, support, and progress."), miniCard("Visible Spaces", "Community, Donations, AI Prediction", "Each portal stays visually separate while sharing one response story.")] }),
       renderActionTiles([{ label: "I Need Help", copy: "Raise an urgent community request", href: "#communityRequestForm", tone: "brand" }, { label: "I Want to Donate", copy: "Open money and item support", href: "./donations.html", tone: "outline" }, { label: "Track Requests", copy: "See live request movement", href: "#communityTrackerSection", tone: "muted" }, { label: "AI Prediction", copy: "Open the forecasting and matching view", href: "./insights.html", tone: "outline", testId: "overview-open-ai" }]),
       renderMetrics(workspaceMetrics(workspace)),
       renderWeightedColumns([{ weight: 2, markup: lifecycleSection }, { weight: 2, markup: districtSection }, { weight: 4, markup: mapSection }, { weight: 4, markup: trackerSection }, { weight: 4, markup: activeNeedsSection }, { weight: 3, markup: aiMatchingSection }, { weight: 2, markup: routeGroupsSection }, { weight: 4, markup: requestFormSection }, { weight: 3, markup: renderRequestLookupSection(workspace, session) }, { weight: 4, markup: renderTrackedRequestSection(workspace, session) }, { weight: 2, markup: responseStorySection }, { weight: 2, markup: donationBreakdownSection }, { weight: 2, markup: completionTrendSection }])
@@ -7348,9 +7180,9 @@
       renderHero({
         eyebrow: "Admin Dashboard",
         title: "Governance, live snapshot, and outreach in one admin control room.",
-        copy: "The admin lane combines local demo intelligence with shared Firestore-backed volunteer and donation management.",
-        primary: '<button class="primary-button" type="button" data-action="seed-demo" data-scenario="flood" data-testid="admin-load-demo">Load Demo</button>',
-        secondary: '<a class="ghost-button" href="./impact.html" data-testid="admin-open-impact">Public Impact</a>',
+        copy: "The admin lane combines shared Firestore-backed volunteer, donation, and workspace management.",
+        primary: '<a class="primary-button" href="./impact.html" data-testid="admin-open-impact">Public Impact</a>',
+        secondary: '<a class="ghost-button" href="./insights.html" data-testid="admin-open-insights">Open AI Insights</a>',
         sideCards: [
           miniCard("Governance Pulse", "Audit events, review queue, outreach drafts", "These cards stay high-contrast in light and dark mode."),
           miniCard("Visible Spaces", "Community, Volunteer, Donations, AI Prediction", "The portal menu keeps navigation compact while the live feed and widgets stay visible.")

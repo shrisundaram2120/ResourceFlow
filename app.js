@@ -401,11 +401,12 @@
       loadPortalProfiles();
       if (!state.demoSession && state.selectedPortalRole) {
         const entryProfile = loadEntryProfile();
+        const selectedRole = normalizeRole(state.selectedPortalRole || entryProfile.role || entryProfile.requestedRole || "user");
         state.userProfile = Object.assign({}, entryProfile, {
-          role: entryProfile.email ? "user" : "guest",
-          requestedRole: normalizeRole(entryProfile.requestedRole || state.selectedPortalRole || "user")
+          role: selectedRole,
+          requestedRole: normalizeRole(entryProfile.requestedRole || selectedRole || "user")
         });
-        state.role = entryProfile.email ? "user" : "guest";
+        state.role = selectedRole;
         state.authResolved = true;
       }
       loadOnboardingState();
@@ -454,12 +455,12 @@
         renderAll();
       });
     } catch (error) {
-      console.warn("Workspace bootstrap failed, falling back to local demo mode.", error);
+      console.warn("Workspace bootstrap failed, falling back to local mode.", error);
       state.authResolved = true;
       state.adapter = createLocalAdapter();
       state.storageMode = state.adapter.mode;
-      state.data = sanitizeState(createDemoState());
-      updateSyncStatus("Offline Ready", "Local demo workspace loaded immediately.");
+      state.data = sanitizeState(createEmptyState());
+      updateSyncStatus("Offline Ready", "Local workspace loaded without seeded data.");
       renderAll();
       bindPageHandlers();
       startInteractiveEnhancements();
@@ -1257,7 +1258,7 @@
 
       const db = window.firebase.firestore();
       const collectionId = config.collectionId || "resourceflow";
-      const workspaceId = config.workspaceId || "resourceflow-demo";
+      const workspaceId = config.workspaceId || "resourceflow-production";
       const docRef = db.collection(collectionId).doc(workspaceId);
 
       // Probe Firestore once so missing database or denied access falls back safely.
@@ -1273,18 +1274,9 @@
             return remoteState;
           }
 
-          const demo = createDemoState();
-          await docRef.set(
-            {
-              state: demo,
-              updatedAt: demo.lastUpdated,
-              updatedBy: state.clientId,
-              revision: demo.meta.revision
-            },
-            { merge: true }
-          );
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(demo));
-          return demo;
+          const empty = createEmptyState();
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(empty));
+          return empty;
         },
         async save(next) {
           localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
@@ -1329,22 +1321,17 @@
       async load() {
         const raw = localStorage.getItem(STORAGE_KEY);
         if (!raw) {
-          const seeded = createDemoState();
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(seeded));
-          return seeded;
+          const empty = createEmptyState();
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(empty));
+          return empty;
         }
         try {
           const parsed = sanitizeState(JSON.parse(raw));
-          if (isBlankWorkspace(parsed)) {
-            const seeded = createDemoState();
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(seeded));
-            return seeded;
-          }
           return parsed;
         } catch (error) {
-          const seeded = createDemoState();
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(seeded));
-          return seeded;
+          const empty = createEmptyState();
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(empty));
+          return empty;
         }
       },
       async save(next) {
@@ -1382,11 +1369,12 @@
         applyDemoSessionState();
       } else if (state.selectedPortalRole) {
         const entryProfile = loadEntryProfile();
+        const selectedRole = normalizeRole(state.selectedPortalRole || entryProfile.role || entryProfile.requestedRole || "user");
         state.userProfile = Object.assign({}, entryProfile, {
-          role: entryProfile.email ? "user" : "guest",
-          requestedRole: normalizeRole(entryProfile.requestedRole || state.selectedPortalRole || "user")
+          role: selectedRole,
+          requestedRole: normalizeRole(entryProfile.requestedRole || selectedRole || "user")
         });
-        state.role = entryProfile.email ? "user" : "guest";
+        state.role = selectedRole;
       } else {
         state.role = "guest";
         state.userProfile = null;
@@ -1465,15 +1453,15 @@
         urlRole = normalizeRole(new URLSearchParams(window.location.search).get("portal"));
       }
       const handoff = loadPortalHandoff();
-      handoffRequestedRole = handoff && handoff.requestedRole ? normalizeRole(handoff.requestedRole) : "";
+      handoffRequestedRole = handoff && (handoff.role || handoff.requestedRole) ? normalizeRole(handoff.role || handoff.requestedRole) : "";
       const stored = urlRole && urlRole !== "guest"
         ? urlRole
-        : (state.demoSession ? localStorage.getItem(PORTAL_SELECTION_KEY) : handoffRequestedRole);
+        : (localStorage.getItem(PORTAL_SELECTION_KEY) || handoffRequestedRole);
       state.selectedPortalRole = normalizeRole(stored);
       if (state.selectedPortalRole === "guest") {
         state.selectedPortalRole = "";
       }
-      if (state.demoSession && urlRole && urlRole !== "guest" && state.selectedPortalRole) {
+      if (urlRole && urlRole !== "guest" && state.selectedPortalRole) {
         localStorage.setItem(PORTAL_SELECTION_KEY, state.selectedPortalRole);
       }
     } catch (error) {
@@ -1494,12 +1482,13 @@
         localStorage.removeItem(PORTAL_HANDOFF_KEY);
         return null;
       }
-      const requestedRole = normalizeRole(parsed.requestedRole || parsed.role || "");
-      if (!requestedRole || requestedRole === "guest") {
+      const role = normalizeRole(parsed.role || parsed.requestedRole || "");
+      if (!role || role === "guest") {
         return null;
       }
       return {
-        requestedRole: requestedRole,
+        role: role,
+        requestedRole: normalizeRole(parsed.requestedRole || role),
         createdAt: createdAt
       };
     } catch (error) {
@@ -1532,7 +1521,6 @@
       const raw = localStorage.getItem(ENTRY_PROFILE_KEY);
       const parsed = raw ? JSON.parse(raw) : {};
       if (parsed && typeof parsed === "object") {
-        delete parsed.role;
         return parsed;
       }
       return {};
@@ -1543,6 +1531,9 @@
   }
 
   function activeAccessRole() {
+    if (state.selectedPortalRole) {
+      return normalizeRole(state.selectedPortalRole);
+    }
     if (state.demoSession) {
       return normalizeRole(state.role || "guest");
     }
@@ -1569,7 +1560,7 @@
 
   function persistSelectedPortal() {
     try {
-      if (state.demoSession && state.selectedPortalRole) {
+      if (state.selectedPortalRole) {
         localStorage.setItem(PORTAL_SELECTION_KEY, state.selectedPortalRole);
       } else {
         localStorage.removeItem(PORTAL_SELECTION_KEY);
@@ -1673,7 +1664,7 @@
         }
         state.demoSession = null;
         persistDemoSession();
-        state.role = "user";
+        state.role = normalizeRole(state.selectedPortalRole || state.role || "user");
         renderAuthUi();
         renderAll();
         maybeHandlePostAuthRouting();
@@ -1693,11 +1684,12 @@
           applyDemoSessionState();
         } else if (state.selectedPortalRole) {
           const entryProfile = loadEntryProfile();
+          const selectedRole = normalizeRole(state.selectedPortalRole || entryProfile.role || entryProfile.requestedRole || "user");
           state.userProfile = Object.assign({}, entryProfile, {
-            role: entryProfile.email ? "user" : "guest",
-            requestedRole: normalizeRole(entryProfile.requestedRole || state.selectedPortalRole || "user")
+            role: selectedRole,
+            requestedRole: normalizeRole(entryProfile.requestedRole || selectedRole || "user")
           });
-          state.role = entryProfile.email ? "user" : "guest";
+          state.role = selectedRole;
         } else {
           state.role = "guest";
           state.userProfile = null;
@@ -1932,7 +1924,6 @@
         '</form>',
         '<div class="screen-lock-secondary-actions">',
         '<button class="ghost-button" id="screenLockGoogle" type="button">Continue with Google</button>',
-        '<button class="ghost-button" id="screenLockDemo" type="button">Preview Demo Access</button>',
         '</div>',
         '<p id="screenLockFootnote" class="card-meta screen-lock-footnote">Use your email and password to enter the shared workspace. New accounts begin as community users until they choose a working portal.</p>',
         '</section>',
@@ -1968,10 +1959,6 @@
       }
       if (event.target.closest("#screenLockGoogle")) {
         signInWithGoogle();
-        return;
-      }
-      if (event.target.closest("#screenLockDemo")) {
-        openDemoRoleDialog();
         return;
       }
       if (event.target.closest("#screenLockClose")) {
@@ -2310,7 +2297,6 @@
       '<div class="button-row auth-primary-actions">',
       '<button class="primary-button" id="emailAuthSubmit" type="submit">Continue</button>',
       '<button class="ghost-button" id="emailAuthGoogleButton" type="button">Google Sign In</button>',
-      '<button class="ghost-button" id="emailAuthDemoButton" type="button">Use Demo Mode</button>',
       '</div>',
       '</form>',
       '<p class="card-meta" id="authModeFootnote">Use your email and password to enter the cloud workspace. New accounts start as volunteers unless an admin approves a higher role.</p>',
@@ -2354,12 +2340,9 @@
 
     const demoButton = document.getElementById("emailAuthDemoButton");
     if (demoButton) {
+      demoButton.hidden = true;
       demoButton.addEventListener("click", function () {
-        closeEmailAuthDialog();
-        openDemoRoleDialog();
-        if (state.pendingPortalRole) {
-          selectDemoRole(state.pendingPortalRole);
-        }
+        announceNotice("Demo mode is disabled for production. Please sign in with a real account.");
       });
     }
   }
@@ -2809,43 +2792,19 @@
   }
 
   function submitDemoLogin(form) {
-    const normalized = normalizeRole(state.pendingDemoRole || "government");
-    const emailInput = form.elements.namedItem("email");
-    const passwordInput = form.elements.namedItem("password");
-    const email = safeText(emailInput ? emailInput.value : "", 140);
-    const password = safeText(passwordInput ? passwordInput.value : "", 80);
-    if (!email || !password) {
-      announceNotice("Enter both email and password to continue.");
-      return;
-    }
-    startDemoSession(normalized, {
-      email: email,
-      displayName: deriveNameFromEmail(email)
-    });
+    void form;
+    announceNotice("Demo mode is disabled for production. Please sign in with a real account.");
   }
 
   function startDemoSession(role, overrides) {
-    const normalized = normalizeRole(role);
-    if (!DEMO_ROLE_PROFILES[normalized]) {
-      return;
-    }
-    state.user = null;
-    state.demoSession = createDemoSession(normalized, overrides);
-    state.role = normalized;
-    state.selectedPortalRole = "";
-    persistSelectedPortal();
-    state.userProfile = {
-      uid: state.demoSession.uid,
-      email: state.demoSession.email,
-      displayName: state.demoSession.displayName,
-      role: normalized,
-      requestedRole: normalized
-    };
+    void role;
+    void overrides;
+    state.demoSession = null;
     persistDemoSession();
     closeDemoRoleDialog();
     renderAuthUi();
     renderAll();
-    announceNotice("Signed in as " + titleCase(normalized) + " for the demo workspace.");
+    announceNotice("Demo mode is disabled for production. Please sign in with a real account.");
   }
 
   function redirectToPortal(role) {
@@ -4464,41 +4423,12 @@
   }
 
   async function seedDemo() {
-    if (!hasActiveSession()) {
-      announceNotice(getFirebaseConfig().enableAuth
-        ? "Sign in first to load the demo workspace."
-        : "Choose a demo role first to load the walkthrough data.");
-      return;
-    }
-    const scenario = readDemoScenarioControl();
-    state.data = createScenarioDemoState(scenario);
-    persistDemoScenario(scenario);
-    updateSyncStatus("Demo Loaded", scenarioTitle(scenario) + " sample records and assignments are ready for walkthrough.");
-    sendBrowserNotification("ResourceFlow demo ready", scenarioTitle(scenario) + " mode is loaded and ready for walkthrough.");
-    trackEvent("resourceflow_seed_demo", { scenario: scenario });
-    state.data = registerActivity(state.data, "system", "Loaded demo workspace data for walkthrough in " + scenarioTitle(scenario) + " mode.", currentActor());
-    if (typeof state.unsubscribeRemote === "function") {
-      state.unsubscribeRemote();
-      state.unsubscribeRemote = null;
-    }
-    state.adapter = createLocalAdapter();
-    state.storageMode = state.adapter.mode;
-    await state.adapter.save(state.data);
-    updateSyncStatus("Demo Loaded", scenarioTitle(scenario) + " sample records are loaded locally for this walkthrough.");
-    renderAll();
+    announceNotice("Demo data loading is disabled in production.");
+    updateSyncStatus("Production Ready", "No sample records were loaded.");
   }
 
   async function launchJudgeDemoMode() {
-    if (canManageWorkspace()) {
-      if (!state.data.requests.length) {
-        await seedDemo();
-      }
-    } else if (!state.data.requests.length) {
-      state.data = createScenarioDemoState(loadDemoScenario());
-      renderAll();
-    }
-    announceNotice("Judge demo mode: show Overview, Operations matching, AI Insights, then Judge Mode proof cards.");
-    sendBrowserNotification("Judge demo mode", "Walk through Overview, Operations, AI Insights, and Judge Mode in that order.");
+    announceNotice("Demo walkthrough mode is disabled in production.");
   }
 
   async function resetAll() {
@@ -7820,7 +7750,7 @@
     const storage = getStorageBucket();
     const artifactPath = [
       "resourceflow",
-      getFirebaseConfig().workspaceId || "resourceflow-demo",
+      getFirebaseConfig().workspaceId || "resourceflow-production",
       "artifacts",
       artifact.id + "-" + safeFileName(file.name)
     ].join("/");

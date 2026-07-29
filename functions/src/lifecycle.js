@@ -4,8 +4,8 @@ function normalizeWorkspaceState(input) {
   const next = input && typeof input === "object" ? input : {};
   return {
     scenario: safeText(next.scenario || "none", 40).toLowerCase(),
-    label: safeText(next.label || "No demo loaded", 120),
-    summary: safeText(next.summary || "Load demo data to see requests, assignments, donations, and AI matching in action.", 280),
+    label: safeText(next.label || "Production workspace", 120),
+    summary: safeText(next.summary || "No operational data has been submitted yet.", 280),
     requests: Array.isArray(next.requests) ? next.requests : [],
     volunteers: Array.isArray(next.volunteers) ? next.volunteers : [],
     assignments: Array.isArray(next.assignments) ? next.assignments : [],
@@ -14,7 +14,7 @@ function normalizeWorkspaceState(input) {
     activityLog: Array.isArray(next.activityLog) ? next.activityLog.slice(0, 60) : [],
     audit: Array.isArray(next.audit) ? next.audit.slice(0, 120) : [],
     outreach: Array.isArray(next.outreach) ? next.outreach.slice(0, 40) : [],
-    systemNotice: safeText(next.systemNotice || "Choose a scenario to populate the workspace.", 280),
+    systemNotice: safeText(next.systemNotice || "Live workspace is ready for production data.", 280),
     generatedAt: safeIso(next.generatedAt || new Date().toISOString()),
     lastRefreshedAt: safeIso(next.lastRefreshedAt || next.generatedAt || new Date().toISOString()),
     lastAutomationAt: safeText(next.lastAutomationAt || "", 80),

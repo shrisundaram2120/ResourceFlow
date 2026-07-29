@@ -5,23 +5,15 @@ service firebase.storage {
       return request.auth != null;
     }
 
-    function isAdminEmail() {
-      return signedIn()
-        && request.auth.token.email is string
-        && request.auth.token.email.lower() == "acshrisundaram@gmail.com";
-    }
-
-    function currentProfileRole() {
-      return signedIn() && firestore.exists(/databases/(default)/documents/resourceflowUsers/$(request.auth.uid))
-        ? firestore.get(/databases/(default)/documents/resourceflowUsers/$(request.auth.uid)).data.role
-        : "volunteer";
+    function currentClaimRole() {
+      return signedIn() && request.auth.token.role is string
+        ? request.auth.token.role
+        : "user";
     }
 
     function canManageWorkspace() {
-      return isAdminEmail()
-        || (signedIn() && (
-          currentProfileRole() == "admin" || currentProfileRole() == "coordinator"
-        ));
+      return signedIn()
+        && currentClaimRole() in ["admin", "coordinator", "government"];
     }
 
     function allowedArtifactType() {

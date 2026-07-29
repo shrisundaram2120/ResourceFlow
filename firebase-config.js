@@ -8,7 +8,7 @@ window.RESOURCEFLOW_FIREBASE_CONFIG = {
   appId: "1:331886592261:web:80c0e2512051c20fa0376c",
   measurementId: "G-4ZPLMJNMBN",
   collectionId: "resourceflow",
-  workspaceId: "resourceflow-demo",
+  workspaceId: "resourceflow-production",
   functionsRegion: "us-central1",
   secureBackendEnabled: true,
   lifecycleBackendEnabled: true,
@@ -48,7 +48,7 @@ window.RESOURCEFLOW_FIREBASE_CONFIG = {
   appCheckSiteKey: "",
   // Real privileged access comes from Firebase custom claims issued by Cloud Functions.
   // These email lists only help the UI explain which users should request elevated roles.
-  adminEmails: ["acshrisundaram@gmail.com"],
+  adminEmails: [],
   coordinatorEmails: []
 };
 

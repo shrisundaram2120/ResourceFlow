@@ -22,8 +22,7 @@ const db = admin.firestore();
 const auth = admin.auth();
 const region = process.env.FUNCTIONS_REGION || "us-central1";
 const workspaceCollection = process.env.DEFAULT_WORKSPACE_COLLECTION || "resourceflow";
-const workspaceId = process.env.DEFAULT_WORKSPACE_ID || "resourceflow-demo";
-const DEMO_REFRESH_MS = 10 * 60 * 1000;
+const workspaceId = process.env.DEFAULT_WORKSPACE_ID || "resourceflow-production";
 
 exports.bootstrapAdmin = onCall({ region: region }, async (request) => {
   ensureSignedIn(request);
@@ -518,8 +517,8 @@ async function loadWorkspaceState() {
   if (!snapshot.exists || !snapshot.data() || !snapshot.data().state) {
     return {
       scenario: "none",
-      label: "No demo loaded",
-      summary: "Load demo data to see requests, assignments, donations, and AI matching in action.",
+      label: "Production workspace",
+      summary: "No operational data has been submitted yet.",
       requests: [],
       volunteers: [],
       assignments: [],
@@ -528,7 +527,7 @@ async function loadWorkspaceState() {
       activityLog: [],
       audit: [],
       outreach: [],
-      systemNotice: "Choose a scenario to populate the workspace.",
+      systemNotice: "Live workspace is ready for production data.",
       generatedAt: new Date().toISOString(),
       lastRefreshedAt: new Date().toISOString(),
       lastAutomationAt: "",
@@ -549,8 +548,8 @@ function normalizeWorkspaceState(input) {
   const next = input && typeof input === "object" ? input : {};
   return {
     scenario: safeText(next.scenario || "none", 40).toLowerCase(),
-    label: safeText(next.label || "No demo loaded", 120),
-    summary: safeText(next.summary || "Load demo data to see requests, assignments, donations, and AI matching in action.", 280),
+    label: safeText(next.label || "Production workspace", 120),
+    summary: safeText(next.summary || "No operational data has been submitted yet.", 280),
     requests: Array.isArray(next.requests) ? next.requests : [],
     volunteers: Array.isArray(next.volunteers) ? next.volunteers : [],
     assignments: Array.isArray(next.assignments) ? next.assignments : [],
@@ -559,7 +558,7 @@ function normalizeWorkspaceState(input) {
     activityLog: Array.isArray(next.activityLog) ? next.activityLog.slice(0, 60) : [],
     audit: Array.isArray(next.audit) ? next.audit.slice(0, 120) : [],
     outreach: Array.isArray(next.outreach) ? next.outreach.slice(0, 40) : [],
-    systemNotice: safeText(next.systemNotice || "Choose a scenario to populate the workspace.", 280),
+    systemNotice: safeText(next.systemNotice || "Live workspace is ready for production data.", 280),
     generatedAt: safeIso(next.generatedAt || new Date().toISOString()),
     lastRefreshedAt: safeIso(next.lastRefreshedAt || next.generatedAt || new Date().toISOString()),
     lastAutomationAt: safeText(next.lastAutomationAt || "", 80),
@@ -654,7 +653,7 @@ function processWorkspaceLifecycleState(state, options) {
 function normalizeLifecycleWorkspace(state) {
   const workspace = normalizeWorkspaceState(state);
   workspace.requests = (workspace.requests || []).map(function (item, index) {
-    const source = safeText(item.source || item.origin || (workspace.scenario !== "none" ? "disaster-demo" : "live"), 40).toLowerCase();
+    const source = safeText(item.source || item.origin || "live", 40).toLowerCase();
     const priority = safeText(item.priority || "Medium", 40);
     const createdAt = safeIso(item.createdAt || item.requestedAt || new Date().toISOString());
     return Object.assign({}, item, {
@@ -665,7 +664,7 @@ function normalizeLifecycleWorkspace(state) {
       priority: priority,
       status: normalizeLifecycleRequestStatus(item.status || "Pending"),
       source: source === "demo" ? "disaster-demo" : source,
-      origin: safeText(item.origin || (source === "live" ? "live" : "demo"), 20).toLowerCase() || "demo",
+      origin: safeText(item.origin || "live", 20).toLowerCase() || "live",
       requester: safeText(item.requester || "Community Network", 140),
       beneficiaries: Number(item.beneficiaries || 0),
       complexity: inferLifecycleComplexity(priority),
@@ -687,7 +686,7 @@ function normalizeLifecycleWorkspace(state) {
       activityStatus: safeText(item.activityStatus || item.availability || "available", 40),
       ngo: safeText(item.ngo || item.ngoGroup || "Relief Network", 120),
       contact: safeText(item.contact || item.email || item.phone || "", 180),
-      origin: safeText(item.origin || "demo", 20).toLowerCase() || "demo",
+      origin: safeText(item.origin || "live", 20).toLowerCase() || "live",
       pointsEarned: Number(item.pointsEarned || 0),
       completedTasks: Number(item.completedTasks || 0),
       reliability: Number(item.reliability || 72),
@@ -715,8 +714,8 @@ function normalizeLifecycleWorkspace(state) {
       autoManaged: Boolean(item.autoManaged),
       points: Number(item.points || 0),
       pointsAwarded: Boolean(item.pointsAwarded),
-      origin: safeText(item.origin || "demo", 20).toLowerCase() || "demo",
-      volunteerOrigin: safeText(item.volunteerOrigin || "demo", 20).toLowerCase() || "demo"
+      origin: safeText(item.origin || "live", 20).toLowerCase() || "live",
+      volunteerOrigin: safeText(item.volunteerOrigin || "live", 20).toLowerCase() || "live"
     });
   });
   workspace.donations = (workspace.donations || []).map(function (item, index) {
@@ -727,39 +726,18 @@ function normalizeLifecycleWorkspace(state) {
       status: safeText(item.status || "Submitted", 40),
       createdAt: safeIso(item.createdAt || new Date().toISOString()),
       updatedAt: safeIso(item.updatedAt || item.createdAt || new Date().toISOString()),
-      origin: safeText(item.origin || (workspace.scenario !== "none" ? "demo" : "live"), 20).toLowerCase() || "demo"
+      origin: safeText(item.origin || "live", 20).toLowerCase() || "live"
     });
   });
   workspace.audit = Array.isArray(workspace.audit) ? workspace.audit.slice(0, 120).map(function (item) { return safeText(item, 240); }) : [];
-  workspace.systemNotice = safeText(workspace.systemNotice || "Choose a scenario to populate the workspace.", 280);
+  workspace.systemNotice = safeText(workspace.systemNotice || "Live workspace is ready for production data.", 280);
   return workspace;
 }
 
 function maybeRefreshDemoCycle(workspace, actor) {
-  if (safeText(workspace.scenario, 40).toLowerCase() === "none") {
-    return false;
-  }
-  const generatedAt = Date.parse(workspace.generatedAt || workspace.lastRefreshedAt || 0);
-  if (!generatedAt || (Date.now() - generatedAt) < DEMO_REFRESH_MS) {
-    return false;
-  }
-  const cycleStamp = new Date().toISOString();
-  workspace.demoCycleId = "demo-" + Date.now();
-  workspace.generatedAt = cycleStamp;
-  workspace.lastRefreshedAt = cycleStamp;
-  workspace.requests = workspace.requests
-    .filter(function (item) { return safeText(item.origin, 20).toLowerCase() !== "demo"; })
-    .concat(randomizeDemoRequests(workspace.scenario, workspace.demoCycleId));
-  workspace.assignments = workspace.assignments.filter(function (item) {
-    return safeText(item.origin, 20).toLowerCase() !== "demo" && safeText(item.origin, 20).toLowerCase() !== "live-support";
-  });
-  workspace.donations = workspace.donations
-    .filter(function (item) { return safeText(item.origin, 20).toLowerCase() !== "demo"; })
-    .concat(randomizeDemoDonations(workspace.scenario, workspace.demoCycleId));
-  workspace.systemNotice = safeText(workspace.label || "Demo workspace", 120) + " auto-refreshed with a new 10-minute demo cycle.";
-  workspace.audit.unshift("AI refreshed the demo workspace for " + safeText(workspace.label || workspace.scenario, 120) + ".");
-  workspace.activityLog = buildNextActivity(workspace.activityLog, "automation", "AI refreshed the demo workspace with new randomized entries.", actor);
-  return true;
+  void workspace;
+  void actor;
+  return false;
 }
 
 function applyLifecycleRequestAutomation(workspace, actor) {
@@ -860,37 +838,37 @@ function recalculateLifecycleVolunteerProfiles(workspace) {
 
 function createLifecycleAssignments(request, workspace) {
   const assignments = [];
-  const realVolunteer = pickLifecycleVolunteer(request, workspace, { origin: "real" });
-  const demoVolunteer = pickLifecycleVolunteer(request, workspace, {
-    origin: "demo",
-    excludeVolunteerNames: realVolunteer ? [realVolunteer.name] : []
-  });
+  const realVolunteer = pickLifecycleVolunteer(request, workspace, { origin: "real" })
+    || pickLifecycleVolunteer(request, workspace, { origin: "live" });
   if (request.source === "live") {
     if (realVolunteer) {
       assignments.push(buildLifecycleAssignment(request, realVolunteer, {
         origin: "live",
-        volunteerOrigin: "real",
+        volunteerOrigin: safeText(realVolunteer.origin || "live", 20).toLowerCase() || "live",
         status: "Accepted",
         autoManaged: false
       }));
     }
-    if (demoVolunteer) {
-      assignments.push(buildLifecycleAssignment(request, demoVolunteer, {
-        origin: "live-support",
-        volunteerOrigin: "demo",
-        status: "Accepted",
-        autoManaged: true,
-        supportLane: true
-      }));
+    if (!assignments.length) {
+      const fallbackVolunteer = pickLifecycleVolunteer(request, workspace, { excludeOrigins: ["demo"] });
+      if (fallbackVolunteer) {
+        assignments.push(buildLifecycleAssignment(request, fallbackVolunteer, {
+          origin: "live",
+          volunteerOrigin: safeText(fallbackVolunteer.origin || "live", 20).toLowerCase() || "live",
+          status: "Accepted",
+          autoManaged: false
+        }));
+      }
     }
   } else {
-    const nearest = demoVolunteer || realVolunteer || pickLifecycleVolunteer(request, workspace, {});
+    const nearest = realVolunteer || pickLifecycleVolunteer(request, workspace, { excludeOrigins: ["demo"] });
     if (nearest) {
+      const nearestOrigin = safeText(nearest.origin || "live", 20).toLowerCase() || "live";
       assignments.push(buildLifecycleAssignment(request, nearest, {
-        origin: "demo",
-        volunteerOrigin: safeText(nearest.origin || "demo", 20).toLowerCase() || "demo",
+        origin: "live",
+        volunteerOrigin: nearestOrigin,
         status: "Accepted",
-        autoManaged: safeText(nearest.origin || "demo", 20).toLowerCase() === "demo"
+        autoManaged: false
       }));
     }
   }
@@ -901,6 +879,9 @@ function pickLifecycleVolunteer(request, workspace, options) {
   const filters = options && typeof options === "object" ? options : {};
   const excluded = Array.isArray(filters.excludeVolunteerNames) ? filters.excludeVolunteerNames.map(normalizeLifecycleSearch) : [];
   const targetOrigin = safeText(filters.origin || "", 20).toLowerCase();
+  const excludedOrigins = Array.isArray(filters.excludeOrigins)
+    ? filters.excludeOrigins.map(function (item) { return safeText(item, 20).toLowerCase(); })
+    : [];
   const requestDistrict = normalizeLifecycleSearch(request && (request.district || request.zone || request.location));
   const requestSkills = normalizeLifecycleSkills(request && request.category).concat(normalizeLifecycleSkills(request && request.title));
   const candidates = (workspace.volunteers || []).filter(function (volunteer) {
@@ -908,6 +889,9 @@ function pickLifecycleVolunteer(request, workspace, options) {
       return false;
     }
     if (targetOrigin && safeText(volunteer.origin, 20).toLowerCase() !== targetOrigin) {
+      return false;
+    }
+    if (excludedOrigins.indexOf(safeText(volunteer.origin || "live", 20).toLowerCase()) !== -1) {
       return false;
     }
     if (excluded.indexOf(normalizeLifecycleSearch(volunteer.name)) >= 0) {
@@ -953,8 +937,8 @@ function buildLifecycleAssignment(request, volunteer, options) {
     autoManaged: Boolean(settings.autoManaged),
     points: computeLifecycleTaskPoints(request.priority || "Medium", 0),
     pointsAwarded: false,
-    origin: safeText(settings.origin || request.origin || "demo", 20).toLowerCase() || "demo",
-    volunteerOrigin: safeText(settings.volunteerOrigin || volunteer && volunteer.origin || "demo", 20).toLowerCase() || "demo"
+    origin: safeText(settings.origin || request.origin || "live", 20).toLowerCase() || "live",
+    volunteerOrigin: safeText(settings.volunteerOrigin || volunteer && volunteer.origin || "live", 20).toLowerCase() || "live"
   };
 }
 
@@ -968,8 +952,8 @@ function shiftLifecycleAssignment(assignment, request, workspace, actor) {
   assignment.shiftCount = Number(assignment.shiftCount || 0) + 1;
   assignment.shifted = true;
   assignment.volunteer = nextVolunteer.name;
-  assignment.volunteerOrigin = safeText(nextVolunteer.origin || "demo", 20).toLowerCase() || "demo";
-  assignment.autoManaged = assignment.volunteerOrigin === "demo";
+  assignment.volunteerOrigin = safeText(nextVolunteer.origin || "live", 20).toLowerCase() || "live";
+  assignment.autoManaged = false;
   assignment.status = "Accepted";
   assignment.acceptedAt = new Date().toISOString();
   assignment.startedAt = "";
@@ -1163,59 +1147,15 @@ function buildLifecycleShiftLine(assignment, nextVolunteer, request) {
 }
 
 function randomizeDemoRequests(scenario, cycleId) {
-  const districts = scenario === "cyclone" ? ["Nagapattinam", "Cuddalore"] : scenario === "medical" ? ["Chennai", "Kolkata"] : ["Chennai", "Nagapattinam"];
-  const categories = scenario === "cyclone"
-    ? ["Shelter", "Community Alert", "Medical"]
-    : scenario === "medical"
-      ? ["Medical", "Food", "Transport"]
-      : ["Food", "Shelter", "Medical"];
-  const titles = scenario === "cyclone"
-    ? ["Pre-position shelter kits", "Move shelter mattresses", "Harbor warning support"]
-    : scenario === "medical"
-      ? ["Triage desk support", "Medicine staging support", "Transport patient supplies"]
-      : ["Emergency food kits", "Harbor warning outreach", "Medicine staging support"];
-  return titles.map(function (title, index) {
-    const district = districts[index % districts.length];
-    const priority = index === 0 ? "High" : index === 1 ? "Medium" : "Critical";
-    const createdAt = new Date(Date.now() - (index + 1) * 4 * 60000).toISOString();
-    return {
-      id: "REQ-" + safeText(scenario, 24) + "-" + (index + 1) + "-" + cycleId.slice(-4),
-      title: title,
-      category: categories[index % categories.length],
-      district: district,
-      location: district + " response point",
-      beneficiaries: 80 + (index * 40),
-      priority: priority,
-      status: "Pending",
-      summary: title + " auto-generated for the new demo cycle.",
-      source: "disaster-demo",
-      origin: "demo",
-      priorityLane: "disaster-demo",
-      requester: "Disaster Demo",
-      complexity: inferLifecycleComplexity(priority),
-      estimatedDurationMinutes: estimateLifecycleDuration(priority, "disaster-demo"),
-      createdAt: createdAt,
-      requestedAt: createdAt,
-      updatedAt: createdAt,
-      broadcastTo: ["admin", "government"]
-    };
-  });
+  void scenario;
+  void cycleId;
+  return [];
 }
 
 function randomizeDemoDonations(scenario, cycleId) {
-  const donors = ["Harbor Traders Forum", "Relief Supplies Hub", "CareLink Trust"];
-  return donors.map(function (donor, index) {
-    const createdAt = new Date(Date.now() - (index + 1) * 6 * 60000).toISOString();
-    return {
-      id: "DON-" + safeText(scenario, 24) + "-" + (index + 1) + "-" + cycleId.slice(-4),
-      donor: donor,
-      kind: index === 0 ? "money" : "item",
-      status: "Submitted",
-      createdAt: createdAt,
-      updatedAt: createdAt,
-      origin: "demo"
-    };
-  });
+  void scenario;
+  void cycleId;
+  return [];
 }
 
 function buildWorkspacePrompt(workspace, requestedPrompt) {
